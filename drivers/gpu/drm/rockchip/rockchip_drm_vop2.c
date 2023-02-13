@@ -7838,6 +7838,9 @@ vop2_crtc_mode_valid(struct drm_crtc *crtc, const struct drm_display_mode *mode)
 	if (vp->splice_mode_right)
 		return MODE_BAD;
 
+	if (mode->flags & DRM_MODE_FLAG_INTERLACE)
+		return MODE_BAD;
+
 	if ((active_vp_mask & BIT(ROCKCHIP_VOP_VP1)) && !vcstate->splice_mode &&
 	    mode->hdisplay > VOP2_MAX_VP_OUTPUT_WIDTH) {
 		DRM_DEV_DEBUG(vop2->dev, "can not support resolution %dx%d, vp1 is busy\n",
