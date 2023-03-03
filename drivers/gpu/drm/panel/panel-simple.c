@@ -88,7 +88,7 @@ extern int tinker_mcu_ili9881c_set_bright(int bright, int dsi_id);
 extern int tinker_mcu_ili9881c_screen_power_up(int dsi_id);
 extern int tinker_mcu_ili9881c_screen_power_off(int dsi_id);
 extern int tinker_mcu_ili9881c_is_connected(int dsi_id);
-//extern void tinker_ft5406_start_polling(int dsi_id);
+extern void tinker_ft5406_start_polling(int dsi_id);
 
 extern int lcd_size_flag[2];
 #endif
@@ -707,7 +707,7 @@ static int panel_simple_prepare(struct drm_panel *panel)
 	if (tinker_mcu_ili9881c_is_connected(p->dsi_id)) {
 		printk("tinker_mcu_ili9881c_screen_power_up\n");
 		tinker_mcu_ili9881c_screen_power_up(p->dsi_id);
-		//tinker_ft5406_start_polling(p->dsi_id);
+		tinker_ft5406_start_polling(p->dsi_id);
 	}
 /*
 	if (lt9211_is_connected()) {
@@ -823,7 +823,7 @@ static int panel_simple_enable(struct drm_panel *panel)
 		tinker_mcu_screen_power_up(p->dsi_id);
 
 		panel_simple_sleep(20);
-		//tinker_ft5406_start_polling(p->dsi_id);
+		tinker_ft5406_start_polling(p->dsi_id);
 	}
 
 	if (lt9211_is_connected()) {

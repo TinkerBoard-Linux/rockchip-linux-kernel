@@ -1387,4 +1387,11 @@ config TOUCHSCREEN_ILITEK
         help
           Control Ilitek touch ic.
 
+config TOUCHSCREEN_TINKER_FT5406
+	tristate "tinker ft5406"
+	default y
+	depends on I2C
+	help
+	  Control ft5406 touch ic.
+
 endif
