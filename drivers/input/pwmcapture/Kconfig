@@ -1,0 +1,11 @@
+# ASUS PWM capture mode driver configuration
+
+menu "ASUS PWM Capture Mode Driver"
+
+config ASUS_PWM_CAPTURE
+	tristate "asus pwm capture"
+	default n
+	help
+	Say Y here, will suport asus pwm catpure mode.
+
+endmenu
