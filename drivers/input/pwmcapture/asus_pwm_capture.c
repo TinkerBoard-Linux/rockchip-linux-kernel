@@ -19,6 +19,45 @@
 #include <linux/slab.h>
 #include "asus_pwm_capture.h"
 
+static int latest_freq_hz ;
+static int latest_high_point;
+static int latest_low_point ;
+
+static struct kobject *getpwm_kob;
+
+static ssize_t get_pwm_freq_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", latest_freq_hz);
+
+}
+
+static ssize_t get_pwm_high_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", latest_high_point);
+
+}
+
+static ssize_t get_pwm_low_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", latest_low_point);
+
+}
+
+static struct kobj_attribute get_pwm_freq_attribute = __ATTR(get_pwm_freq, 0444, get_pwm_freq_show, NULL);
+static struct kobj_attribute get_pwm_high_attribute = __ATTR(get_pwm_high, 0444, get_pwm_high_show, NULL);
+static struct kobj_attribute get_pwm_low_attribute = __ATTR(get_pwm_low, 0444, get_pwm_low_show, NULL);
+
+static struct attribute *getpwm_attrs[] = {
+	&get_pwm_freq_attribute.attr,
+	&get_pwm_high_attribute.attr,
+	&get_pwm_low_attribute.attr,
+	NULL,
+};
+
+static struct attribute_group attr_group = {
+	.attrs = getpwm_attrs,
+};
+
 struct asus_capture_data {
 	void __iomem *base;
 	int state;
@@ -72,7 +111,6 @@ static irqreturn_t asus_pwm_capture_irq(int irq, void *dev_id)
 	int val;
 	int temp_hpr;
 	int temp_lpr;
-	int temp_freq_hz;
 	unsigned int id = drvData->asus_pwm_id;
 
 	if (id > 3)
@@ -87,8 +125,10 @@ static irqreturn_t asus_pwm_capture_irq(int irq, void *dev_id)
 		temp_lpr = readl_relaxed(drvData->base + PWM_REG_LPR);
 		//pr_info("lpr=%d\n", temp_lpr);
 		drvData->temp_period = drvData->pwm_freq_pstime * (temp_hpr + temp_lpr) / 1000;
-		temp_freq_hz = 1000000000 / drvData->temp_period;
-		//pr_info("freq=%d\n", temp_freq_hz);
+		latest_high_point = temp_hpr;
+		latest_low_point = temp_lpr;
+		latest_freq_hz = 1000000000 / drvData->temp_period;
+		//pr_info("freq=%d\n", latest_freq_hz);
 	}
 	writel_relaxed(PWM_CH_INT(id), drvData->base + PWM_REG_INTSTS(id));
 	if (drvData->state == RMC_PRELOAD)
@@ -330,6 +370,15 @@ static int asus_pwm_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "Controller support pwm capture\n");
 		goto end;
 	}
+
+	getpwm_kob = kobject_create_and_add("pwmcapture_sysfs", kernel_kobj);
+	if (!getpwm_kob)
+		return -ENOMEM;
+
+	ret = sysfs_create_group(getpwm_kob, &attr_group);
+	if (ret)
+		kobject_put(getpwm_kob);
+
 	pr_info("asus rk3568 pwm capture mode init success!\n");
 end:
 	return 0;
@@ -342,6 +391,11 @@ error_clk:
 	return ret;
 }
 
+static int asus_pwm_remove(struct platform_device *pdev)
+{
+	kobject_put(getpwm_kob);
+	return 0;
+}
 static const struct of_device_id asus_pwm_of_match[] = {
 	{ .compatible =  "asus,pwm-capture"},
 	{ }
@@ -354,6 +408,7 @@ static struct platform_driver asus_pwm_driver = {
 		.name = "asus-pwm-capture",
 		.of_match_table = asus_pwm_of_match,
 	},
+	.remove = asus_pwm_remove,
 };
 
 module_platform_driver_probe(asus_pwm_driver, asus_pwm_probe);
