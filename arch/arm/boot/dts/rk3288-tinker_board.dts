@@ -173,7 +173,7 @@
 		#clock-cells = <0>;
 	};
 
-	gpio-leds {
+	gpio_leds: gpio-leds {
 		compatible = "gpio-leds";
 
 		pwr-led {
