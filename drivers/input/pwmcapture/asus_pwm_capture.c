@@ -31,6 +31,13 @@ static ssize_t get_pwm_freq_show(struct kobject *kobj, struct kobj_attribute *at
 
 }
 
+static ssize_t reset_pwm_freq(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t n)
+{
+	if (*(buf) == '0')
+		latest_freq_hz = 0;
+	return n;
+}
+
 static ssize_t get_pwm_high_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
 {
 	return sprintf(buf, "%d\n", latest_high_point);
@@ -43,12 +50,12 @@ static ssize_t get_pwm_low_show(struct kobject *kobj, struct kobj_attribute *att
 
 }
 
-static struct kobj_attribute get_pwm_freq_attribute = __ATTR(get_pwm_freq, 0444, get_pwm_freq_show, NULL);
+static struct kobj_attribute pwm_freq_attribute = __ATTR(pwm_freq, 0644, get_pwm_freq_show, reset_pwm_freq);
 static struct kobj_attribute get_pwm_high_attribute = __ATTR(get_pwm_high, 0444, get_pwm_high_show, NULL);
 static struct kobj_attribute get_pwm_low_attribute = __ATTR(get_pwm_low, 0444, get_pwm_low_show, NULL);
 
 static struct attribute *getpwm_attrs[] = {
-	&get_pwm_freq_attribute.attr,
+	&pwm_freq_attribute.attr,
 	&get_pwm_high_attribute.attr,
 	&get_pwm_low_attribute.attr,
 	NULL,
