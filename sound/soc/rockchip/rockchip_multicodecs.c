@@ -43,6 +43,8 @@
 #define DEFAULT_MCLK_FS	256
 #define DAI_FMT_BASE	(SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF)
 
+int jack_connection_status;
+
 struct adc_keys_button {
 	u32 voltage;
 	u32 keycode;
@@ -227,11 +229,13 @@ static void adc_jack_handler(struct work_struct *work)
 	int adc, ret = 0;
 
 	if (!gpiod_get_value(mc_data->hp_det_gpio)) {
-		snd_soc_jack_report(jack_headset, 0, SND_JACK_HEADSET);
+		snd_soc_jack_report(jack_headset, SND_JACK_HEADPHONE, SND_JACK_HEADSET);
 		extcon_set_state_sync(mc_data->extcon,
 				EXTCON_JACK_HEADPHONE, false);
 		extcon_set_state_sync(mc_data->extcon,
 				EXTCON_JACK_MICROPHONE, false);
+		jack_connection_status = 0;
+
 		if (mc_data->poller)
 			mc_keys_poller_stop(mc_data->poller);
 
@@ -242,6 +246,7 @@ static void adc_jack_handler(struct work_struct *work)
 		snd_soc_jack_report(jack_headset, SND_JACK_HEADPHONE, SND_JACK_HEADSET);
 		extcon_set_state_sync(mc_data->extcon, EXTCON_JACK_HEADPHONE, true);
 		extcon_set_state_sync(mc_data->extcon, EXTCON_JACK_MICROPHONE, false);
+		jack_connection_status = 1;
 		return;
 	}
 	ret = iio_read_channel_processed(mc_data->adc, &adc);
@@ -264,6 +269,8 @@ static void adc_jack_handler(struct work_struct *work)
 		}
 	}
 };
+
+EXPORT_SYMBOL(jack_connection_status);
 
 static irqreturn_t headset_det_irq_thread(int irq, void *data)
 {
