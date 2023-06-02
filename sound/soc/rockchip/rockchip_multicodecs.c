@@ -228,6 +228,25 @@ static void adc_jack_handler(struct work_struct *work)
 	struct snd_soc_jack *jack_headset = mc_data->jack_headset;
 	int adc, ret = 0;
 
+	char *envp[] = {
+		"HOME=/",
+		"TERM=linux",
+		"PATH=/sbin:/usr/sbin:/bin:/usr/bin",
+		NULL,
+	};
+	//plug-out
+	char *argv_0[] = {
+		"/etc/pulse/jack_hotplug.sh",
+		"0",
+		NULL,
+	};
+	//plug-in
+	char *argv_1[] = {
+		"/etc/pulse/jack_hotplug.sh",
+		"1",
+		NULL,
+	};
+
 	if (!gpiod_get_value(mc_data->hp_det_gpio)) {
 		snd_soc_jack_report(jack_headset, SND_JACK_HEADPHONE, SND_JACK_HEADSET);
 		extcon_set_state_sync(mc_data->extcon,
@@ -235,6 +254,9 @@ static void adc_jack_handler(struct work_struct *work)
 		extcon_set_state_sync(mc_data->extcon,
 				EXTCON_JACK_MICROPHONE, false);
 		jack_connection_status = 0;
+		ret = call_usermodehelper(argv_0[0], argv_0, envp, UMH_WAIT_PROC);
+		if (ret != 0)
+			printk("failed to call_usermodehelper, ret=%d, status=%d\n", ret, jack_connection_status);
 
 		if (mc_data->poller)
 			mc_keys_poller_stop(mc_data->poller);
@@ -247,6 +269,9 @@ static void adc_jack_handler(struct work_struct *work)
 		extcon_set_state_sync(mc_data->extcon, EXTCON_JACK_HEADPHONE, true);
 		extcon_set_state_sync(mc_data->extcon, EXTCON_JACK_MICROPHONE, false);
 		jack_connection_status = 1;
+		ret = call_usermodehelper(argv_1[0], argv_1, envp, UMH_WAIT_PROC);
+		if (ret != 0)
+			printk("failed to call_usermodehelper, ret=%d, status=%d\n", ret, jack_connection_status);
 		return;
 	}
 	ret = iio_read_channel_processed(mc_data->adc, &adc);
