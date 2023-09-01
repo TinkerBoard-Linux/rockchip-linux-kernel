@@ -3205,6 +3205,7 @@ static void dw_mci_xfer_timer(unsigned long arg)
 		set_bit(EVENT_DATA_ERROR, &host->pending_events);
 		set_bit(EVENT_DATA_COMPLETE, &host->pending_events);
 		tasklet_schedule(&host->tasklet);
+		dev_info(host->dev, "xfer timeout, state STATE_SENDING_DATA\n");
 		break;
 	default:
 		dev_warn(host->dev, "Unexpected xfer timeout, state %d\n",
