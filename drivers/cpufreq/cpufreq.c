@@ -1917,6 +1917,9 @@ static int __target_index(struct cpufreq_policy *policy,
 		pr_debug("%s: cpu: %d, oldfreq: %u, new freq: %u\n",
 			 __func__, policy->cpu, freqs.old, freqs.new);
 
+                pr_info("cpu: %d, old: %u, new : %u\n",
+                         policy->cpu, freqs.old, freqs.new);
+
 		cpufreq_freq_transition_begin(policy, &freqs);
 	}
 
