@@ -146,7 +146,7 @@
 
 	eeprom {
 		tb3_eeprom: tb3-eeprom {
-			rockchip,pins = <3 RK_PC1 RK_FUNC_GPIO &pcfg_pull_down>;
+			rockchip,pins = <3 RK_PC1 RK_FUNC_GPIO &pcfg_pull_up>;
 		};
 	};
 };
