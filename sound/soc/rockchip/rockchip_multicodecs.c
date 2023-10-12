@@ -42,7 +42,7 @@
 #define WAIT_CARDS	(SNDRV_CARDS - 1)
 #define DEFAULT_MCLK_FS	256
 
-#ifdef CONFIG_ASUS_TB3N_SPK
+#ifdef CONFIG_RK3568_TB3N
 int jack_connection_status;
 #endif
 
@@ -242,7 +242,7 @@ static void adc_jack_handler(struct work_struct *work)
 	};
 
 	if (!gpiod_get_value(mc_data->hp_det_gpio)) {
-#ifdef CONFIG_ASUS_TB3N_SPK
+#ifdef CONFIG_RK3568_TB3N
 		snd_soc_jack_report(jack_headset, SND_JACK_HEADPHONE, SND_JACK_HEADSET);
 #else
 		snd_soc_jack_report(jack_headset, 0, SND_JACK_HEADSET);
@@ -251,7 +251,7 @@ static void adc_jack_handler(struct work_struct *work)
 				EXTCON_JACK_HEADPHONE, false);
 		extcon_set_state_sync(mc_data->extcon,
 				EXTCON_JACK_MICROPHONE, false);
-#ifdef CONFIG_ASUS_TB3N_SPK
+#ifdef CONFIG_RK3568_TB3N
 		jack_connection_status = 0;
 #endif
 		ret = call_usermodehelper(argv_0[0], argv_0, envp, UMH_WAIT_PROC);
@@ -268,7 +268,7 @@ static void adc_jack_handler(struct work_struct *work)
 		snd_soc_jack_report(jack_headset, SND_JACK_HEADPHONE, SND_JACK_HEADSET);
 		extcon_set_state_sync(mc_data->extcon, EXTCON_JACK_HEADPHONE, true);
 		extcon_set_state_sync(mc_data->extcon, EXTCON_JACK_MICROPHONE, false);
-#ifdef CONFIG_ASUS_TB3N_SPK
+#ifdef CONFIG_RK3568_TB3N
 		jack_connection_status = 1;
 #endif
 		ret = call_usermodehelper(argv_1[0], argv_1, envp, UMH_WAIT_PROC);
@@ -297,7 +297,7 @@ static void adc_jack_handler(struct work_struct *work)
 	}
 };
 
-#ifdef CONFIG_ASUS_TB3N_SPK
+#ifdef CONFIG_RK3568_TB3N
 EXPORT_SYMBOL(jack_connection_status);
 #endif
 
