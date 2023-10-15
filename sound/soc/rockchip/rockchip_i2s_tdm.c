@@ -29,6 +29,7 @@
 
 #include "rockchip_i2s_tdm.h"
 #include "rockchip_dlp.h"
+#include "rockchip_utils.h"
 
 #define DRV_NAME "rockchip-i2s-tdm"
 
@@ -1749,8 +1750,16 @@ static int rockchip_i2s_tdm_hw_params(struct snd_pcm_substream *substream,
 
 	ret = rockchip_i2s_io_multiplex(substream, dai);
 
+	rockchip_utils_get_performance(substream, params, dai);
 err:
 	return ret;
+}
+static int rockchip_i2s_tdm_hw_free(struct snd_pcm_substream *substream,
+				    struct snd_soc_dai *dai)
+{
+	rockchip_utils_put_performance(substream, dai);
+
+	return 0;
 }
 
 static int rockchip_i2s_tdm_trigger(struct snd_pcm_substream *substream,
@@ -2011,6 +2020,7 @@ static const struct snd_soc_dai_ops rockchip_i2s_tdm_dai_ops = {
 	.startup = rockchip_i2s_tdm_startup,
 	.shutdown = rockchip_i2s_tdm_shutdown,
 	.hw_params = rockchip_i2s_tdm_hw_params,
+	.hw_free = rockchip_i2s_tdm_hw_free,
 	.set_sysclk = rockchip_i2s_tdm_set_sysclk,
 	.set_fmt = rockchip_i2s_tdm_set_fmt,
 	.set_tdm_slot = rockchip_dai_tdm_slot,
