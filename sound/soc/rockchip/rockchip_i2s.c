@@ -21,6 +21,7 @@
 #include <sound/dmaengine_pcm.h>
 
 #include "rockchip_i2s.h"
+#include "rockchip_utils.h"
 
 #define DRV_NAME "rockchip-i2s"
 
@@ -417,6 +418,16 @@ static int rockchip_i2s_hw_params(struct snd_pcm_substream *substream,
 	regmap_update_bits(i2s->regmap, I2S_DMACR, I2S_DMACR_RDL_MASK,
 			   I2S_DMACR_RDL(16));
 
+	rockchip_utils_get_performance(substream, params, dai);
+
+	return 0;
+}
+
+static int rockchip_i2s_hw_free(struct snd_pcm_substream *substream,
+				struct snd_soc_dai *dai)
+{
+	rockchip_utils_put_performance(substream, dai);
+
 	return 0;
 }
 
@@ -596,6 +607,7 @@ static int rockchip_i2s_dai_probe(struct snd_soc_dai *dai)
 
 static const struct snd_soc_dai_ops rockchip_i2s_dai_ops = {
 	.hw_params = rockchip_i2s_hw_params,
+	.hw_free = rockchip_i2s_hw_free,
 	.set_bclk_ratio	= rockchip_i2s_set_bclk_ratio,
 	.set_sysclk = rockchip_i2s_set_sysclk,
 	.set_fmt = rockchip_i2s_set_fmt,
