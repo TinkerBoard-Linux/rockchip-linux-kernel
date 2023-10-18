@@ -426,6 +426,8 @@ static int rockchip_sai_hw_params(struct snd_pcm_substream *substream,
 	unsigned int ch_per_lane, lanes, slot_width;
 	unsigned int val, fscr, reg;
 
+	rockchip_utils_get_performance(substream, params, dai);
+
 	dma_data = snd_soc_dai_get_dma_data(dai, substream);
 	dma_data->maxburst = MAXBURST_PER_FIFO * params_channels(params) / 2;
 
@@ -508,8 +510,6 @@ static int rockchip_sai_hw_params(struct snd_pcm_substream *substream,
 		regmap_update_bits(sai->regmap, SAI_CKR, SAI_CKR_MDIV_MASK,
 				   SAI_CKR_MDIV(div_bclk));
 	}
-
-	rockchip_utils_get_performance(substream, params, dai);
 
 	return 0;
 }

@@ -1688,6 +1688,8 @@ static int rockchip_i2s_tdm_hw_params(struct snd_pcm_substream *substream,
 	unsigned int val = 0;
 	unsigned int mclk_rate, bclk_rate, lrck_rate, div_bclk = 4, div_lrck = 64;
 
+        rockchip_utils_get_performance(substream, params, dai);
+
 #ifdef CONFIG_SND_SOC_ROCKCHIP_I2S_TDM_MULTI_LANES
 	if (i2s_tdm->is_tdm_multi_lanes)
 		rockchip_i2s_tdm_multi_lanes_set_clk(substream, params, dai);
@@ -1750,7 +1752,6 @@ static int rockchip_i2s_tdm_hw_params(struct snd_pcm_substream *substream,
 
 	ret = rockchip_i2s_io_multiplex(substream, dai);
 
-	rockchip_utils_get_performance(substream, params, dai);
 err:
 	return ret;
 }

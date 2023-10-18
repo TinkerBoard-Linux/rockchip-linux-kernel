@@ -21,7 +21,7 @@ void rockchip_utils_get_performance(struct snd_pcm_substream *substream,
 
 	might_sleep();
 
-	if (rate < 192000 && channels < 8)
+	if (rate < 96000 && channels < 8)
 		return;
 
 	dev_dbg(dai->dev, "%s: stream[%d]: rate: %u, channels: %u\n",
@@ -39,7 +39,7 @@ void rockchip_utils_put_performance(struct snd_pcm_substream *substream,
 
 	might_sleep();
 
-	if (rate < 192000 && channels < 8)
+	if (rate < 96000 && channels < 8)
 		return;
 
 	dev_dbg(dai->dev, "%s: stream[%d]: rate: %u, channels: %u\n",
