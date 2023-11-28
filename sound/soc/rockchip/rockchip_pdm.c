@@ -569,7 +569,20 @@ static int rockchip_pdm_filter_delay_put(struct snd_kcontrol *kcontrol,
 	return 1;
 }
 
+static const char * const rpaths_text[] = {
+	"From SDI0", "From SDI1", "From SDI2", "From SDI3" };
+
+static SOC_ENUM_SINGLE_DECL(rpath3_enum, PDM_CLK_CTRL, 14, rpaths_text);
+static SOC_ENUM_SINGLE_DECL(rpath2_enum, PDM_CLK_CTRL, 12, rpaths_text);
+static SOC_ENUM_SINGLE_DECL(rpath1_enum, PDM_CLK_CTRL, 10, rpaths_text);
+static SOC_ENUM_SINGLE_DECL(rpath0_enum, PDM_CLK_CTRL, 8, rpaths_text);
+
 static const struct snd_kcontrol_new rockchip_pdm_controls[] = {
+	SOC_ENUM("Receive PATH3 Source Select", rpath3_enum),
+	SOC_ENUM("Receive PATH2 Source Select", rpath2_enum),
+	SOC_ENUM("Receive PATH1 Source Select", rpath1_enum),
+	SOC_ENUM("Receive PATH0 Source Select", rpath0_enum),
+
 	{
 		.iface = SNDRV_CTL_ELEM_IFACE_PCM,
 		.name = "PDM Start Delay Ms",
@@ -640,10 +653,12 @@ static int rockchip_pdm_dai_probe(struct snd_soc_dai *dai)
 	struct rk_pdm_dev *pdm = to_info(dai);
 
 	dai->capture_dma_data = &pdm->capture_dma_data;
-	snd_soc_add_dai_controls(dai, rockchip_pdm_controls,
-				 ARRAY_SIZE(rockchip_pdm_controls));
+
 	if (pdm->clk_calibrate)
-		snd_soc_add_dai_controls(dai, &rockchip_pdm_compensation_control, 1);
+		snd_soc_add_component_controls(dai->component,
+					       &rockchip_pdm_compensation_control,
+					       1);
+
 	return 0;
 }
 
@@ -724,6 +739,8 @@ static struct snd_soc_dai_driver rockchip_pdm_dai = {
 
 static const struct snd_soc_component_driver rockchip_pdm_component = {
 	.name = "rockchip-pdm",
+	.controls = rockchip_pdm_controls,
+	.num_controls = ARRAY_SIZE(rockchip_pdm_controls),
 };
 
 static int rockchip_pdm_pinctrl_select_clk_state(struct device *dev)
@@ -1003,6 +1020,23 @@ static int rockchip_pdm_probe(struct platform_device *pdev)
 	if (ret)
 		return ret;
 
+	rockchip_pdm_set_samplerate(pdm, PDM_DEFAULT_RATE);
+	rockchip_pdm_rxctrl(pdm, 0);
+
+	ret = rockchip_pdm_path_parse(pdm, node);
+	if (ret != 0 && ret != -ENOENT)
+		goto err_clk;
+
+	/*
+	 * MUST: after pm_runtime_enable step, any register R/W
+	 * should be wrapped with pm_runtime_get_sync/put.
+	 *
+	 * Another approach is to enable the regcache true to
+	 * avoid access HW registers.
+	 *
+	 * Alternatively, performing the registers R/W before
+	 * pm_runtime_enable is also a good option.
+	 */
 	pm_runtime_enable(&pdev->dev);
 	if (!pm_runtime_enabled(&pdev->dev)) {
 		ret = rockchip_pdm_runtime_resume(&pdev->dev);
@@ -1018,13 +1052,6 @@ static int rockchip_pdm_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "could not register dai: %d\n", ret);
 		goto err_suspend;
 	}
-
-	rockchip_pdm_set_samplerate(pdm, PDM_DEFAULT_RATE);
-	rockchip_pdm_rxctrl(pdm, 0);
-
-	ret = rockchip_pdm_path_parse(pdm, node);
-	if (ret != 0 && ret != -ENOENT)
-		goto err_suspend;
 
 	if (of_property_read_bool(node, "rockchip,no-dmaengine")) {
 		dev_info(&pdev->dev, "Used for Multi-DAI\n");
@@ -1046,7 +1073,7 @@ err_suspend:
 		rockchip_pdm_runtime_suspend(&pdev->dev);
 err_pm_disable:
 	pm_runtime_disable(&pdev->dev);
-
+err_clk:
 	clk_disable_unprepare(pdm->hclk);
 
 	return ret;

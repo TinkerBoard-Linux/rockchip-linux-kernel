@@ -193,6 +193,8 @@ struct rk_pcie {
 	u32				msi_vector_num;
 	struct workqueue_struct		*hot_rst_wq;
 	struct work_struct		hot_rst_work;
+	u32				comp_prst[2];
+	u32				intx;
 };
 
 struct rk_pcie_of_data {
@@ -1714,7 +1716,7 @@ static struct irq_chip rk_pcie_legacy_irq_chip = {
 static int rk_pcie_intx_map(struct irq_domain *domain, unsigned int irq,
 			    irq_hw_number_t hwirq)
 {
-	irq_set_chip_and_handler(irq, &rk_pcie_legacy_irq_chip, handle_simple_irq);
+	irq_set_chip_and_handler(irq, &rk_pcie_legacy_irq_chip, handle_level_irq);
 	irq_set_chip_data(irq, domain->host_data);
 
 	return 0;
@@ -2115,11 +2117,25 @@ retry_regulator:
 		rk_pcie->is_signal_test = true;
 	}
 
-	/* Force into compliance mode */
-	if (device_property_read_bool(dev, "rockchip,compliance-mode")) {
-		val = dw_pcie_readl_dbi(pci, PCIE_CAP_LINK_CONTROL2_LINK_STATUS);
-		val |= BIT(4);
-		dw_pcie_writel_dbi(pci, PCIE_CAP_LINK_CONTROL2_LINK_STATUS, val);
+	/*
+	 * Force into compliance mode
+	 * comp_prst is a two dimensional array of which the first element
+	 * stands for speed mode, and the second one is preset value encoding:
+	 * [0] 0->SMA tool control the signal switch, 1/2/3 is for manual Gen setting
+	 * [1] transmitter setting for manual Gen setting, valid only if [0] isn't zero.
+	 */
+	if (!device_property_read_u32_array(dev, "rockchip,compliance-mode",
+					    rk_pcie->comp_prst, 2)) {
+		BUG_ON(rk_pcie->comp_prst[0] > 3 || rk_pcie->comp_prst[1] > 10);
+		if (!rk_pcie->comp_prst[0]) {
+			dev_info(dev, "Auto compliance mode for SMA tool.\n");
+		} else {
+			dev_info(dev, "compliance mode for soldered board Gen%d, P%d.\n",
+				 rk_pcie->comp_prst[0], rk_pcie->comp_prst[1]);
+			val = dw_pcie_readl_dbi(pci, PCIE_CAP_LINK_CONTROL2_LINK_STATUS);
+			val |= BIT(4) | rk_pcie->comp_prst[0] | (rk_pcie->comp_prst[1] << 12);
+			dw_pcie_writel_dbi(pci, PCIE_CAP_LINK_CONTROL2_LINK_STATUS, val);
+		}
 		rk_pcie->is_signal_test = true;
 	}
 
@@ -2397,6 +2413,8 @@ no_l2:
 	phy_power_off(rk_pcie->phy);
 	phy_exit(rk_pcie->phy);
 
+	rk_pcie->intx = rk_pcie_readl_apb(rk_pcie, PCIE_CLIENT_INTR_MASK_LEGACY);
+
 	clk_bulk_disable_unprepare(rk_pcie->clk_cnt, rk_pcie->clks);
 
 	rk_pcie->in_suspend = true;
@@ -2461,6 +2479,9 @@ static int __maybe_unused rockchip_dw_pcie_resume(struct device *dev)
 
 	if (std_rc)
 		dw_pcie_setup_rc(&rk_pcie->pci->pp);
+
+	rk_pcie_writel_apb(rk_pcie, PCIE_CLIENT_INTR_MASK_LEGACY,
+			   rk_pcie->intx | 0xffff0000);
 
 	ret = rk_pcie_establish_link(rk_pcie->pci);
 	if (ret) {
