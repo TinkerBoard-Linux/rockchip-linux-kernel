@@ -232,6 +232,63 @@
 #define C_CMSPAR(tty) _C_FLAG((tty), CMSPAR)
 #endif
 
+#define F75115_GPIO_BASE            463
+#define F75115_GPIO00   (F75115_GPIO_BASE + 0)
+#define F75115_GPIO01   (F75115_GPIO_BASE + 1)
+#define F75115_GPIO02   (F75115_GPIO_BASE + 2)
+#define F75115_GPIO03   (F75115_GPIO_BASE + 3)
+#define F75115_GPIO04   (F75115_GPIO_BASE + 4)
+#define F75115_GPIO05   (F75115_GPIO_BASE + 5)
+#define F75115_GPIO06   (F75115_GPIO_BASE + 6)
+#define F75115_GPIO07   (F75115_GPIO_BASE + 7)
+
+#define F75115_GPIO10   (F75115_GPIO_BASE + 1*8 + 0)
+#define F75115_GPIO11   (F75115_GPIO_BASE + 1*8 + 1)
+#define F75115_GPIO12   (F75115_GPIO_BASE + 1*8 + 2)
+#define F75115_GPIO13   (F75115_GPIO_BASE + 1*8 + 3)
+#define F75115_GPIO14   (F75115_GPIO_BASE + 1*8 + 4)
+#define F75115_GPIO15   (F75115_GPIO_BASE + 1*8 + 5)
+#define F75115_GPIO16   (F75115_GPIO_BASE + 1*8 + 6)
+#define F75115_GPIO17   (F75115_GPIO_BASE + 1*8 + 7)
+
+#define F75115_GPIO20   (F75115_GPIO_BASE + 2*8 + 0)
+#define F75115_GPIO21   (F75115_GPIO_BASE + 2*8 + 1)
+#define F75115_GPIO22   (F75115_GPIO_BASE + 2*8 + 2)
+#define F75115_GPIO23   (F75115_GPIO_BASE + 2*8 + 3)
+#define F75115_GPIO24   (F75115_GPIO_BASE + 2*8 + 4)
+#define F75115_GPIO25   (F75115_GPIO_BASE + 2*8 + 5)
+#define F75115_GPIO26   (F75115_GPIO_BASE + 2*8 + 6)
+#define F75115_GPIO27   (F75115_GPIO_BASE + 2*8 + 7)
+
+#define F75115_GPIO30   (F75115_GPIO_BASE + 3*8 + 0)
+#define F75115_GPIO31   (F75115_GPIO_BASE + 3*8 + 1)
+#define F75115_GPIO32   (F75115_GPIO_BASE + 3*8 + 2)
+#define F75115_GPIO33   (F75115_GPIO_BASE + 3*8 + 3)
+#define F75115_GPIO34   (F75115_GPIO_BASE + 3*8 + 4)
+#define F75115_GPIO35   (F75115_GPIO_BASE + 3*8 + 5)
+#define F75115_GPIO36   (F75115_GPIO_BASE + 3*8 + 6)
+#define F75115_GPIO37   (F75115_GPIO_BASE + 3*8 + 7)
+
+// For SDA0 and SCL0
+//#define F75115_GPIO40  (F75115_GPIO_BASE + 4*8 + 0)
+//#define F75115_GPIO41  (F75115_GPIO_BASE + 4*8 + 1)
+#define F75115_GPIO42   (F75115_GPIO_BASE + 4*8 + 2)
+#define F75115_GPIO43   (F75115_GPIO_BASE + 4*8 + 3)
+#define F75115_GPIO44   (F75115_GPIO_BASE + 4*8 + 4)
+#define F75115_GPIO45   (F75115_GPIO_BASE + 4*8 + 5)
+#define F75115_GPIO46   (F75115_GPIO_BASE + 4*8 + 6)
+#define F75115_GPIO47   (F75115_GPIO_BASE + 4*8 + 7)
+
+#define F75115_GPIO50   (F75115_GPIO_BASE + 5*8 + 0)
+#define F75115_GPIO51   (F75115_GPIO_BASE + 5*8 + 1)
+#define F75115_GPIO52   (F75115_GPIO_BASE + 5*8 + 2)
+#define F75115_GPIO53   (F75115_GPIO_BASE + 5*8 + 3)
+#define F75115_GPIO54   (F75115_GPIO_BASE + 5*8 + 4)
+#define F75115_GPIO55   (F75115_GPIO_BASE + 5*8 + 5)
+// For TXD and RXD
+//#define F75115_GPIO56   (F75115_GPIO_BASE + 5*8 + 6)
+//#define F75115_GPIO57   (F75115_GPIO_BASE + 5*8 + 7)
+
 static int full_uart = 0;
 module_param(full_uart, int, S_IRUGO);
 MODULE_PARM_DESC(full_uart, "Full UART function PIN");
@@ -3442,6 +3499,33 @@ static int f75115_release_gpio(struct usb_serial *serial)
 	struct f75115_serial_private *serial_priv =
 		usb_get_serial_data(serial);
 
+
+        gpio_unexport(F75115_GPIO52);
+        gpio_unexport(F75115_GPIO16);
+        gpio_unexport(F75115_GPIO30);
+        gpio_unexport(F75115_GPIO32);
+        gpio_unexport(F75115_GPIO34);
+        gpio_unexport(F75115_GPIO36);
+        gpio_unexport(F75115_GPIO20);
+        gpio_unexport(F75115_GPIO21);
+        gpio_unexport(F75115_GPIO24);
+        gpio_unexport(F75115_GPIO07);
+        gpio_unexport(F75115_GPIO03);
+        gpio_unexport(F75115_GPIO01);
+
+        gpio_free(F75115_GPIO52);
+        gpio_free(F75115_GPIO16);
+        gpio_free(F75115_GPIO30);
+        gpio_free(F75115_GPIO32);
+        gpio_free(F75115_GPIO34);
+        gpio_free(F75115_GPIO36);
+        gpio_free(F75115_GPIO20);
+        gpio_free(F75115_GPIO21);
+        gpio_free(F75115_GPIO24);
+        gpio_free(F75115_GPIO07);
+        gpio_free(F75115_GPIO03);
+        gpio_free(F75115_GPIO01);
+
 	device_remove_file(&serial->interface->dev, &dev_attr_open_drain_mode);
 	gpiochip_remove(&serial_priv->f75115_gpio_chip);
 
@@ -5701,6 +5785,51 @@ static int f75115_read_fw_ver(struct usb_serial *serial)
 	return 0;
 }
 
+static void f75115_gpio_init_status(void)
+{
+	gpio_request(F75115_GPIO52,"U2_E12_1_EN");
+	gpio_request(F75115_GPIO16,"U2_E12_2_EN");
+	gpio_request(F75115_GPIO30,"U2_E34_1_EN");
+	gpio_request(F75115_GPIO32,"U2_E34_2_EN");
+	gpio_request(F75115_GPIO34,"CC_SW_EN");
+	gpio_request(F75115_GPIO36,"DIS_SW_EN");
+	gpio_request(F75115_GPIO20,"USB_5V_EN");
+	gpio_request(F75115_GPIO21,"S_U2H_RESET_N");
+	gpio_request(F75115_GPIO24,"EX_DO1");
+	gpio_request(F75115_GPIO07,"SSR_EN");
+	gpio_request(F75115_GPIO03,"AMP_SDZ_N");
+	gpio_request(F75115_GPIO01,"EX_DO2");
+	
+	mdelay(150);
+
+	gpio_direction_output(F75115_GPIO52, 1);
+	gpio_direction_output(F75115_GPIO16, 1);
+	gpio_direction_output(F75115_GPIO30, 1);
+	gpio_direction_output(F75115_GPIO32, 1);
+	gpio_direction_output(F75115_GPIO34, 1);
+	gpio_direction_output(F75115_GPIO36, 1);
+	gpio_direction_output(F75115_GPIO20, 1);
+	gpio_direction_output(F75115_GPIO21, 1);
+	gpio_direction_output(F75115_GPIO24, 1);
+	gpio_direction_output(F75115_GPIO07, 1);
+	gpio_direction_output(F75115_GPIO03, 1);
+	gpio_direction_output(F75115_GPIO01, 1);
+
+	gpio_export(F75115_GPIO52, 1);
+	gpio_export(F75115_GPIO16, 1);
+	gpio_export(F75115_GPIO30, 1);
+	gpio_export(F75115_GPIO32, 1);
+	gpio_export(F75115_GPIO34, 1);
+	gpio_export(F75115_GPIO36, 1);
+	gpio_export(F75115_GPIO20, 1);
+	gpio_export(F75115_GPIO21, 1);
+	gpio_export(F75115_GPIO24, 1);
+	gpio_export(F75115_GPIO07, 1);
+        gpio_export(F75115_GPIO03, 1);
+	gpio_export(F75115_GPIO01, 1);
+
+}
+
 static int f75115_attach(struct usb_serial *serial)
 {
 	struct f75115_serial_private *serial_priv = NULL;
@@ -5789,6 +5918,8 @@ static int f75115_attach(struct usb_serial *serial)
 		f75115_release_gpio(serial);
 		return -EINVAL;
 	}
+
+	f75115_gpio_init_status();
 
 	device_set_wakeup_enable(&serial->dev->dev, true);
 	return 0;
