@@ -232,7 +232,7 @@
 #define C_CMSPAR(tty) _C_FLAG((tty), CMSPAR)
 #endif
 
-#define F75115_GPIO_BASE            463
+#define F75115_GPIO_BASE            0
 #define F75115_GPIO00   (F75115_GPIO_BASE + 0)
 #define F75115_GPIO01   (F75115_GPIO_BASE + 1)
 #define F75115_GPIO02   (F75115_GPIO_BASE + 2)
@@ -3491,6 +3491,7 @@ static int f75115_prepare_gpio(struct usb_serial *serial)
 	if (rc)
 		return -EPERM;
 
+
 	return 0;
 }
 
@@ -3498,33 +3499,35 @@ static int f75115_release_gpio(struct usb_serial *serial)
 {
 	struct f75115_serial_private *serial_priv =
 		usb_get_serial_data(serial);
+        int base = serial_priv->f75115_gpio_chip.base;
 
+        gpio_unexport(base + F75115_GPIO52);
+        gpio_unexport(base + F75115_GPIO16);
+        gpio_unexport(base + F75115_GPIO30);
+        gpio_unexport(base + F75115_GPIO32);
+        gpio_unexport(base + F75115_GPIO34);
+        gpio_unexport(base + F75115_GPIO36);
+        gpio_unexport(base + F75115_GPIO20);
+        gpio_unexport(base + F75115_GPIO21);
+        gpio_unexport(base + F75115_GPIO24);
+        gpio_unexport(base + F75115_GPIO07);
+        gpio_unexport(base + F75115_GPIO03);
+        gpio_unexport(base + F75115_GPIO01);
+        gpio_unexport(base + F75115_GPIO10);
 
-        gpio_unexport(F75115_GPIO52);
-        gpio_unexport(F75115_GPIO16);
-        gpio_unexport(F75115_GPIO30);
-        gpio_unexport(F75115_GPIO32);
-        gpio_unexport(F75115_GPIO34);
-        gpio_unexport(F75115_GPIO36);
-        gpio_unexport(F75115_GPIO20);
-        gpio_unexport(F75115_GPIO21);
-        gpio_unexport(F75115_GPIO24);
-        gpio_unexport(F75115_GPIO07);
-        gpio_unexport(F75115_GPIO03);
-        gpio_unexport(F75115_GPIO01);
-
-        gpio_free(F75115_GPIO52);
-        gpio_free(F75115_GPIO16);
-        gpio_free(F75115_GPIO30);
-        gpio_free(F75115_GPIO32);
-        gpio_free(F75115_GPIO34);
-        gpio_free(F75115_GPIO36);
-        gpio_free(F75115_GPIO20);
-        gpio_free(F75115_GPIO21);
-        gpio_free(F75115_GPIO24);
-        gpio_free(F75115_GPIO07);
-        gpio_free(F75115_GPIO03);
-        gpio_free(F75115_GPIO01);
+        gpio_free(base + F75115_GPIO52);
+        gpio_free(base + F75115_GPIO16);
+        gpio_free(base + F75115_GPIO30);
+        gpio_free(base + F75115_GPIO32);
+        gpio_free(base + F75115_GPIO34);
+        gpio_free(base + F75115_GPIO36);
+        gpio_free(base + F75115_GPIO20);
+        gpio_free(base + F75115_GPIO21);
+        gpio_free(base + F75115_GPIO24);
+        gpio_free(base + F75115_GPIO07);
+        gpio_free(base + F75115_GPIO03);
+        gpio_free(base + F75115_GPIO01);
+        gpio_free(base + F75115_GPIO10);
 
 	device_remove_file(&serial->interface->dev, &dev_attr_open_drain_mode);
 	gpiochip_remove(&serial_priv->f75115_gpio_chip);
@@ -5785,48 +5788,56 @@ static int f75115_read_fw_ver(struct usb_serial *serial)
 	return 0;
 }
 
-static void f75115_gpio_init_status(void)
+static void f75115_gpio_init_status(struct usb_serial *serial)
 {
-	gpio_request(F75115_GPIO52,"U2_E12_1_EN");
-	gpio_request(F75115_GPIO16,"U2_E12_2_EN");
-	gpio_request(F75115_GPIO30,"U2_E34_1_EN");
-	gpio_request(F75115_GPIO32,"U2_E34_2_EN");
-	gpio_request(F75115_GPIO34,"CC_SW_EN");
-	gpio_request(F75115_GPIO36,"DIS_SW_EN");
-	gpio_request(F75115_GPIO20,"USB_5V_EN");
-	gpio_request(F75115_GPIO21,"S_U2H_RESET_N");
-	gpio_request(F75115_GPIO24,"EX_DO1");
-	gpio_request(F75115_GPIO07,"SSR_EN");
-	gpio_request(F75115_GPIO03,"AMP_SDZ_N");
-	gpio_request(F75115_GPIO01,"EX_DO2");
+        struct f75115_serial_private *serial_priv =
+                usb_get_serial_data(serial);
+	int base = serial_priv->f75115_gpio_chip.base;
+
+        dev_info(&serial->dev->dev, "%s: base=%d\n", __func__, base);
+	gpio_request(base + F75115_GPIO52,"U2_E12_1_EN");
+	gpio_request(base + F75115_GPIO16,"U2_E12_2_EN");
+	gpio_request(base + F75115_GPIO30,"U2_E34_1_EN");
+	gpio_request(base + F75115_GPIO32,"U2_E34_2_EN");
+	gpio_request(base + F75115_GPIO34,"CC_SW_EN");
+	gpio_request(base + F75115_GPIO36,"DIS_SW_EN");
+	gpio_request(base + F75115_GPIO20,"USB_5V_EN");
+	gpio_request(base + F75115_GPIO21,"S_U2H_RESET_N");
+	gpio_request(base + F75115_GPIO24,"EX_DO1");
+	gpio_request(base + F75115_GPIO07,"SSR_EN");
+	gpio_request(base + F75115_GPIO03,"AMP_SDZ_N");
+	gpio_request(base + F75115_GPIO01,"EX_DO2");
+        gpio_request(base + F75115_GPIO10,"U2H_RESET_N");
 	
 	mdelay(150);
 
-	gpio_direction_output(F75115_GPIO52, 1);
-	gpio_direction_output(F75115_GPIO16, 1);
-	gpio_direction_output(F75115_GPIO30, 1);
-	gpio_direction_output(F75115_GPIO32, 1);
-	gpio_direction_output(F75115_GPIO34, 1);
-	gpio_direction_output(F75115_GPIO36, 1);
-	gpio_direction_output(F75115_GPIO20, 1);
-	gpio_direction_output(F75115_GPIO21, 1);
-	gpio_direction_output(F75115_GPIO24, 1);
-	gpio_direction_output(F75115_GPIO07, 1);
-	gpio_direction_output(F75115_GPIO03, 1);
-	gpio_direction_output(F75115_GPIO01, 1);
+	gpio_direction_output(base + F75115_GPIO52, 1);
+	gpio_direction_output(base + F75115_GPIO16, 1);
+	gpio_direction_output(base + F75115_GPIO30, 1);
+	gpio_direction_output(base + F75115_GPIO32, 1);
+	gpio_direction_output(base + F75115_GPIO34, 1);
+	gpio_direction_output(base + F75115_GPIO36, 1);
+	gpio_direction_output(base + F75115_GPIO20, 1);
+	gpio_direction_output(base + F75115_GPIO21, 1);
+	gpio_direction_output(base + F75115_GPIO24, 1);
+	gpio_direction_output(base + F75115_GPIO07, 1);
+	gpio_direction_output(base + F75115_GPIO03, 1);
+	gpio_direction_output(base + F75115_GPIO01, 1);
+        gpio_direction_output(base + F75115_GPIO10, 1);
 
-	gpio_export(F75115_GPIO52, 1);
-	gpio_export(F75115_GPIO16, 1);
-	gpio_export(F75115_GPIO30, 1);
-	gpio_export(F75115_GPIO32, 1);
-	gpio_export(F75115_GPIO34, 1);
-	gpio_export(F75115_GPIO36, 1);
-	gpio_export(F75115_GPIO20, 1);
-	gpio_export(F75115_GPIO21, 1);
-	gpio_export(F75115_GPIO24, 1);
-	gpio_export(F75115_GPIO07, 1);
-        gpio_export(F75115_GPIO03, 1);
-	gpio_export(F75115_GPIO01, 1);
+	gpio_export(base + F75115_GPIO52, 1);
+	gpio_export(base + F75115_GPIO16, 1);
+	gpio_export(base + F75115_GPIO30, 1);
+	gpio_export(base + F75115_GPIO32, 1);
+	gpio_export(base + F75115_GPIO34, 1);
+	gpio_export(base + F75115_GPIO36, 1);
+	gpio_export(base + F75115_GPIO20, 1);
+	gpio_export(base + F75115_GPIO21, 1);
+	gpio_export(base + F75115_GPIO24, 1);
+	gpio_export(base + F75115_GPIO07, 1);
+        gpio_export(base + F75115_GPIO03, 1);
+	gpio_export(base + F75115_GPIO01, 1);
+        gpio_export(base + F75115_GPIO10, 1);
 
 }
 
@@ -5919,7 +5930,7 @@ static int f75115_attach(struct usb_serial *serial)
 		return -EINVAL;
 	}
 
-	f75115_gpio_init_status();
+	f75115_gpio_init_status(serial);
 
 	device_set_wakeup_enable(&serial->dev->dev, true);
 	return 0;
