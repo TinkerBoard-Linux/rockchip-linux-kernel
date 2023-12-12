@@ -9,6 +9,7 @@
 #include <linux/usb.h>
 #include <linux/usb/audio.h>
 #include <linux/usb/audio-v2.h>
+#include <linux/gpio.h>
 
 #include <sound/core.h>
 #include <sound/pcm.h>
@@ -29,6 +30,32 @@
 
 #define SUBSTREAM_FLAG_DATA_EP_STARTED	0
 #define SUBSTREAM_FLAG_SYNC_EP_STARTED	1
+
+#define USB_GPIO_AMP 466
+
+static int usb_gpio_amp_init(void)
+{
+	int ret = 0;
+	ret = gpio_request(USB_GPIO_AMP, "usb_gpio_amp");
+	if (ret){
+		printk("gpio %d request failed \n", USB_GPIO_AMP);
+		goto err_gpio;
+	}
+	ret = gpio_direction_output(USB_GPIO_AMP, 0);
+	if (ret) {
+		printk("gpio %d unavaliable for output \n", USB_GPIO_AMP);
+		goto err_free_gpio;
+	}
+
+	printk("GPIO pin requested ok, USB_GPIO_AMP = %s\n", gpio_get_value(USB_GPIO_AMP)? "H":"L");
+	return 0;
+
+err_free_gpio:
+	if (gpio_is_valid(USB_GPIO_AMP))
+		gpio_free(USB_GPIO_AMP);
+err_gpio:
+	return ret;
+}
 
 /* return the estimated delay based on USB frame counters */
 snd_pcm_uframes_t snd_usb_pcm_delay(struct snd_usb_substream *subs,
@@ -1948,10 +1975,14 @@ static int snd_usb_substream_playback_trigger(struct snd_pcm_substream *substrea
 		subs->data_endpoint->prepare_data_urb = prepare_playback_urb;
 		subs->data_endpoint->retire_data_urb = retire_playback_urb;
 		subs->running = 1;
+		gpio_set_value(USB_GPIO_AMP, 1);
+		printk("SNDRV_PCM_TRIGGER_PAUSE_RELEASE, USB_GPIO_AMP = %s\n", gpio_get_value(USB_GPIO_AMP)? "H":"L");
 		return 0;
 	case SNDRV_PCM_TRIGGER_STOP:
 		stop_endpoints(subs);
 		subs->running = 0;
+		gpio_set_value(USB_GPIO_AMP, 0);
+		printk("SNDRV_PCM_TRIGGER_STOP, USB_GPIO_AMP = %s\n", gpio_get_value(USB_GPIO_AMP)? "H":"L");
 		return 0;
 	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
 		subs->data_endpoint->prepare_data_urb = NULL;
@@ -2036,6 +2067,12 @@ static const struct snd_pcm_ops snd_usb_capture_ops = {
 void snd_usb_set_pcm_ops(struct snd_pcm *pcm, int stream)
 {
 	const struct snd_pcm_ops *ops;
+
+	if(stream == SNDRV_PCM_STREAM_PLAYBACK){
+		int ret = usb_gpio_amp_init();
+		if (ret)
+			printk("Request USB_GPIO_AMP Failed (%d)\n", ret);
+	}
 
 	ops = stream == SNDRV_PCM_STREAM_PLAYBACK ?
 			&snd_usb_playback_ops : &snd_usb_capture_ops;

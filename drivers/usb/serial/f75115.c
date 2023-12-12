@@ -5799,7 +5799,6 @@ static void f75115_gpio_init_status(struct usb_serial *serial)
 	gpio_request(base + F75115_GPIO21,"S_U2H_RESET_N");
 	gpio_request(base + F75115_GPIO24,"EX_DO1");
 	gpio_request(base + F75115_GPIO07,"SSR_EN");
-	gpio_request(base + F75115_GPIO03,"AMP_SDZ_N");
 	gpio_request(base + F75115_GPIO01,"EX_DO2");
         gpio_request(base + F75115_GPIO10,"U2H_RESET_N");
 	
@@ -5815,7 +5814,6 @@ static void f75115_gpio_init_status(struct usb_serial *serial)
 	gpio_direction_output(base + F75115_GPIO21, 1);
 	gpio_direction_output(base + F75115_GPIO24, 1);
 	gpio_direction_output(base + F75115_GPIO07, 1);
-	gpio_direction_output(base + F75115_GPIO03, 1);
 	gpio_direction_output(base + F75115_GPIO01, 1);
         gpio_direction_output(base + F75115_GPIO10, 1);
 
@@ -5829,7 +5827,6 @@ static void f75115_gpio_init_status(struct usb_serial *serial)
 	gpio_export(base + F75115_GPIO21, 1);
 	gpio_export(base + F75115_GPIO24, 1);
 	gpio_export(base + F75115_GPIO07, 1);
-        gpio_export(base + F75115_GPIO03, 1);
 	gpio_export(base + F75115_GPIO01, 1);
         gpio_export(base + F75115_GPIO10, 1);
 
