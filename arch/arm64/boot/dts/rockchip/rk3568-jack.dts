@@ -108,6 +108,18 @@
         i2c7: i2c@f751150 {
                 #address-cells = <1>;
                 #size-cells = <0>;
+                status = "okay";
+                temps1_nct7716: temps1nct7716@49 {
+                        compatible = "nuvoton,nct7716";
+                        reg = <0x49>;
+                        status = "okay";
+                };
+
+                temps2_nct7716: temps2nct7716@48 {
+                        compatible = "nuvoton,nct7716";
+                        reg = <0x48>;
+                        status = "okay";
+                };
         };
 
 };
@@ -164,6 +176,9 @@
 };
 
 &pinctrl {
+        pinctrl-names = "default";
+        pinctrl-0 = <&pinctrl_external_board>;
+
         rtc {
                 pinctrl_externalrtc_reg: externalrtcreggrp {
                         rockchip,pins = <0 RK_PD3 RK_FUNC_GPIO &pcfg_pull_up>;
@@ -177,6 +192,14 @@
         eeprom {
                 tb3_eeprom: tb3-eeprom {
                         rockchip,pins = <1 RK_PB2 RK_FUNC_GPIO &pcfg_pull_up>;
+                };
+        };
+
+        externalboard {
+                pinctrl_external_board: external-board {
+                        rockchip,pins = <4 RK_PC4 RK_FUNC_GPIO &pcfg_output_high>,
+                                        <4 RK_PC5 RK_FUNC_GPIO &pcfg_output_high>,
+                                        <4 RK_PC6 RK_FUNC_GPIO &pcfg_pull_down>;
                 };
         };
 };
@@ -283,4 +306,51 @@
 		rockchip,pins =
 			<3 RK_PA4 RK_FUNC_GPIO &pcfg_pull_up>;
 	};
+};
+
+&uart4 {
+        status = "okay";
+};
+
+&i2c5 {
+        status = "okay";
+        ina3221mon1@41 {
+                compatible = "ti,ina3221";
+                reg = <0x41>;
+                #address-cells = <1>;
+                #size-cells = <0>;
+
+                input@0 {
+                        reg = <0x0>;
+                        label = "VDD_12V_SYS";
+                };
+                input@1 {
+                        reg = <0x1>;
+                        label = "VDD_5V_SYS";
+                };
+                input@2 {
+                        reg = <0x2>;
+                        label = "VDD_3V_SYS";
+                };
+        };
+
+        ina3221mon2@40 {
+                compatible = "ti,ina3221";
+                reg = <0x40>;
+                #address-cells = <1>;
+                #size-cells = <0>;
+
+                input@0 {
+                        reg = <0x0>;
+                        label = "VDD_12V_CC";
+                };
+                input@1 {
+                        reg = <0x1>;
+                        label = "VDD_12V_DIS";
+                };
+                input@2 {
+                        reg = <0x2>;
+                        label = "AMP_PVCC";
+                };
+        };
 };
