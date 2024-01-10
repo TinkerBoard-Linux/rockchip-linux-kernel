@@ -9,7 +9,10 @@
 #include <linux/usb.h>
 #include <linux/usb/audio.h>
 #include <linux/usb/audio-v2.h>
+
+#ifdef CONFIG_SND_USB_AUDIO_AMP
 #include <linux/gpio.h>
+#endif
 
 #include <sound/core.h>
 #include <sound/pcm.h>
@@ -31,6 +34,7 @@
 #define SUBSTREAM_FLAG_DATA_EP_STARTED	0
 #define SUBSTREAM_FLAG_SYNC_EP_STARTED	1
 
+#ifdef CONFIG_SND_USB_AUDIO_AMP
 #define USB_GPIO_AMP 466
 
 static int usb_gpio_amp_init(void)
@@ -56,6 +60,7 @@ err_free_gpio:
 err_gpio:
 	return ret;
 }
+#endif
 
 /* return the estimated delay based on USB frame counters */
 snd_pcm_uframes_t snd_usb_pcm_delay(struct snd_usb_substream *subs,
@@ -1566,7 +1571,10 @@ static int snd_usb_pcm_open(struct snd_pcm_substream *substream)
 	trace_android_vh_sound_usb_support_cpu_suspend(subs->dev, direction, &is_support);
 	if (!ret && is_support)
 		snd_usb_autosuspend(subs->stream->chip);
-
+#ifdef CONFIG_SND_USB_AUDIO_AMP
+        if(direction == SNDRV_PCM_STREAM_PLAYBACK)
+		gpio_set_value(USB_GPIO_AMP, 1);
+#endif
 	return ret;
 }
 
@@ -1608,7 +1616,10 @@ static int snd_usb_pcm_close(struct snd_pcm_substream *substream)
 
 	subs->pcm_substream = NULL;
 	snd_usb_autosuspend(subs->stream->chip);
-
+#ifdef CONFIG_SND_USB_AUDIO_AMP
+	if(direction == SNDRV_PCM_STREAM_PLAYBACK)
+		gpio_set_value(USB_GPIO_AMP, 0);
+#endif
 	return 0;
 }
 
@@ -1975,14 +1986,10 @@ static int snd_usb_substream_playback_trigger(struct snd_pcm_substream *substrea
 		subs->data_endpoint->prepare_data_urb = prepare_playback_urb;
 		subs->data_endpoint->retire_data_urb = retire_playback_urb;
 		subs->running = 1;
-		gpio_set_value(USB_GPIO_AMP, 1);
-		printk("SNDRV_PCM_TRIGGER_PAUSE_RELEASE, USB_GPIO_AMP = %s\n", gpio_get_value(USB_GPIO_AMP)? "H":"L");
 		return 0;
 	case SNDRV_PCM_TRIGGER_STOP:
 		stop_endpoints(subs);
 		subs->running = 0;
-		gpio_set_value(USB_GPIO_AMP, 0);
-		printk("SNDRV_PCM_TRIGGER_STOP, USB_GPIO_AMP = %s\n", gpio_get_value(USB_GPIO_AMP)? "H":"L");
 		return 0;
 	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
 		subs->data_endpoint->prepare_data_urb = NULL;
@@ -2068,12 +2075,13 @@ void snd_usb_set_pcm_ops(struct snd_pcm *pcm, int stream)
 {
 	const struct snd_pcm_ops *ops;
 
+#ifdef CONFIG_SND_USB_AUDIO_AMP
 	if(stream == SNDRV_PCM_STREAM_PLAYBACK){
 		int ret = usb_gpio_amp_init();
 		if (ret)
 			printk("Request USB_GPIO_AMP Failed (%d)\n", ret);
 	}
-
+#endif
 	ops = stream == SNDRV_PCM_STREAM_PLAYBACK ?
 			&snd_usb_playback_ops : &snd_usb_capture_ops;
 	snd_pcm_set_ops(pcm, stream, ops);

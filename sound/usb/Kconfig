@@ -24,6 +24,9 @@ config SND_USB_AUDIO
 	  To compile this driver as a module, choose M here: the module
 	  will be called snd-usb-audio.
 
+config SND_USB_AUDIO_AMP
+        bool "Control USB Audio AMP for PANTHER 3568"
+
 config SND_USB_AUDIO_USE_MEDIA_CONTROLLER
 	bool
 
