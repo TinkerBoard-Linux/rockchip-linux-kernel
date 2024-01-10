@@ -3399,7 +3399,7 @@ static struct gpio_chip f75115_gpio_chip_templete = {
 	.request = f75115_gpio_request,
 	.free = f75115_gpio_free,
 	.ngpio = 48, /* M0(SD)/M1/M2(40) & GPIO0(8) */
-	.base = -1,
+	.base = 463,
 };
 
 static ssize_t open_drain_mode_show(struct device *dev,
