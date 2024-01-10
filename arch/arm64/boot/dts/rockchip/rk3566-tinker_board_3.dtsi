@@ -55,11 +55,11 @@
 };
 
 &csi2_dphy_hw {
-	status = "okay";
+	status = "disabled";
 };
 
 &csi2_dphy0 {
-	status = "okay";
+	status = "disabled";
 	/*
 	 * dphy0 only used for full mode,
 	 * full mode and split mode are mutually exclusive
@@ -254,7 +254,7 @@
 
 	/* split mode: lane0/1 */
 	ov5695: ov5695@36 {
-		status = "okay";
+		status = "disabled";
 		compatible = "ovti,ov5695";
 		reg = <0x36>;
 		clocks = <&cru CLK_CIF_OUT>;
@@ -279,7 +279,7 @@
 
 	/* split mode: lane:2/3 */
 	gc5025: gc5025@37 {
-		status = "okay";
+		status = "disabled";
 		compatible = "galaxycore,gc5025";
 		reg = <0x37>;
 		clocks = <&pmucru CLK_WIFI>;
@@ -305,7 +305,7 @@
 	/* full mode: lane0-3 */
 	gc8034: gc8034@37 {
 		compatible = "galaxycore,gc8034";
-		status = "okay";
+		status = "disabled";
 		reg = <0x37>;
 		clocks = <&cru CLK_CIF_OUT>;
 		clock-names = "xvclk";
@@ -467,7 +467,7 @@
  */
 
 &mipi_csi2 {
-	status = "okay";
+	status = "disabled";
 
 	ports {
 		#address-cells = <1>;
@@ -637,15 +637,15 @@
 };
 
 &rkisp {
-	status = "okay";
+	status = "disabled";
 };
 
 &rkisp_mmu {
-	status = "okay";
+	status = "disabled";
 };
 
 &rkisp_vir0 {
-	status = "okay";
+	status = "disabled";
 
 	port {
 		#address-cells = <1>;
