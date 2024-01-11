@@ -123,6 +123,7 @@
 	 rockchip,wakeup-config = <
 		(0
 		| RKPM_GPIO_WKUP_EN
+		| RKPM_USB_WKUP_EN
 		| RKPM_CPU0_WKUP_EN
 		| RKPM_CPU2_WKUP_EN
 		)
