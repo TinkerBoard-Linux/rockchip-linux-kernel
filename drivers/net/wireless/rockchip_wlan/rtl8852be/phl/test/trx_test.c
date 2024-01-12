@@ -98,7 +98,7 @@ struct rtw_test_rx *_phl_query_idle_rx_req(struct phl_info_t *phl_info)
 	struct rtw_pool *rx_req_pool = &trx_test->rx_req_pool;
 	void *drv_priv = phl_to_drvpriv(phl_info);
 
-	_os_spinlock(drv_priv, &rx_req_pool->idle_lock, _ps, NULL);
+	_os_spinlock(drv_priv, &rx_req_pool->idle_lock, _bh, NULL);
 
 	if (false == list_empty(&rx_req_pool->idle_list)) {
 		rreq = list_first_entry(&rx_req_pool->idle_list,
@@ -107,7 +107,7 @@ struct rtw_test_rx *_phl_query_idle_rx_req(struct phl_info_t *phl_info)
 		rx_req_pool->idle_cnt--;
 	}
 
-	_os_spinunlock(drv_priv, &rx_req_pool->idle_lock, _ps, NULL);
+	_os_spinunlock(drv_priv, &rx_req_pool->idle_lock, _bh, NULL);
 
 	return rreq;
 }
@@ -119,7 +119,7 @@ struct rtw_test_rx *_phl_query_busy_rx_req(struct phl_info_t *phl_info)
 	struct rtw_pool *rx_req_pool = &trx_test->rx_req_pool;
 	void *drv_priv = phl_to_drvpriv(phl_info);
 
-	_os_spinlock(drv_priv, &rx_req_pool->busy_lock, _ps, NULL);
+	_os_spinlock(drv_priv, &rx_req_pool->busy_lock, _bh, NULL);
 
 	if (false == list_empty(&rx_req_pool->busy_list)) {
 		rreq = list_first_entry(&rx_req_pool->busy_list,
@@ -128,7 +128,7 @@ struct rtw_test_rx *_phl_query_busy_rx_req(struct phl_info_t *phl_info)
 		rx_req_pool->busy_cnt--;
 	}
 
-	_os_spinunlock(drv_priv, &rx_req_pool->busy_lock, _ps, NULL);
+	_os_spinunlock(drv_priv, &rx_req_pool->busy_lock, _bh, NULL);
 
 	return rreq;
 }
@@ -139,7 +139,7 @@ void _phl_release_rx_req(struct phl_info_t *phl_info, struct rtw_test_rx *rreq)
 	struct rtw_pool *rx_req_pool = &trx_test->rx_req_pool;
 	void *drv_priv = phl_to_drvpriv(phl_info);
 
-	_os_spinlock(drv_priv, &rx_req_pool->idle_lock, _ps, NULL);
+	_os_spinlock(drv_priv, &rx_req_pool->idle_lock, _bh, NULL);
 
 	_os_mem_set(drv_priv, &rreq->rx.mdata, 0,
 		    sizeof(rreq->rx.mdata));
@@ -153,7 +153,7 @@ void _phl_release_rx_req(struct phl_info_t *phl_info, struct rtw_test_rx *rreq)
 	list_add_tail(&rreq->list, &rx_req_pool->idle_list);
 	rx_req_pool->idle_cnt++;
 
-	_os_spinunlock(drv_priv, &rx_req_pool->idle_lock, _ps, NULL);
+	_os_spinunlock(drv_priv, &rx_req_pool->idle_lock, _bh, NULL);
 }
 
 void _phl_insert_busy_rx_req(struct phl_info_t *phl_info, struct rtw_test_rx *rreq)
@@ -162,12 +162,12 @@ void _phl_insert_busy_rx_req(struct phl_info_t *phl_info, struct rtw_test_rx *rr
 	struct rtw_pool *rx_req_pool = &trx_test->rx_req_pool;
 	void *drv_priv = phl_to_drvpriv(phl_info);
 
-	_os_spinlock(drv_priv, &rx_req_pool->busy_lock, _ps, NULL);
+	_os_spinlock(drv_priv, &rx_req_pool->busy_lock, _bh, NULL);
 
 	list_add_tail(&rreq->list, &rx_req_pool->busy_list);
 	rx_req_pool->busy_cnt++;
 
-	_os_spinunlock(drv_priv, &rx_req_pool->busy_lock, _ps, NULL);
+	_os_spinunlock(drv_priv, &rx_req_pool->busy_lock, _bh, NULL);
 }
 
 
@@ -247,7 +247,7 @@ struct rtw_xmit_req *_phl_query_idle_tx_req(struct phl_info_t *phl_info)
 	struct rtw_pool *tx_req_pool = &trx_test->tx_req_pool;
 	void *drv_priv = phl_to_drvpriv(phl_info);
 
-	_os_spinlock(drv_priv, &tx_req_pool->idle_lock, _ps, NULL);
+	_os_spinlock(drv_priv, &tx_req_pool->idle_lock, _bh, NULL);
 
 	if (false == list_empty(&tx_req_pool->idle_list)) {
 		treq = list_first_entry(&tx_req_pool->idle_list,
@@ -256,7 +256,7 @@ struct rtw_xmit_req *_phl_query_idle_tx_req(struct phl_info_t *phl_info)
 		tx_req_pool->idle_cnt--;
 	}
 
-	_os_spinunlock(drv_priv, &tx_req_pool->idle_lock, _ps, NULL);
+	_os_spinunlock(drv_priv, &tx_req_pool->idle_lock, _bh, NULL);
 
 	return treq;
 }
@@ -268,7 +268,7 @@ struct rtw_xmit_req *_phl_query_busy_tx_req(struct phl_info_t *phl_info)
 	struct rtw_xmit_req *treq = NULL;
 	void *drv_priv = phl_to_drvpriv(phl_info);
 
-	_os_spinlock(drv_priv, &tx_req_pool->busy_lock, _ps, NULL);
+	_os_spinlock(drv_priv, &tx_req_pool->busy_lock, _bh, NULL);
 
 	if (false == list_empty(&tx_req_pool->busy_list)) {
 		treq = list_first_entry(&tx_req_pool->busy_list,
@@ -277,7 +277,7 @@ struct rtw_xmit_req *_phl_query_busy_tx_req(struct phl_info_t *phl_info)
 		tx_req_pool->busy_cnt--;
 	}
 
-	_os_spinunlock(drv_priv, &tx_req_pool->busy_lock, _ps, NULL);
+	_os_spinunlock(drv_priv, &tx_req_pool->busy_lock, _bh, NULL);
 
 	return treq;
 }
@@ -288,14 +288,14 @@ void _phl_remove_busy_tx_req(struct phl_info_t *phl_info, struct rtw_xmit_req *t
 	struct rtw_pool *tx_req_pool = &trx_test->tx_req_pool;
 	void *drv_priv = phl_to_drvpriv(phl_info);
 
-	_os_spinlock(drv_priv, &tx_req_pool->busy_lock, _ps, NULL);
+	_os_spinlock(drv_priv, &tx_req_pool->busy_lock, _bh, NULL);
 
 	if (false == list_empty(&tx_req_pool->busy_list)) {
 		list_del(&treq->list);
 		tx_req_pool->busy_cnt--;
 	}
 
-	_os_spinunlock(drv_priv, &tx_req_pool->busy_lock, _ps, NULL);
+	_os_spinunlock(drv_priv, &tx_req_pool->busy_lock, _bh, NULL);
 }
 
 
@@ -305,7 +305,7 @@ void _phl_release_tx_req(struct phl_info_t *phl_info, struct rtw_xmit_req *treq)
 	struct rtw_pool *tx_req_pool = &trx_test->tx_req_pool;
 	void *drv_priv = phl_to_drvpriv(phl_info);
 
-	_os_spinlock(drv_priv, &tx_req_pool->idle_lock, _ps, NULL);
+	_os_spinlock(drv_priv, &tx_req_pool->idle_lock, _bh, NULL);
 
 	_os_mem_set(drv_priv, &treq->mdata, 0, sizeof(treq->mdata));
 
@@ -319,7 +319,7 @@ void _phl_release_tx_req(struct phl_info_t *phl_info, struct rtw_xmit_req *treq)
 	list_add_tail(&treq->list, &tx_req_pool->idle_list);
 	tx_req_pool->idle_cnt++;
 
-	_os_spinunlock(drv_priv, &tx_req_pool->idle_lock, _ps, NULL);
+	_os_spinunlock(drv_priv, &tx_req_pool->idle_lock, _bh, NULL);
 }
 
 void _phl_insert_busy_tx_req(struct phl_info_t *phl_info, struct rtw_xmit_req *treq)
@@ -328,11 +328,11 @@ void _phl_insert_busy_tx_req(struct phl_info_t *phl_info, struct rtw_xmit_req *t
 	struct rtw_pool *tx_req_pool = &trx_test->tx_req_pool;
 	void *drv_priv = phl_to_drvpriv(phl_info);
 
-	_os_spinlock(drv_priv, &tx_req_pool->busy_lock, _ps, NULL);
+	_os_spinlock(drv_priv, &tx_req_pool->busy_lock, _bh, NULL);
 	list_add_tail(&treq->list, &tx_req_pool->busy_list);
 	tx_req_pool->busy_cnt++;
 
-	_os_spinunlock(drv_priv, &tx_req_pool->busy_lock, _ps, NULL);
+	_os_spinunlock(drv_priv, &tx_req_pool->busy_lock, _bh, NULL);
 }
 
 
@@ -344,6 +344,9 @@ void _phl_free_tx_pkt_pool(void *phl)
 	void *drv_priv = phl_to_drvpriv(phl_info);
 	struct rtw_payload *tpkt = NULL;
 	u32 i = 0;
+#ifdef CONFIG_PCI_HCI
+	void *rtw_dma_pool = NULL;
+#endif
 
 	PHL_INFO("_phl_free_tx_pkt_pool : idle counter (%d), busy counter (%d), total counter (%d)\n",
 			 tx_pkt_pool->idle_cnt, tx_pkt_pool->busy_cnt, tx_pkt_pool->total_cnt);
@@ -357,13 +360,14 @@ void _phl_free_tx_pkt_pool(void *phl)
 		INIT_LIST_HEAD(&tpkt->list);
 		if (NULL != tpkt->pkt.vir_addr) {
 			#ifdef CONFIG_PCI_HCI
-			_os_shmem_free(drv_priv, NULL,
+			_os_shmem_free(drv_priv,
+						rtw_dma_pool,
 						tpkt->pkt.vir_addr,
-						(_dma *)&tpkt->pkt.phy_addr_l,
-						(_dma *)&tpkt->pkt.phy_addr_h,
+						&tpkt->pkt.phy_addr_l,
+						&tpkt->pkt.phy_addr_h,
 						MAX_TEST_PAYLOAD_SIZE,
-						false,
-						PCI_DMA_TODEVICE,
+						tpkt->cache,
+						DMA_TO_DEVICE,
 						tpkt->os_rsvd[0]);
 			#else
 			_os_mem_free(drv_priv, tpkt->pkt.vir_addr,
@@ -395,6 +399,14 @@ enum rtw_phl_status _phl_alloc_tx_pkt_pool(void *phl, u32 tx_pkt_num,
 	struct rtw_pool *tx_pkt_pool = &trx_test->tx_pkt_pool;
 	void *drv_priv = phl_to_drvpriv(phl_info);
 	struct rtw_payload *tpkt = NULL;
+#ifdef CONFIG_PCI_HCI
+	void *rtw_dma_pool = NULL;
+#endif
+#ifdef CONFIG_TX_PKT_NONCACHE_ADDR
+	enum cache_addr_type cache = NONCACHE_ADDR;
+#else
+	enum cache_addr_type cache = CACHE_ADDR;
+#endif
 	u32 buf_len = 0, i = 0;
 	FUNCIN_WSTS(status);
 
@@ -416,13 +428,14 @@ enum rtw_phl_status _phl_alloc_tx_pkt_pool(void *phl, u32 tx_pkt_num,
 		tpkt = (struct rtw_payload *)tx_pkt_pool->buf;
 		for (i = 0; i < tx_pkt_num; i++) {
 			INIT_LIST_HEAD(&tpkt[i].list);
+			tpkt[i].cache = cache;
 			#ifdef CONFIG_PCI_HCI
-			tpkt[i].pkt.vir_addr = _os_shmem_alloc(drv_priv, NULL,
-						  (_dma *)&tpkt[i].pkt.phy_addr_l,
-						  (_dma *)&tpkt[i].pkt.phy_addr_h,
+			tpkt[i].pkt.vir_addr = _os_shmem_alloc(drv_priv, rtw_dma_pool,
+						  &tpkt[i].pkt.phy_addr_l,
+						  &tpkt[i].pkt.phy_addr_h,
 						  tx_pkt_size,
-						  false,
-						  PCI_DMA_TODEVICE,
+						  tpkt[i].cache,
+						  DMA_TO_DEVICE,
 						  &tpkt[i].os_rsvd[0]);
 			#else /*USB/SDIO*/
 			tpkt[i].pkt.vir_addr = _os_mem_alloc(drv_priv, tx_pkt_size);
@@ -459,7 +472,7 @@ struct rtw_payload *_phl_query_idle_tx_pkt(struct phl_info_t *phl_info)
 	struct rtw_payload *tpkt = NULL;
 	void *drv_priv = phl_to_drvpriv(phl_info);
 
-	_os_spinlock(drv_priv, &tx_pkt_pool->idle_lock, _ps, NULL);
+	_os_spinlock(drv_priv, &tx_pkt_pool->idle_lock, _bh, NULL);
 
 	if (false == list_empty(&tx_pkt_pool->idle_list)) {
 		tpkt = list_first_entry(&tx_pkt_pool->idle_list,
@@ -468,7 +481,7 @@ struct rtw_payload *_phl_query_idle_tx_pkt(struct phl_info_t *phl_info)
 		tx_pkt_pool->idle_cnt--;
 	}
 
-	_os_spinunlock(drv_priv, &tx_pkt_pool->idle_lock, _ps, NULL);
+	_os_spinunlock(drv_priv, &tx_pkt_pool->idle_lock, _bh, NULL);
 
 	return tpkt;
 }
@@ -480,7 +493,7 @@ struct rtw_payload *_phl_query_busy_tx_pkt(struct phl_info_t *phl_info)
 	struct rtw_payload *tpkt = NULL;
 	void *drv_priv = phl_to_drvpriv(phl_info);
 
-	_os_spinlock(drv_priv, &tx_pkt_pool->busy_lock, _ps, NULL);
+	_os_spinlock(drv_priv, &tx_pkt_pool->busy_lock, _bh, NULL);
 
 	if (false == list_empty(&tx_pkt_pool->busy_list)) {
 		tpkt = list_first_entry(&tx_pkt_pool->busy_list,
@@ -489,7 +502,7 @@ struct rtw_payload *_phl_query_busy_tx_pkt(struct phl_info_t *phl_info)
 		tx_pkt_pool->busy_cnt--;
 	}
 
-	_os_spinunlock(drv_priv, &tx_pkt_pool->busy_lock, _ps, NULL);
+	_os_spinunlock(drv_priv, &tx_pkt_pool->busy_lock, _bh, NULL);
 
 	return tpkt;
 }
@@ -500,14 +513,14 @@ void _phl_remove_busy_tx_pkt(struct phl_info_t *phl_info, struct rtw_payload *tp
 	struct rtw_pool *tx_pkt_pool = &trx_test->tx_pkt_pool;
 	void *drv_priv = phl_to_drvpriv(phl_info);
 
-	_os_spinlock(drv_priv, &tx_pkt_pool->busy_lock, _ps, NULL);
+	_os_spinlock(drv_priv, &tx_pkt_pool->busy_lock, _bh, NULL);
 
 	if (false == list_empty(&tx_pkt_pool->busy_list)) {
 		list_del(&tpkt->list);
 		tx_pkt_pool->busy_cnt--;
 	}
 
-	_os_spinunlock(drv_priv, &tx_pkt_pool->busy_lock, _ps, NULL);
+	_os_spinunlock(drv_priv, &tx_pkt_pool->busy_lock, _bh, NULL);
 }
 
 
@@ -517,7 +530,7 @@ void _phl_release_tx_pkt(struct phl_info_t *phl_info, struct rtw_payload *tpkt)
 	struct rtw_pool *tx_pkt_pool = &trx_test->tx_pkt_pool;
 	void *drv_priv = phl_to_drvpriv(phl_info);
 
-	_os_spinlock(drv_priv, &tx_pkt_pool->idle_lock, _ps, NULL);
+	_os_spinlock(drv_priv, &tx_pkt_pool->idle_lock, _bh, NULL);
 
 	_os_mem_set(drv_priv, tpkt->pkt.vir_addr, 0, tpkt->pkt.length);
 	tpkt->pkt.length = 0;
@@ -526,7 +539,7 @@ void _phl_release_tx_pkt(struct phl_info_t *phl_info, struct rtw_payload *tpkt)
 	list_add_tail(&tpkt->list, &tx_pkt_pool->idle_list);
 	tx_pkt_pool->idle_cnt++;
 
-	_os_spinunlock(drv_priv, &tx_pkt_pool->idle_lock, _ps, NULL);
+	_os_spinunlock(drv_priv, &tx_pkt_pool->idle_lock, _bh, NULL);
 }
 
 void _phl_insert_busy_tx_pkt(struct phl_info_t *phl_info, struct rtw_payload *tpkt)
@@ -535,12 +548,12 @@ void _phl_insert_busy_tx_pkt(struct phl_info_t *phl_info, struct rtw_payload *tp
 	struct rtw_pool *tx_pkt_pool = &trx_test->tx_pkt_pool;
 	void *drv_priv = phl_to_drvpriv(phl_info);
 
-	_os_spinlock(drv_priv, &tx_pkt_pool->busy_lock, _ps, NULL);
+	_os_spinlock(drv_priv, &tx_pkt_pool->busy_lock, _bh, NULL);
 
 	list_add_tail(&tpkt->list, &tx_pkt_pool->busy_list);
 	tx_pkt_pool->busy_cnt++;
 
-	_os_spinunlock(drv_priv, &tx_pkt_pool->busy_lock, _ps, NULL);
+	_os_spinunlock(drv_priv, &tx_pkt_pool->busy_lock, _bh, NULL);
 }
 
 u8 _phl_is_tx_test_done(void *phl)
@@ -571,24 +584,27 @@ extern enum rtw_phl_status
 phl_wifi_role_start(struct phl_info_t *phl_info,
 				struct rtw_wifi_role_t *wrole,
 				struct rtw_phl_stainfo_t *sta);
-enum rtw_phl_status _phl_test_add_role(
-					   void *phl,
-				       struct rtw_trx_test_param *test_param)
+enum rtw_phl_status
+_phl_test_add_role(void *phl, struct rtw_trx_test_param *test_param)
 {
 	enum rtw_phl_status phl_status = RTW_PHL_STATUS_FAILURE;
 	struct phl_info_t *phl_info = (struct phl_info_t *)phl;
 	struct rtw_phl_com_t *phl_com = phl_info->phl_com;
 	struct rtw_t_meta_data *txcap = NULL;
 	struct rtw_wifi_role_t *test_wrole = &phl_com->wifi_roles[0];
+	struct rtw_wifi_role_link_t *rlink = get_rlink(test_wrole,
+	                                               RTW_RLINK_PRIMARY);
 	struct rtw_phl_stainfo_t *sta_info = NULL;
 
 	if (NULL != test_param) {
 		txcap = &test_param->tx_cap;
 
-		test_wrole->hw_band = txcap->band;
-		test_wrole->hw_port = (u8)txcap->macid;
+		rlink->hw_port = (u8)txcap->macid;
 
-		sta_info = rtw_phl_get_stainfo_by_addr(phl_info, test_wrole, test_wrole->mac_addr);
+		sta_info = rtw_phl_get_stainfo_by_addr(phl_info,
+		                                       test_wrole,
+		                                       rlink,
+		                                       test_wrole->mac_addr);
 		if (NULL != sta_info) {
 			test_param->tx_cap.macid = sta_info->macid;
 			phl_status = phl_wifi_role_start(phl_info, test_wrole, sta_info);
@@ -1176,7 +1192,7 @@ end:
 void rtw_phl_trx_default_param(void *phl, struct rtw_trx_test_param *test_param)
 {
 	struct phl_info_t *phl_info = (struct phl_info_t *)phl;
-	_os_mem_set(phl_to_drvpriv(phl_info), test_param, 0, sizeof(struct rtw_trx_test_param));
+	_os_mem_set(phl_to_drvpriv(phl_info), test_param, 0, sizeof(test_param));
 	test_param->mode = TEST_MODE_PHL_TX_RING_TEST;
 	test_param->ap_mode = 0;
 	test_param->pkt_type = TEST_PKT_TYPE_BC;

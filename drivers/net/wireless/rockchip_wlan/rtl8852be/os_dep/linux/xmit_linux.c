@@ -329,15 +329,19 @@ void rtw_os_xmit_schedule(_adapter *padapter)
 	_rtw_spinlock_bh(&pxmitpriv->lock);
 
 	if (rtw_txframes_pending(padapter))
-		rtw_tasklet_hi_schedule(&pxmitpriv->xmit_tasklet);
+#if defined(CONFIG_TX_AMSDU_SW_MODE) && defined(CONFIG_RTW_TX_AMSDU_USE_WQ)
+	_set_workitem_cpu(&pxmitpriv->xmit_workitem);
+#else
+	rtw_tasklet_hi_schedule(&pxmitpriv->xmit_tasklet);
+#endif
 
 	_rtw_spinunlock_bh(&pxmitpriv->lock);
-	
+
 	#if 0 /*defined(CONFIG_PCI_HCI) && defined(CONFIG_XMIT_THREAD_MODE)*/
 	if (_rtw_queue_empty(&padapter->xmitpriv.pending_xmitbuf_queue) == _FALSE)
 		_rtw_up_sema(&padapter->xmitpriv.xmit_sema);
 	#endif
-	
+
 
 #endif
 }
@@ -605,6 +609,11 @@ int rtw_os_tx(struct sk_buff *pkt, _nic_hdl pnetdev)
 #endif
 	)
 		goto drop_packet;
+
+	if (adapter_to_pwrctl(padapter)->bInSuspend == _TRUE) {
+		RTW_INFO("[%s] Stop TX because bInSuspend has been carried! \n", __func__);
+		goto drop_packet;
+	}
 
 	PHLTX_LOG;
 
