@@ -622,7 +622,7 @@
 };
 
 &rkcif_mipi_lvds {
-	status = "okay";
+	status = "disabled";
 
 	port {
 		cif_mipi_in: endpoint {
