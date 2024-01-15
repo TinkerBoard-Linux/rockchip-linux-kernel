@@ -17,6 +17,8 @@ snd-soc-rockchip-vad-$(CONFIG_ARM64) += vad_preprocess_arm64.o
 snd-soc-rockchip-vad-$(CONFIG_ARM) += vad_preprocess_arm.o
 endif
 
+ccflags-y += -DROCKCHIP_AUDIO
+
 obj-$(CONFIG_SND_SOC_ROCKCHIP) += snd-soc-rockchip.o
 obj-$(CONFIG_SND_SOC_ROCKCHIP_DLP) += snd-soc-rockchip-dlp.o
 obj-$(CONFIG_SND_SOC_ROCKCHIP_I2S) += snd-soc-rockchip-i2s.o
@@ -34,6 +36,11 @@ snd-soc-rockchip-multicodecs-objs := rockchip_multicodecs.o
 snd-soc-rockchip-rt5645-objs := rockchip_rt5645.o
 snd-soc-rk3288-hdmi-analog-objs := rk3288_hdmi_analog.o
 snd-soc-rk3399-gru-sound-objs := rk3399_gru_sound.o
+snd-soc-hifiberry-dacplus-objs := hifiberry_dacplus.o
+snd-soc-iqaudio-dac-objs := iqaudio-dac.o
+snd-soc-justboom-dac-objs := justboom-dac.o
+snd-soc-rpi-simple-soundcard-objs := rpi-simple-soundcard.o
+snd-soc-rpi-wm8804-soundcard-objs := rpi-wm8804-soundcard.o
 
 obj-$(CONFIG_SND_SOC_ROCKCHIP_HDMI) += snd-soc-rockchip-hdmi.o
 obj-$(CONFIG_SND_SOC_ROCKCHIP_MAX98090) += snd-soc-rockchip-max98090.o
@@ -41,3 +48,8 @@ obj-$(CONFIG_SND_SOC_ROCKCHIP_MULTICODECS) += snd-soc-rockchip-multicodecs.o
 obj-$(CONFIG_SND_SOC_ROCKCHIP_RT5645) += snd-soc-rockchip-rt5645.o
 obj-$(CONFIG_SND_SOC_RK3288_HDMI_ANALOG) += snd-soc-rk3288-hdmi-analog.o
 obj-$(CONFIG_SND_SOC_RK3399_GRU_SOUND) += snd-soc-rk3399-gru-sound.o
+obj-$(CONFIG_SND_SOC_HIFIBERRY_DACPLUS) += snd-soc-hifiberry-dacplus.o
+obj-$(CONFIG_SND_SOC_IQAUDIO_DAC) += snd-soc-iqaudio-dac.o
+obj-$(CONFIG_SND_SOC_JUSTBOOM_DAC) += snd-soc-justboom-dac.o
+obj-$(CONFIG_SND_RPI_SIMPLE_SOUNDCARD) += snd-soc-rpi-simple-soundcard.o
+obj-$(CONFIG_SND_RPI_WM8804_SOUNDCARD) += snd-soc-rpi-wm8804-soundcard.o
