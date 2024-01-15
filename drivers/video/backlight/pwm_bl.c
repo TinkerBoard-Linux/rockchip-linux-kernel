@@ -20,6 +20,8 @@
 #include <linux/slab.h>
 
 unsigned int minimal_brightness = 0;
+bool hdmi_backlight = false;
+struct backlight_device *g_bl;
 static bool bl_quiescent;
 module_param_named(quiescent, bl_quiescent, bool, 0600);
 MODULE_PARM_DESC(quiescent,
@@ -415,6 +417,11 @@ static int pwm_backlight_parse_dt(struct device *dev,
 		data->max_brightness--;
 	}
 
+	if(of_property_read_bool(node, "hdmi-backlight")) {
+		hdmi_backlight = true;
+		pr_info("%s: set hdmi_backlight to true\n", __func__);
+	}
+
 	return 0;
 }
 
@@ -704,6 +711,11 @@ static int pwm_backlight_probe(struct platform_device *pdev)
 	backlight_update_status(bl);
 
 	platform_set_drvdata(pdev, bl);
+
+	if(hdmi_backlight) {
+		g_bl = bl;
+	}
+
 	return 0;
 
 err_alloc:

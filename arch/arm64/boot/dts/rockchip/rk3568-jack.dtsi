@@ -276,6 +276,10 @@
 	status = "okay";
 };
 
+&pwm14 {
+	status = "okay";
+};
+
 &edp_phy {
 	status = "disabled";
 };
@@ -580,6 +584,12 @@
 
 		gmac1_pmeb_gpios:  gmac1-pmeb-gpios {
 			rockchip,pins = <3 RK_PA7 RK_FUNC_GPIO &pcfg_pull_none>;
+		};
+	};
+
+	hdmi-bl-control {
+		pinctrl_hdmi_bl_en: hdmi_bl_en {
+			rockchip,pins = <4 RK_PC3 RK_FUNC_GPIO &pcfg_pull_none>;
 		};
 	};
 

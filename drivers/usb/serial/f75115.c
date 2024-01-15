@@ -50,8 +50,11 @@
 #include <linux/i2c-algo-bit.h>
 #include <linux/gpio/machine.h>
 #include <linux/pwm.h>
-
+#include <linux/backlight.h>
 //#include "f75115.h"
+
+extern bool hdmi_backlight;
+extern struct backlight_device *g_bl;
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3, 0, 0)
 #define __dynamic_dev_dbg(...)
@@ -6039,6 +6042,16 @@ static void f75115_gpio_init_status(struct usb_serial *serial)
         gpio_export(base + F75115_GPIO22, 1);
         gpio_export(base + F75115_GPIO46, 1);
 
+	if(hdmi_backlight){
+		if(g_bl) {
+			pr_info("%s: backlight_hdmi enable\n", __func__);
+			mdelay(400);
+			backlight_enable(g_bl);
+		}
+		else {
+			pr_info("%s: backlight_hdmi doesn't enable\n", __func__);
+		}
+	}
 }
 
 #ifdef DUMP_GPIO_INIT_SET
