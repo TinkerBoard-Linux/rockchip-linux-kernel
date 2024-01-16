@@ -1594,7 +1594,7 @@
 				regulator-max-microvolt = <3300000>;
 				regulator-name = "vccio_sd";
 				regulator-state-mem {
-					regulator-off-in-suspend;
+					regulator-on-in-suspend;
 				};
 			};
 
@@ -1668,7 +1668,7 @@
 				regulator-boot-on;
 				regulator-name = "vcc3v3_sd";
 				regulator-state-mem {
-					regulator-off-in-suspend;
+					regulator-on-in-suspend;
 				};
 			};
 		};
