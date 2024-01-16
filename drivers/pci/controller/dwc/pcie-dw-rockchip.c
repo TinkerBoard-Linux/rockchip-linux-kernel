@@ -184,6 +184,7 @@ struct rk_pcie {
 	bool				is_signal_test;
 	bool				bifurcation;
 	bool				supports_clkreq;
+	bool				vpcie3v3_always_on;
 	struct regulator		*vpcie3v3;
 	struct irq_domain		*irq_domain;
 	raw_spinlock_t			intx_lock;
@@ -2030,6 +2031,11 @@ static int rk_pcie_really_probe(void *p)
 	rk_pcie->supports_clkreq = device_property_read_bool(dev, "supports-clkreq");
 
 retry_regulator:
+	if (device_property_read_bool(dev, "vpcie3v3-always-on"))
+		rk_pcie->vpcie3v3_always_on = true;
+	else
+		rk_pcie->vpcie3v3_always_on = false;
+
 	/* DON'T MOVE ME: must be enable before phy init */
 	rk_pcie->vpcie3v3 = devm_regulator_get_optional(dev, "vpcie3v3");
 	if (IS_ERR(rk_pcie->vpcie3v3)) {
@@ -2420,7 +2426,8 @@ no_l2:
 	rk_pcie->in_suspend = true;
 
 	gpiod_set_value_cansleep(rk_pcie->rst_gpio, 0);
-	ret = rk_pcie_disable_power(rk_pcie);
+	if (rk_pcie->vpcie3v3_always_on == false)
+		ret = rk_pcie_disable_power(rk_pcie);
 
 	dev_info(dev, "suspend!");
 	return ret;
