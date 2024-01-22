@@ -124,7 +124,7 @@ USE_TRUE_PHY = y
 CONFIG_I386_BUILD_VERIFY = n
 CONFIG_RTW_MBO = n
 # CONFIG_RTKM - n/m/y for not support / standalone / built-in
-CONFIG_RTKM ?= y
+CONFIG_RTKM ?= n
 ########################## Android ###########################
 # CONFIG_RTW_ANDROID - 0: no Android, 4/5/6/7/8/9/10/11/12 : Android version
 CONFIG_RTW_ANDROID = 0
