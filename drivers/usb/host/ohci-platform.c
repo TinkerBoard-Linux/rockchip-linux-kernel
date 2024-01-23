@@ -219,6 +219,10 @@ static int ohci_platform_probe(struct platform_device *dev)
 	device_init_wakeup(hcd->self.controller, true);
 	device_init_wakeup(&hcd->self.root_hub->dev, true);
 
+	if (of_device_is_compatible(dev->dev.of_node,
+				    "rockchip,rk3588-ohci"))
+		device_enable_async_suspend(hcd->self.controller);
+
 	platform_set_drvdata(dev, hcd);
 
 	return err;
