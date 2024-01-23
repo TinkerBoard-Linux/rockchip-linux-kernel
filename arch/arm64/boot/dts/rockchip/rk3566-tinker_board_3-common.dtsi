@@ -2192,6 +2192,10 @@
 &uart1 {
 	status = "disabled";
 };
+&uart4 {
+	pinctrl-0 = <&uart4m1_xfer>;
+	status = "disabled";
+};
 &spi3 {
         pinctrl-0 = <&spi3m1_pins &spi3m1_cs0>;
         cs-gpios = <0>;
@@ -2225,13 +2229,33 @@
        pinctrl-0 = <&spdifm1_tx>;
        status = "disabled";
 };
-&pwm7 {
+&pwm0 {
+	pinctrl-0 = <&pwm0m1_pins>;
+	status = "disabled";
+};
+&pwm1 {
+	status = "disabled";
+};
+&pwm2 {
 	status = "disabled";
 };
 &pwm8 {
 	status = "disabled";
 };
-&pwm9 {
+&pwm12 {
+	pinctrl-0 = <&pwm12m1_pins>;
+	status = "disabled";
+};
+&pwm13 {
+	pinctrl-0 = <&pwm13m1_pins>;
+	status = "disabled";
+};
+&pwm14 {
+	pinctrl-0 = <&pwm14m1_pins>;
+	status = "disabled";
+};
+&pwm15 {
+	pinctrl-0 = <&pwm15m0_pins &pwm15m1_pins>;
 	status = "disabled";
 };
 &xin32k {
