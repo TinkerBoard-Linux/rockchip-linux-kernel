@@ -5331,6 +5331,13 @@ int stmmac_dvr_probe(struct device *device,
 		goto error_phy_setup;
 	}
 
+	if (get_board_model() == 3568) {
+		if (!strcmp(dev_name(device), "fe2a0000.ethernet"))
+			strcpy(ndev->name, "eth0");
+		else if (!strcmp(dev_name(device), "fe010000.ethernet"))
+			strcpy(ndev->name, "eth1");
+	}
+
 	ret = register_netdev(ndev);
 	if (ret) {
 		dev_err(priv->device, "%s: ERROR %i registering the device\n",
