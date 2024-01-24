@@ -2817,8 +2817,6 @@ static int rk_gmac_probe(struct platform_device *pdev)
 		goto err_remove_config_dt;
 
 	ret = stmmac_dvr_probe(&pdev->dev, plat_dat, &stmmac_res);
-	if (ret == -EPROBE_DEFER)
-		return -EPROBE_DEFER;
 
 	if (ret)
 		goto err_gmac_powerdown;
@@ -2944,7 +2942,18 @@ static struct platform_driver rk_gmac_dwmac_driver = {
 		.of_match_table = rk_gmac_dwmac_match,
 	},
 };
-module_platform_driver(rk_gmac_dwmac_driver);
+
+static int __init rockchip_rk_gmac_dwmac_driver_init(void)
+{
+	return platform_driver_register(&rk_gmac_dwmac_driver);
+}
+late_initcall_sync(rockchip_rk_gmac_dwmac_driver_init);
+
+static void __exit rockchip_rk_gmac_dwmac_driver_exit(void)
+{
+	platform_driver_unregister(&rk_gmac_dwmac_driver);
+}
+module_exit(rockchip_rk_gmac_dwmac_driver_exit);
 
 MODULE_AUTHOR("Chen-Zhi (Roger Chen) <roger.chen@rock-chips.com>");
 MODULE_DESCRIPTION("Rockchip RK3288 DWMAC specific glue layer");
