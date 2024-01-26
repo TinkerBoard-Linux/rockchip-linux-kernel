@@ -64,7 +64,7 @@ static void pwm_backlight_power_on(struct pwm_bl_data *pb)
 	if (err < 0)
 		dev_err(pb->dev, "failed to enable power supply\n");
 
-	if (!pb->power_sequence_reverse) {
+	if (pb->power_sequence_reverse) {
 		if (pb->soc_enablekl)
 			gpiod_set_value_cansleep(pb->soc_enablekl, 1);
 
@@ -78,7 +78,7 @@ static void pwm_backlight_power_on(struct pwm_bl_data *pb)
 	if (pb->post_pwm_on_delay)
 		msleep(pb->post_pwm_on_delay);
 
-	if (pb->power_sequence_reverse) {
+	if (!pb->power_sequence_reverse) {
 		if (pb->enable_soc_enablekl_delay)
 			msleep(pb->enable_soc_enablekl_delay);
 
@@ -100,7 +100,7 @@ static void pwm_backlight_power_off(struct pwm_bl_data *pb)
 	if (!pb->enabled && !state.enabled)
 		return;
 
-	if (!pb->power_sequence_reverse) {
+	if (pb->power_sequence_reverse) {
 		if (pb->soc_enablekl)
 			gpiod_set_value_cansleep(pb->soc_enablekl, 0);
 
@@ -115,7 +115,7 @@ static void pwm_backlight_power_off(struct pwm_bl_data *pb)
 	state.duty_cycle = 0;
 	pwm_apply_state(pb->pwm, &state);
 
-	if (pb->power_sequence_reverse) {
+	if (!pb->power_sequence_reverse) {
 		if (pb->disable_soc_enablekl_delay)
 			msleep(pb->disable_soc_enablekl_delay);
 
