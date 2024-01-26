@@ -244,6 +244,7 @@ struct rockchip_usb2phy_cfg {
  * @prev_iddig: previous otg port id pin status.
  * @sel_pipe_phystatus: select pipe phystatus from grf.
  * @suspended: phy suspended flag.
+ * @disconnected: phy host port disconnected flag.
  * @typec_vbus_det: Type-C otg vbus detect.
  * @utmi_avalid: utmi avalid status usage flag.
  *	true	- use avalid to get vbus status
@@ -279,6 +280,7 @@ struct rockchip_usb2phy_port {
 	bool		prev_iddig;
 	bool		sel_pipe_phystatus;
 	bool		suspended;
+	bool            disconnected;
 	bool		typec_vbus_det;
 	bool		utmi_avalid;
 	bool		vbus_attached;
@@ -944,7 +946,20 @@ static int rockchip_usb2phy_power_off(struct phy *phy)
 		goto unlock;
 	}
 
-	ret = property_enable(base, &rport->port_cfg->phy_sus, true);
+	/*
+	 * For the USB2 port of USB3 Host interface on RK3566 and
+	 * RK3568, it select suspend control from controller by
+	 * default. When system enter deep sleep , the control from
+	 * controller is invalid, use grf suspend control instead
+	 * of the controller.
+	 */
+	if ((soc_is_rk3566() || soc_is_rk3568()) &&
+	    (rphy->phy_cfg->reg == 0xfe8a0000) &&
+	    (rport->port_id == USB2PHY_PORT_HOST) &&
+	    (rport->disconnected != true))
+		ret = property_enable(base, &rport->port_cfg->phy_sus_host_port, true);
+	else
+		ret = property_enable(base, &rport->port_cfg->phy_sus, true);
 	if (ret)
 		goto unlock;
 
@@ -1622,6 +1637,8 @@ static void rockchip_usb2phy_sm_work(struct work_struct *work)
 			rport->host_disconnect;
 	}
 
+	rport->disconnected = false;
+
 	switch (state) {
 	case PHY_STATE_HS_ONLINE:
 		dev_dbg(&rport->phy->dev, "HS online\n");
@@ -1666,6 +1683,7 @@ static void rockchip_usb2phy_sm_work(struct work_struct *work)
 	case PHY_STATE_DISCONNECT:
 		if (!rport->suspended) {
 			dev_dbg(&rport->phy->dev, "Disconnected\n");
+			rport->disconnected = true;
 			mutex_unlock(&rport->mutex);
 			rockchip_usb2phy_power_off(rport->phy);
 			mutex_lock(&rport->mutex);
@@ -2991,7 +3009,6 @@ static int rockchip_usb2phy_pm_suspend(struct device *dev)
 	unsigned int index;
 	int ret = 0;
 	bool wakeup_enable = false;
-	struct regmap *base = get_reg_base(rphy);
 
 	if (device_may_wakeup(rphy->dev))
 		wakeup_enable = true;
@@ -3040,24 +3057,6 @@ static int rockchip_usb2phy_pm_suspend(struct device *dev)
 			enable_irq_wake(rport->bvalid_irq);
 
 		mutex_lock(&rport->mutex);
-
-		/*
-		 * For the USB2 port of USB3 Host interface on RK3566 and
-		 * RK3568, it select suspend control from controller by
-		 * default. When system enter deep sleep , the control from
-		 * controller is invalid, use grf suspend control instead
-		 * of the controller.
-		 */
-		if ((soc_is_rk3566() || soc_is_rk3568()) &&
-		    (rphy->phy_cfg->reg == 0xfe8a0000) &&
-		    (rport->port_id == USB2PHY_PORT_HOST)) {
-			ret = property_enable(base, &rport->port_cfg->phy_sus_host_port, true);
-			dev_info(rphy->dev, "suspend host port\n");
-			if (ret) {
-				dev_err(rphy->dev, "failed to suspend host port\n");
-				return ret;
-			}
-		}
 
 		/* activate the linestate to detect the next interrupt. */
 		ret = rockchip_usb2phy_enable_line_irq(rphy, rport, true);
