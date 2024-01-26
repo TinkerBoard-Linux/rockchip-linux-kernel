@@ -5100,7 +5100,9 @@ int stmmac_reinit_ringparam(struct net_device *dev, u32 rx_size, u32 tx_size)
  * Return:
  * returns 0 on success, otherwise errno.
  */
+#ifdef CONFIG_BOARDINFO
 extern int get_board_model(void);
+#endif
 int stmmac_dvr_probe(struct device *device,
 		     struct plat_stmmacenet_data *plat_dat,
 		     struct stmmac_resources *res)
@@ -5169,7 +5171,7 @@ int stmmac_dvr_probe(struct device *device,
 	if (ret)
 		goto error_hw_init;
 
-
+#ifdef CONFIG_BOARDINFO
 	if (get_board_model() == 3568) {
 		if (!strcmp(dev_name(device), "fe2a0000.ethernet"))
 			gmac_num = 0;
@@ -5180,6 +5182,9 @@ int stmmac_dvr_probe(struct device *device,
 	} else {
 		gmac_num = 0;
 	}
+#else
+	gmac_num = 0;
+#endif
 
 	stmmac_check_ether_addr(priv);
 
@@ -5331,12 +5336,14 @@ int stmmac_dvr_probe(struct device *device,
 		goto error_phy_setup;
 	}
 
+#ifdef CONFIG_BOARDINFO
 	if (get_board_model() == 3568) {
 		if (!strcmp(dev_name(device), "fe2a0000.ethernet"))
 			strcpy(ndev->name, "eth0");
 		else if (!strcmp(dev_name(device), "fe010000.ethernet"))
 			strcpy(ndev->name, "eth1");
 	}
+#endif
 
 	ret = register_netdev(ndev);
 	if (ret) {
