@@ -195,7 +195,6 @@ static int ohci_platform_probe(struct platform_device *dev)
 
 	pm_runtime_set_active(&dev->dev);
 	pm_runtime_enable(&dev->dev);
-	pm_runtime_get_sync(&dev->dev);
 	if (pdata->power_on) {
 		err = pdata->power_on(dev);
 		if (err < 0)
@@ -216,8 +215,6 @@ static int ohci_platform_probe(struct platform_device *dev)
 		goto err_power;
 
 	device_wakeup_enable(hcd->self.controller);
-	device_init_wakeup(hcd->self.controller, true);
-	device_init_wakeup(&hcd->self.root_hub->dev, true);
 
 	if (of_device_is_compatible(dev->dev.of_node,
 				    "rockchip,rk3588-ohci"))
@@ -231,7 +228,6 @@ err_power:
 	if (pdata->power_off)
 		pdata->power_off(dev);
 err_reset:
-	pm_runtime_put_sync(&dev->dev);
 	pm_runtime_disable(&dev->dev);
 	reset_control_assert(priv->resets);
 err_put_clks:
@@ -253,6 +249,7 @@ static int ohci_platform_remove(struct platform_device *dev)
 	struct ohci_platform_priv *priv = hcd_to_ohci_priv(hcd);
 	int clk;
 
+	pm_runtime_get_sync(&dev->dev);
 	usb_remove_hcd(hcd);
 
 	if (pdata->power_off)
@@ -287,11 +284,8 @@ static int ohci_platform_suspend(struct device *dev)
 	if (ret)
 		return ret;
 
-	if (pdata->power_suspend && !do_wakeup)
+	if (pdata->power_suspend)
 		pdata->power_suspend(pdev);
-
-	if (do_wakeup)
-		enable_irq_wake(hcd->irq);
 
 	return ret;
 }
@@ -301,12 +295,8 @@ static int ohci_platform_resume(struct device *dev)
 	struct usb_hcd *hcd = dev_get_drvdata(dev);
 	struct usb_ohci_pdata *pdata = dev_get_platdata(dev);
 	struct platform_device *pdev = to_platform_device(dev);
-	bool do_wakeup = device_may_wakeup(dev);
 
-	if (do_wakeup)
-		disable_irq_wake(hcd->irq);
-
-	if (pdata->power_on && !do_wakeup) {
+	if (pdata->power_on) {
 		int err = pdata->power_on(pdev);
 		if (err < 0)
 			return err;
