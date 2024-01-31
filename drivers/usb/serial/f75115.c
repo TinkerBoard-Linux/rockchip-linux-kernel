@@ -10,6 +10,7 @@
 #define SPI_HWMODE
 #define I2C_HWMODE
 #define PWM_MODE
+//#define DUMP_GPIO_INIT_SET
 
 #ifdef ENABLE_CUSTOM_IOCTLS
 #define MULTIDROP_ENABLE
@@ -37,7 +38,7 @@
 //#include <linux/spi/spi_bitbang.h>
 //#include "spi_gpio.h"
 
-#define DRIVER_VER "v1.02-20231205a1"
+#define DRIVER_VER "v1.03.1-20240124"
 
 #include <linux/platform_device.h>
 #if LINUX_VERSION_CODE <= KERNEL_VERSION(4, 17, 0)
@@ -71,7 +72,7 @@
 	       ##arg)
 #endif
 
-#define VERSION "$Rev: 19 $"
+#define VERSION "$Rev: 20 $"
 #define GPIO_OUTPUT_FAST_MODE
 
 /* Serial Port register Address */
@@ -361,6 +362,7 @@ struct io_map_value {
 	struct out_pin port[MAX_NUM_PORTS + 1];
 };
 
+#if 0
 static const struct io_map_value f75115_rs232_control = {
 	FINTEK_DEVICE_ID,
 	F75115_NUM_PORT,
@@ -983,6 +985,7 @@ static const struct io_map_value *f75115_mode_control[uart_mode_invalid] = {
 	&f75115_rs422_term_control,   &f75115_rs232_coexist_control,
 	&f75115_rs485_1_term_control, &f75115_shutdown_control,
 };
+#endif
 
 static unsigned int pin0_mode_table[] = { 0x2ad2, 0x2ad4, 0x2ad6, 0x2ada,
 					  0x2adc };
@@ -1134,6 +1137,7 @@ struct f75115_i2c_priv {
 	struct i2c_adapter adapter;
 	struct usb_device *dev;
 	int chan;
+	int fw_ver;
 };
 
 static u32 f75115_i2c_func(struct i2c_adapter *adap)
@@ -1317,13 +1321,13 @@ static int f75111_sendbytes(struct i2c_adapter *adap, struct i2c_msg *msg)
 	int retval;
 	int wrcount = 0;
 
-	dev_info(&adap->dev, "%s: in\n", __func__);
+	dev_dbg(&adap->dev, "%s: in\n", __func__);
 
 	while (count > 0) {
 		retval = f75111_i2c_outb(adap, *temp);
-		dev_info(&adap->dev,
-			 "%s: wrcount: %d, *temp: %xh, retval: %d\n", __func__,
-			 wrcount, *temp, retval);
+		//dev_info(&adap->dev,
+		//	 "%s: wrcount: %d, *temp: %xh, retval: %d\n", __func__,
+		//	 wrcount, *temp, retval);
 
 		/* OK/ACK; or ignored NAK */
 		if ((retval > 0) || (nak_ok && (retval == 0))) {
@@ -1563,6 +1567,77 @@ static const struct i2c_algorithm f75115_i2c_algo = {
 	.functionality = f75115_i2c_func,
 };
 
+static int f75115_i2c_set_speed(struct platform_device *pdev, u8 delay)
+{
+	struct f75115_i2c_priv *i2c_priv = dev_get_platdata(&pdev->dev);
+	struct usb_device *dev = i2c_priv->dev;
+	u16 reg;
+
+	if (i2c_priv->chan == 1)
+		reg = 0xd02e;
+	else
+		reg = 0xd02f;
+
+	return f75115_set_normal_register(dev, reg, delay);
+}
+
+static int f75115_i2c_get_speed(struct platform_device *pdev, u8 *delay)
+{
+	struct f75115_i2c_priv *i2c_priv = dev_get_platdata(&pdev->dev);
+	struct usb_device *dev = i2c_priv->dev;
+	u16 reg;
+
+	if (i2c_priv->chan == 1)
+		reg = 0xd02e;
+	else
+		reg = 0xd02f;
+
+	return f75115_get_normal_register(dev, reg, delay);
+}
+
+static ssize_t i2c_speed_show(struct device *dev,
+			      struct device_attribute *attr, char *buf)
+{
+	struct f75115_i2c_priv *i2c_priv;
+	struct platform_device *pdev;
+	u8 delay;
+	int r;
+
+	pdev = container_of(dev, struct platform_device, dev);
+	i2c_priv = dev_get_platdata(&pdev->dev);
+
+	r = f75115_i2c_get_speed(pdev, &delay);
+	if (r)
+		return r;
+
+	return sprintf(buf, "%d\n", delay);
+}
+
+static ssize_t i2c_speed_store(struct device *dev,
+			       struct device_attribute *attr, const char *buf,
+			       size_t count)
+{
+	struct f75115_i2c_priv *i2c_priv;
+	struct platform_device *pdev;
+	u8 delay;
+	int r;
+
+	pdev = container_of(dev, struct platform_device, dev);
+	i2c_priv = dev_get_platdata(&pdev->dev);
+
+	delay = simple_strtoull(buf, NULL, 0);
+	if (delay < 1 || delay >= 256)
+		return -EINVAL;
+
+	r = f75115_i2c_set_speed(pdev, delay);
+	if (r)
+		return r;
+
+	return count;
+}
+
+static DEVICE_ATTR_RW(i2c_speed);
+
 static int f75115_i2c_probe(struct platform_device *pdev)
 {
 	struct f75115_i2c_priv *i2c_priv = dev_get_platdata(&pdev->dev);
@@ -1589,9 +1664,17 @@ static int f75115_i2c_probe(struct platform_device *pdev)
 
 	i2c_priv->adapter.dev.of_node   = of_find_node_by_path(name);
 
-	status = i2c_add_adapter(&i2c_priv->adapter);
+	f75115_i2c_set_speed(pdev, 6);
+
+	status = device_create_file(&pdev->dev, &dev_attr_i2c_speed);
 	if (status)
+		return -EPERM;
+
+	status = i2c_add_adapter(&i2c_priv->adapter);
+	if (status) {
+		device_remove_file(&pdev->dev, &dev_attr_i2c_speed);
 		return status;
+	}
 
 	dev_dbg(&pdev->dev, "%s: i2c bus %d ok\n", __func__, i2c_priv->chan);
 
@@ -1603,6 +1686,8 @@ static int f75115_i2c_remove(struct platform_device *pdev)
 	struct f75115_i2c_priv *i2c_priv = dev_get_platdata(&pdev->dev);
 
 	pr_debug("%s\n", __func__);
+
+	device_remove_file(&pdev->dev, &dev_attr_i2c_speed);
 	i2c_del_adapter(&i2c_priv->adapter);
 
 	return 0;
@@ -1629,7 +1714,7 @@ static int f75115_i2c_init(struct usb_serial *serial, int gpio_start)
 	for (i = 0; i < F75115_MAX_I2C_SET; ++i) {
 		if ((en_i2c & BIT(i)) == 0)
 			continue;
-		
+
 		priv->i2c_device[i].name = "f75115-i2c";
 		priv->i2c_device[i].id =
 			PLATFORM_DEVID_AUTO; //PLATFORM_DEVID_AUTO;
@@ -1639,6 +1724,7 @@ static int f75115_i2c_init(struct usb_serial *serial, int gpio_start)
 		memset(i2c_priv, 0, sizeof(*i2c_priv));
 		i2c_priv->chan = i;
 		i2c_priv->dev = serial->dev;
+		i2c_priv->fw_ver = priv->fw_ver;
 
 		pr_debug("%s: i2c_priv.dev: %p", __func__, i2c_priv->dev);
 
@@ -2212,6 +2298,7 @@ static int f75115_spi_init(struct usb_serial *serial, int gpio_start)
 		return status;
 	}
 #endif
+
 	return 0;
 }
 
@@ -2644,47 +2731,157 @@ static int f75115_erase_sector(struct usb_serial *usbserial, int address)
 	return 0;
 }
 
+typedef enum pin_mode {
+	pin_mode_quasi_bidir,
+	pin_mode_push_pull,
+	pin_mode_input,
+	pin_mode_opendrain,
+	pin_mode_invalid,
+} pin_mode;
+
+static int f75115_set_pin_mode(struct usb_serial *serial, int index,
+			       pin_mode mode, int def_val)
+{
+	struct usb_device *dev = serial->dev;
+	int set = (index >> 4) & 0x0f;
+	int idx = (index >> 0) & 0x0f;
+	int m0 = 0, m1 = 0;
+	int r = 0;
+
+	switch (mode) {
+	case pin_mode_quasi_bidir:
+		break;
+	case pin_mode_push_pull:
+		m0 = 1;
+		break;
+	case pin_mode_input:
+		m1 = 1;
+		break;
+	case pin_mode_opendrain:
+		m0 = m1 = 1;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	r |= f75115_set_mask_normal_register(dev, pin0_mode_table[set],
+					     BIT(idx),
+					     m0 << idx); // m0
+
+	r |= f75115_set_mask_normal_register(dev, pin1_mode_table[set],
+					     BIT(idx),
+					     m1 << idx); // m1
+
+	r |= f75115_set_mask_normal_register(dev, pin_data_table[set],
+					     BIT(idx),
+					     (!!def_val) << idx); // m1
+
+	return r;
+}
+
 static int f75115_pin_init(struct usb_serial *serial)
 {
+	struct usb_device *dev = serial->dev;
 	int status;
 	int i;
 
+	dev = serial->dev;
+
 	// force all sfr gpio input mode
-#if 0	
+#if 1
 	for (i = 0; i < 5; ++i) {
-		status = f75115_set_normal_register(serial->dev,
-						pin1_mode_table[i], 0xff);
+		status = f75115_set_normal_register(dev, pin1_mode_table[i],
+						    0xff);
 		if (status)
 			return status;
 
-		status = f75115_set_normal_register(serial->dev,
-						pin0_mode_table[i], 0x00);
+		status = f75115_set_normal_register(dev, pin0_mode_table[i],
+						    0x00);
 		if (status)
 			return status;
 
-		status = f75115_set_normal_register(serial->dev,
-						pin_data_table[i], 0xff);
+		status = f75115_set_normal_register(dev, pin_data_table[i],
+						    0xff);
 		if (status)
 			return status;
 	}
 #endif
 	for (i = 0; i < 3; ++i) {
-		status = f75115_set_normal_register(serial->dev,
-						    0x120C + i * 0x10, 0x00);
+		status = f75115_set_normal_register(dev, 0x120C + i * 0x10,
+						    0x00);
 		if (status)
 			return status;
 	}
 
 	// force all gpio into input mode
-	f75115_set_normal_register(serial->dev, 0x1620, 0x00);
-	f75115_set_normal_register(serial->dev, 0x1640, 0x00);
-	f75115_set_normal_register(serial->dev, 0x1660, 0x00);
-	f75115_set_normal_register(serial->dev, 0x1661, 0x00);
+	f75115_set_normal_register(dev, 0x1620, 0x00);
+	f75115_set_normal_register(dev, 0x1640, 0x00);
+	f75115_set_normal_register(dev, 0x1660, 0x00);
+	f75115_set_normal_register(dev, 0x1661, 0x00);
 
 	if (!full_uart)
-		status = f75115_set_normal_register(serial->dev, 0x123C, 0x03);
+		status = f75115_set_normal_register(dev, 0x123C, 0x03);
 	else
-		status = f75115_set_normal_register(serial->dev, 0x123C, 0xff);
+		status = f75115_set_normal_register(dev, 0x123C, 0xff);
+
+	/* 
+		set pin to SPI mode (f/w 0.05 & above)
+				m1	m0
+		P1.4		0	1	PP	SPI_CS0
+		P1.5		0	1	PP	SPI_MOSI
+		P1.6		1	0	In	SPI_MISO
+		P1.7		0	1	PP	SPI_CLK
+		
+		P2.0		0	1	PP	SPI_CS1
+	 */
+
+	if (en_spi) {
+#if 1
+		f75115_set_pin_mode(serial, 0x14, pin_mode_push_pull, 1);
+		f75115_set_pin_mode(serial, 0x15, pin_mode_push_pull, 1);
+		f75115_set_pin_mode(serial, 0x16, pin_mode_input, 1);
+		f75115_set_pin_mode(serial, 0x17, pin_mode_push_pull, 1);
+		f75115_set_pin_mode(serial, 0x20, pin_mode_push_pull, 1);
+#else
+		//cs0 / mosi / miso / clk
+		f75115_set_mask_normal_register(dev, pin0_mode_table[1],
+						GENMASK(7, 4),
+						0xb0); // m0
+		f75115_set_mask_normal_register(dev, pin1_mode_table[1],
+						GENMASK(7, 4),
+						0x40); // m1
+
+		//cs1
+		f75115_set_mask_normal_register(dev, pin0_mode_table[2],
+						BIT(0), 1); // m0
+		f75115_set_mask_normal_register(dev, pin1_mode_table[2],
+						BIT(0), 0); // m1
+#endif
+	}
+
+	/*
+	 P2.1		 1	 1	 OD	 SDA1
+	 P2.2		 1	 1	 OD	 SCL1
+	 P4.0		 1	 1	 OD	 SCL0
+	 P4.1		 1	 1	 OD	 SDA0
+	 */
+
+	switch (en_i2c) {
+	case 2:
+		f75115_set_pin_mode(serial, 0x21, pin_mode_opendrain, 1);
+		f75115_set_pin_mode(serial, 0x22, pin_mode_opendrain, 1);
+		break;
+	case 1:
+		f75115_set_pin_mode(serial, 0x40, pin_mode_opendrain, 1);
+		f75115_set_pin_mode(serial, 0x41, pin_mode_opendrain, 1);
+		break;
+	case 3:
+		f75115_set_pin_mode(serial, 0x21, pin_mode_opendrain, 1);
+		f75115_set_pin_mode(serial, 0x22, pin_mode_opendrain, 1);
+		f75115_set_pin_mode(serial, 0x40, pin_mode_opendrain, 1);
+		f75115_set_pin_mode(serial, 0x41, pin_mode_opendrain, 1);
+		break;
+	}
 
 	return status;
 }
@@ -2816,6 +3013,7 @@ static int f75115_submit_writer(struct usb_serial_port *port, gfp_t mem_flags)
 	return 0;
 }
 
+#if 0
 static int f75115_switch_gpio_mode(struct usb_serial_port *port, u8 mode)
 {
 	struct f75115_port_private *port_priv = usb_get_serial_port_data(port);
@@ -2869,6 +3067,7 @@ static int f75115_switch_gpio_mode(struct usb_serial_port *port, u8 mode)
 
 	return 0;
 }
+#endif
 
 #ifdef CONFIG_GPIOLIB
 static int f75115_gpio_hw_gpio_set(struct gpio_chip *chip, unsigned gpio_num,
@@ -3484,7 +3683,6 @@ static int f75115_prepare_gpio(struct usb_serial *serial)
 				&dev_attr_open_drain_mode);
 	if (rc)
 		return -EPERM;
-
 
 	return 0;
 }
@@ -4251,14 +4449,6 @@ static int f75115_pwm_init(struct usb_serial *serial)
 
 	serial_priv = usb_get_serial_data(serial);
 
-	if (serial_priv->fw_ver <= 0xaa88) {
-		dev_info(&serial->dev->dev,
-			 "%s: the version(%lx) not support PWM", __func__,
-			 serial_priv->fw_ver);
-
-		return 0;
-	}
-
 	f75115_pwm_reload(serial);
 
 	/* change pwm from p2 to p4 */
@@ -4306,9 +4496,6 @@ static void f75115_pwm_deinit(struct usb_serial *serial)
 #endif
 
 	serial_priv = usb_get_serial_data(serial);
-
-	if (serial_priv->fw_ver <= 0xaa88)
-		return;
 
 	pwmchip_remove(&serial_priv->f75115_pwm_chip);
 	//device_remove_file(&serial->dev->dev, &dev_attr_pwm_freq);
@@ -4482,6 +4669,7 @@ static int f75115_init_uart(struct usb_serial_port *port)
 	port_priv = usb_get_serial_port_data(port);
 	serial_priv = usb_get_serial_data(port->serial);
 
+#if 0
 	status = f75115_switch_gpio_mode(port, F75115_PIN_SET_DEFAULT);
 	if (status) {
 		dev_err(&port->dev,
@@ -4489,6 +4677,7 @@ static int f75115_init_uart(struct usb_serial_port *port)
 			status);
 		return status;
 	}
+#endif
 
 	status = f75115_setregister(
 		port->serial->dev, port_priv->phy, INTERRUPT_ENABLE_REGISTER,
@@ -5767,10 +5956,24 @@ static int f75115_fixup(struct usb_serial *serial)
 static int f75115_read_fw_ver(struct usb_serial *serial)
 {
 	struct f75115_serial_private *serial_priv;
-	int i, r, len;
+	int r;
 	u8 buf[5] = { 0 };
 
 	serial_priv = usb_get_serial_data(serial);
+#if 1
+	r = f75115_read_data(serial, 0x1ffc, 4, buf);
+	if (r)
+		return r;
+
+	//pr_info("%s: %s\n", __func__, buf);
+
+	serial_priv->fw_ver = 0;
+	serial_priv->fw_ver |= (buf[0] - 0x30) << 16;
+	serial_priv->fw_ver |= (buf[2] - 0x30) << 8;
+	serial_priv->fw_ver |= (buf[3] - 0x30) << 0;
+
+	dev_info(&serial->dev->dev, "current F/W version: %s\n", buf);
+#else
 	len = strlen(serial->dev->product);
 
 	for (i = 0; i < 4; ++i)
@@ -5779,7 +5982,8 @@ static int f75115_read_fw_ver(struct usb_serial *serial)
 	r = kstrtol(buf, 16, &serial_priv->fw_ver);
 	//pr_info("%s: %lx\n", __func__, serial_priv->fw_ver);
 
-	//dev_info(&serial->dev->dev, "%s: H/W version: %x\n", __func__, ver);
+	//dev_info(&serial->dev->dev, "%s: F/W version: %x\n", __func__, ver);
+#endif
 
 	return 0;
 }
@@ -5837,12 +6041,37 @@ static void f75115_gpio_init_status(struct usb_serial *serial)
 
 }
 
+#ifdef DUMP_GPIO_INIT_SET
+static void f75115_dump_gpio_setting(struct usb_serial *serial)
+{
+	int i, r, count = 0;
+	u8 m0, m1;
+
+	for (i = 0; i < 6; ++i) {
+		r = 0;
+		r |= f75115_get_normal_register(serial->dev, 0x2ad2 + i * 2, &m0);
+		r |= f75115_get_normal_register(serial->dev, 0x2ad3 + i * 2, &m1);
+		if (r)
+			continue;
+
+		pr_info("P%dM0: %04x\n", count, m0);
+		pr_info("P%dM1: %04x\n", count, m1);
+
+		count++;
+	}
+}
+#endif
+
 static int f75115_attach(struct usb_serial *serial)
 {
 	struct f75115_serial_private *serial_priv = NULL;
 	int status;
 	int offset;
-	int i;
+	int i, r;
+
+#ifdef DUMP_GPIO_INIT_SET
+	f75115_dump_gpio_setting(serial);
+#endif
 
 	status = f75115_pin_init(serial);
 	if (status)
@@ -5860,7 +6089,17 @@ static int f75115_attach(struct usb_serial *serial)
 	serial_priv->serial = serial;
 	usb_set_serial_data(serial, serial_priv);
 
-	f75115_read_fw_ver(serial);
+	r = f75115_read_fw_ver(serial);
+	if (r)
+		return r;
+
+	if (serial_priv->fw_ver < 5) {
+		dev_warn(&serial->dev->dev,
+			 "This driver only support version 0.05 and above\n");
+
+		//kfree(serial_priv);
+		//return -ENODEV;
+	}
 
 	for (i = 0; i < F75115_NUM_PORT; ++i)
 		atomic_set(&serial_priv->port_active[i], 0);
