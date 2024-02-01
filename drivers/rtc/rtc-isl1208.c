@@ -198,6 +198,7 @@ isl1208_i2c_get_atr(struct i2c_client *client)
 	return atr;
 }
 
+#ifdef CONFIG_RK3566_TB3
 static int
 isl1208_i2c_set_atr(struct i2c_client *client, u8 atr)
 {
@@ -211,6 +212,7 @@ isl1208_i2c_set_atr(struct i2c_client *client, u8 atr)
 
 	return ret;
 }
+#endif
 
 /* returns adjustment value + 100 */
 static int
