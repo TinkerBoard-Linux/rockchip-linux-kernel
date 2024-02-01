@@ -193,8 +193,23 @@ isl1208_i2c_get_atr(struct i2c_client *client)
 	atr &= 0x3f;		/* mask out lsb */
 	atr ^= 1 << 5;		/* invert 6th bit */
 	atr += 2 * 9;		/* add offset of 4.5pF; unit[atr] = 0.25pF */
+	pr_info("isl1208_i2c_get_atr : %d\n", atr);
 
 	return atr;
+}
+
+static int
+isl1208_i2c_set_atr(struct i2c_client *client, u8 atr)
+{
+	int ret, read_atr;
+	u8 buf[1];
+	buf[0] = atr & 0x3f;		/* mask out lsb */
+
+	ret = isl1208_i2c_set_regs(client, ISL1208_REG_ATR, buf, 1);
+	read_atr = i2c_smbus_read_byte_data(client, ISL1208_REG_ATR);
+	pr_info("isl1208_i2c_set_atr: %#X, ret: %d\n", read_atr, ret);
+
+	return ret;
 }
 
 /* returns adjustment value + 100 */
@@ -893,6 +908,14 @@ isl1208_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	rc = rtc_nvmem_register(isl1208->rtc, &isl1208->nvmem_config);
 	if (rc)
 		return rc;
+
+#ifdef CONFIG_RK3566_TB3
+	rc = isl1208_i2c_set_atr(client, 0x34);
+	if (rc < 0) {
+		dev_err(&client->dev, "could not set atr correctly\n");
+		return rc;
+	}
+#endif
 
 	return rtc_register_device(isl1208->rtc);
 }
