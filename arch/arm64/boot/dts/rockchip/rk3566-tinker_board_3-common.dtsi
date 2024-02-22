@@ -1853,7 +1853,7 @@
 };
 
 &pwm7 {
-	status = "okay";
+	status = "disabled";
 
 	compatible = "rockchip,remotectl-pwm";
 	remote_pwm_id = <3>;
