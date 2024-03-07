@@ -3710,6 +3710,8 @@ static int f75115_release_gpio(struct usb_serial *serial)
         gpio_unexport(base + F75115_GPIO37);
         gpio_unexport(base + F75115_GPIO22);
         gpio_unexport(base + F75115_GPIO46);
+	gpio_unexport(base + F75115_GPIO26);
+	gpio_unexport(base + F75115_GPIO27);
 
         gpio_free(base + F75115_GPIO52);
         gpio_free(base + F75115_GPIO16);
@@ -3725,6 +3727,8 @@ static int f75115_release_gpio(struct usb_serial *serial)
         gpio_free(base + F75115_GPIO37);
         gpio_free(base + F75115_GPIO22);
         gpio_free(base + F75115_GPIO46);
+	gpio_free(base + F75115_GPIO26);
+	gpio_free(base + F75115_GPIO27);
 
 	device_remove_file(&serial->interface->dev, &dev_attr_open_drain_mode);
 	gpiochip_remove(&serial_priv->f75115_gpio_chip);
@@ -6011,6 +6015,8 @@ static void f75115_gpio_init_status(struct usb_serial *serial)
         gpio_request(base + F75115_GPIO37,"Gamble_SW_EN");
         gpio_request(base + F75115_GPIO22,"LED_SW_EN");
         gpio_request(base + F75115_GPIO46,"Marshall_SW_EN");
+	gpio_request(base + F75115_GPIO26,"EX_DIO3_OUT");
+	gpio_request(base + F75115_GPIO27,"EX_DIO4_OUT");
 	
 	mdelay(150);
 
@@ -6027,6 +6033,8 @@ static void f75115_gpio_init_status(struct usb_serial *serial)
         gpio_direction_output(base + F75115_GPIO37, 1);
         gpio_direction_output(base + F75115_GPIO22, 1);
         gpio_direction_output(base + F75115_GPIO46, 1);
+	gpio_direction_output(base + F75115_GPIO26, 0);
+	gpio_direction_output(base + F75115_GPIO27, 0);
 
 	gpio_export(base + F75115_GPIO52, 1);
 	gpio_export(base + F75115_GPIO16, 1);
@@ -6041,6 +6049,8 @@ static void f75115_gpio_init_status(struct usb_serial *serial)
         gpio_export(base + F75115_GPIO37, 1);
         gpio_export(base + F75115_GPIO22, 1);
         gpio_export(base + F75115_GPIO46, 1);
+	gpio_export(base + F75115_GPIO26, 1);
+	gpio_export(base + F75115_GPIO27, 1);
 
 	if(hdmi_backlight){
 		if(g_bl) {
