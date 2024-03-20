@@ -1717,7 +1717,7 @@
 
 &pinctrl {
 	pinctrl-names = "default";
-	pinctrl-0 = <&dsi_pwren &gpio_fan_pin &fourty_pin5v0 &fourty_pin3v3 &u3_oc>;
+	pinctrl-0 = <&dsi_pwren &fan_speed &fan_power &fourty_pin5v0 &fourty_pin3v3 &u3_oc>;
 
 	dsi_panel_vcc {
 		dsi_pwren: dsi-pwren {
@@ -1811,8 +1811,11 @@
 	};
 
 	gpio_fan {
-		gpio_fan_pin: gpio-fan-pin {
+		fan_speed: fan-speed {
 			rockchip,pins = <0 RK_PB7 RK_FUNC_GPIO &pcfg_output_low>;
+		};
+		fan_power: fan-power {
+			rockchip,pins = <3 RK_PD3 RK_FUNC_GPIO &pcfg_output_high>;
 		};
 	};
 };
