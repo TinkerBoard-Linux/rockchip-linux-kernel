@@ -601,7 +601,7 @@
 };
 
 &rk809_sound {
-	hp-det-gpio = <&gpio3 RK_PA1 GPIO_ACTIVE_LOW>;
+	hp-det-gpio = <&gpio3 RK_PA1 GPIO_ACTIVE_HIGH>;
 };
 
 &rkcif {
