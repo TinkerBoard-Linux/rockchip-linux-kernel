@@ -33,6 +33,8 @@
 #define VBUS_INTERRUPT (1 << 6)
 /* IT5201_REG_IOCPCR */
 #define TYPEC_INTERRUPT (1 << 7)
+/* IT5201_REG_TCFSMCR0 */
+#define TYPEC_ROLE_DRP (1 << 4)
 /* IT5201_REG_CC_STATUS */
 #define IS_NOT_CONNECTED(val) (val == 0)
 #define IS_UFP_ATTATCHED(val) (val&0x1)
@@ -168,6 +170,16 @@ static int it5201_setup_i2c_det(
 		return ret;
 	}
         dev_info(info->dev, "ITE IT5201: General Control Reg:0x%x\n", val);
+
+	ret = regmap_write(info->regmap, IT5201_REG_TCFSMCR0, TYPEC_ROLE_DRP);
+	if (ret) {
+		dev_err(info->dev, "failed to set TypeC Role Setting to DRP:%d\n",
+			ret);
+	}
+
+	ret = regmap_read(info->regmap, IT5201_REG_TCFSMCR0, &val);
+	if (!ret)
+		dev_info(info->dev, "ITE IT5201: TypeC FSM Control Reg:0x%x\n", val);
 
 	/* Clear chip interrupt status */
 	ret = it5201_clear_interrupt(info);
