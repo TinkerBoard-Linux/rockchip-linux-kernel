@@ -242,11 +242,8 @@ static void adc_jack_handler(struct work_struct *work)
 	};
 
 	if (!gpiod_get_value(mc_data->hp_det_gpio)) {
-#ifdef CONFIG_RK3568_TB3N
+		//Do not report jack_headset to 0, due to report HEADPHONE to 0 and then to HEADPHONE will cause no sound in 5 seconds. (For TinkerBoard 3)
 		snd_soc_jack_report(jack_headset, SND_JACK_HEADPHONE, SND_JACK_HEADSET);
-#else
-		snd_soc_jack_report(jack_headset, 0, SND_JACK_HEADSET);
-#endif
 		extcon_set_state_sync(mc_data->extcon,
 				EXTCON_JACK_HEADPHONE, false);
 		extcon_set_state_sync(mc_data->extcon,
