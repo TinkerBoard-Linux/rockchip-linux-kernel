@@ -199,7 +199,7 @@
                 pinctrl_external_board: external-board {
                         rockchip,pins = <4 RK_PC4 RK_FUNC_GPIO &pcfg_output_high>,
                                         <4 RK_PC5 RK_FUNC_GPIO &pcfg_output_high>,
-                                        <4 RK_PC6 RK_FUNC_GPIO &pcfg_pull_down>;
+                                        <4 RK_PC6 RK_FUNC_GPIO &pcfg_output_low>;
                 };
         };
 };
