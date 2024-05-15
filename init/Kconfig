@@ -111,6 +111,9 @@ config THREAD_INFO_IN_TASK
 	  One subtle change that will be needed is to use try_get_task_stack()
 	  and put_task_stack() in save_thread_stack_tsk() and get_wchan().
 
+config TINKER_YOCTO
+	bool "Support to Tinker Board Yocto"
+
 menu "General setup"
 
 config BROKEN

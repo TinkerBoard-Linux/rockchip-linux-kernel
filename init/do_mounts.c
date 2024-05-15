@@ -578,6 +578,65 @@ void __init mount_root(void)
 #endif
 }
 
+#ifdef CONFIG_TINKER_YOCTO
+extern char *saved_command_line;
+static int is_boot_from_sd(void)
+{
+	char *s=NULL;
+	int is_sd_boot = 0;
+
+	s = strstr(saved_command_line, "storagemedia=sd");
+	if (s != NULL) {
+		is_sd_boot = 1;
+	} else {
+		is_sd_boot = 0;
+	}
+
+    printk("is_boot_from_sd is_sd_boot=%d\n", is_sd_boot);
+    return is_sd_boot;
+}
+
+#define DEFAULT_ROOT_DEVICE_PATH_SD "/dev/mmcblk1p8"
+#define DEFAULT_DATA_DEVICE_PATH_SD "/dev/mmcblk1p9"
+void mount_overlay_on_rootfs_sd(void)
+{
+	static char *argv[] = { "/bin/bash", "/etc/init.d/overlayetc", DEFAULT_ROOT_DEVICE_PATH_SD, DEFAULT_DATA_DEVICE_PATH_SD, NULL, };
+	static char *envp[] = {
+		"HOME=/",
+		"TERM=linux",
+		"PATH=/sbin:/bin:/usr/sbin:/usr/bin", NULL };
+	char *root_device = DEFAULT_ROOT_DEVICE_PATH_SD;
+	char *data_device = DEFAULT_DATA_DEVICE_PATH_SD;
+
+	argv[2] = root_device;
+	argv[3] = data_device;
+
+	printk("mount_overlay_on_rootfs_sd  /etc/init.d/overlayetc root_device = %s data_device = %s +\n", root_device, data_device);
+	call_usermodehelper(argv[0], argv, envp, UMH_WAIT_PROC);
+	printk("mount_overlay_on_rootfs_sd  /etc/init.d/overlayetc-\n");
+}
+
+#define DEFAULT_ROOT_DEVICE_PATH_EMMC "/dev/mmcblk0p8"
+#define DEFAULT_DATA_DEVICE_PATH_EMMC "/dev/mmcblk0p9"
+void mount_overlay_on_rootfs_emmc(void)
+{
+	static char *argv[] = { "/bin/bash", "/etc/init.d/overlayetc", DEFAULT_ROOT_DEVICE_PATH_EMMC, DEFAULT_DATA_DEVICE_PATH_EMMC, NULL, };
+	static char *envp[] = {
+		"HOME=/",
+		"TERM=linux",
+		"PATH=/sbin:/bin:/usr/sbin:/usr/bin", NULL };
+	char *root_device = DEFAULT_ROOT_DEVICE_PATH_EMMC;
+	char *data_device = DEFAULT_DATA_DEVICE_PATH_EMMC;
+
+	argv[2] = root_device;
+	argv[3] = data_device;
+
+	printk("mount_overlay_on_rootfs_emmc  /etc/init.d/overlayetc root_device = %s data_device = %s +\n", root_device, data_device);
+	call_usermodehelper(argv[0], argv, envp, UMH_WAIT_PROC);
+	printk("mount_overlay_on_rootfs_emmc  /etc/init.d/overlayetc-\n");
+}
+#endif
+
 /*
  * Prepare the namespace - decide what/where to mount, load ramdisks, etc.
  */
@@ -630,6 +689,12 @@ out:
 	devtmpfs_mount();
 	init_mount(".", "/", NULL, MS_MOVE, NULL);
 	init_chroot(".");
+#ifdef CONFIG_TINKER_YOCTO
+	if (is_boot_from_sd()) {
+		mount_overlay_on_rootfs_sd();
+	} else
+		mount_overlay_on_rootfs_emmc();
+#endif
 }
 
 static bool is_tmpfs;
