@@ -37,6 +37,13 @@
 		startup-delay-us = <5000>;
 		vin-supply = <&dc_12v>;
 	};
+
+	fan0: gpio-fan {
+		compatible = "gpio-fan-tb3";
+		speed-gpios = <&gpio0 RK_PB7 GPIO_ACTIVE_HIGH>;
+		power-gpios = <&gpio3 RK_PD3 GPIO_ACTIVE_HIGH>;
+		status = "okay";
+	};
 };
 
 &bt_sound {
