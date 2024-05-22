@@ -248,9 +248,7 @@ struct ehci_hcd {			/* one per controller */
 #endif
 
 	/* debug files */
-#ifdef CONFIG_DYNAMIC_DEBUG
 	struct dentry		*debug_dir;
-#endif
 
 	/* bandwidth usage */
 #define EHCI_BANDWIDTH_SIZE	64
