@@ -31,6 +31,11 @@
 
 #define MAX_ETH		2
 
+#ifdef CONFIG_BOARDINFO
+extern int get_board_model(void);
+extern int get_prjid(void);
+#endif
+
 struct rk_priv_data;
 struct rk_gmac_ops {
 	void (*set_to_rgmii)(struct rk_priv_data *bsp_priv,
@@ -2466,6 +2471,8 @@ static struct rk_priv_data *rk_gmac_setup(struct platform_device *pdev,
 	int ret;
 	const char *strings = NULL;
 	int value;
+	int tx_delay_rtl8211f_rk3566 = 0x36, rx_delay_rtl8211f_rk3566 = 0x2b;
+	int tx_delay_yt8531_rk3566 = 0x2c, rx_delay_yt8531_rk3566 = 0x30;
 
 	bsp_priv = devm_kzalloc(dev, sizeof(*bsp_priv), GFP_KERNEL);
 	if (!bsp_priv)
@@ -2516,6 +2523,20 @@ static struct rk_priv_data *rk_gmac_setup(struct platform_device *pdev,
 		dev_info(dev, "RX delay(0x%x).\n", value);
 		bsp_priv->rx_delay = value;
 	}
+
+#ifdef CONFIG_BOARDINFO
+	pr_info("%s: #### board_model = %d, project_id = %d\n", __func__, get_board_model(), get_prjid());
+	if (get_board_model() == 3566) {
+		if (get_prjid() == 15) {
+			bsp_priv->tx_delay = tx_delay_yt8531_rk3566;
+			bsp_priv->rx_delay = rx_delay_yt8531_rk3566;
+		} else {
+			bsp_priv->tx_delay = tx_delay_rtl8211f_rk3566;
+			bsp_priv->rx_delay = rx_delay_rtl8211f_rk3566;
+		}
+		dev_info(dev, "Tune TX delay(0x%x) RX delay(0x%x).\n", bsp_priv->tx_delay, bsp_priv->rx_delay);
+	}
+#endif
 
 	bsp_priv->grf = syscon_regmap_lookup_by_phandle(dev->of_node,
 							"rockchip,grf");

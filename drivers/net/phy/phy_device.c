@@ -33,6 +33,11 @@
 #include <linux/uaccess.h>
 #include <linux/unistd.h>
 
+#ifdef CONFIG_BOARDINFO
+extern int get_board_model(void);
+extern int get_prjid(void);
+#endif
+
 MODULE_DESCRIPTION("PHY library");
 MODULE_AUTHOR("Andy Fleming");
 MODULE_LICENSE("GPL");
@@ -2582,7 +2587,14 @@ int genphy_suspend(struct phy_device *phydev)
 	int value;
 	struct net_device * ndev = phydev->attached_dev;
 
-	if(ndev != NULL) {
+#ifdef CONFIG_BOARDINFO
+	if ((get_board_model() == 3566) && (get_prjid() == 15)) {
+		pr_info("YT8531 enter WOL\n");
+		return phy_set_bits(phydev, MII_BMCR, BMCR_PDOWN);
+	}
+#endif
+
+	if (ndev != NULL) {
 		pr_info("RTL8211F enter WOL\n");
 		//set INTB pin
 		phy_write(phydev, 31, 0x0d40);
@@ -2618,6 +2630,14 @@ EXPORT_SYMBOL(genphy_suspend);
 int genphy_resume(struct phy_device *phydev)
 {
 	int value;
+
+#ifdef CONFIG_BOARDINFO
+	if ((get_board_model() == 3566) && (get_prjid() == 15)){
+		pr_info("YT8531 exit WOL\n");
+		msleep(100);
+		return phy_clear_bits(phydev, MII_BMCR, BMCR_PDOWN);
+	}
+#endif
 
 	pr_info("RTL8211F exit WOL\n");
 	//exit wol event

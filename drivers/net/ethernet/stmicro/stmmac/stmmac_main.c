@@ -62,6 +62,11 @@
 /* Module parameters */
 #define TX_TIMEO	5000
 
+#ifdef CONFIG_BOARDINFO
+extern int get_board_model(void);
+extern int get_prjid(void);
+#endif
+
 int gmac_num = -1;
 
 static int watchdog = TX_TIMEO;
@@ -1092,19 +1097,43 @@ static void stmmac_mac_link_up(struct phylink_config *config,
 	}
 }
 
-void set_led_configuration(struct phy_device *phy_dev) {
+void set_led_configuration_yt8531(struct phy_device *phy_dev) {
+	pr_info("YT8531: set led configuration\n");
+	// LED0
+	phy_write(phy_dev, 30, 0xa00c);
+	phy_write(phy_dev, 31, 0x0040);
+
+	// LED1
+	phy_write(phy_dev, 30, 0xa00d);
+	phy_write(phy_dev, 31, 0x2670);
+
+	// LED2
+	phy_write(phy_dev, 30, 0xa00e);
+	phy_write(phy_dev, 31, 0x0020);
+}
+
+void set_led_configuration_rtl8211f_vd_cg(struct phy_device *phy_dev) {
+	pr_info("RTL8211F: set led configuration\n");
 	// To switch Page0xd04
 	phy_write(phy_dev, 31, 0x0d04);
 
-	//Disable EEELCR mode
+	// Disable EEELCR mode
 	phy_write(phy_dev, 17, 0x0000);
-
-	printk("%s: #### before setting led, Reg16 = 0x%x\n", __func__, phy_read(phy_dev, 16));
 	phy_write(phy_dev, 16, 0x8b68);
-	printk("%s: #### after setting led, Reg16 = 0x%x\n", __func__, phy_read(phy_dev, 16));
 
-	//switch to Page0
+	// Switch to Page0
 	phy_write(phy_dev, 31, 0x0000);
+}
+
+void set_led_configuration(struct phy_device *phy_dev) {
+#ifdef CONFIG_BOARDINFO
+	if ((get_board_model() == 3566) && (get_prjid() == 15))
+		set_led_configuration_yt8531(phy_dev);
+	else
+		set_led_configuration_rtl8211f_vd_cg(phy_dev);
+#else
+	set_led_configuration_rtl8211f_vd_cg(phy_dev);
+#endif
 }
 
 static const struct phylink_mac_ops stmmac_phylink_mac_ops = {
@@ -5100,9 +5129,6 @@ int stmmac_reinit_ringparam(struct net_device *dev, u32 rx_size, u32 tx_size)
  * Return:
  * returns 0 on success, otherwise errno.
  */
-#ifdef CONFIG_BOARDINFO
-extern int get_board_model(void);
-#endif
 int stmmac_dvr_probe(struct device *device,
 		     struct plat_stmmacenet_data *plat_dat,
 		     struct stmmac_resources *res)
@@ -5352,9 +5378,17 @@ int stmmac_dvr_probe(struct device *device,
 		goto error_netdev_register;
 	}
 
+#ifdef CONFIG_BOARDINFO
+	if (!((get_board_model() == 3566) && (get_prjid() == 15))) {
+		ret = phy_register_fixup_for_uid(RTL8211F_FI_VD_PHY_ID, 0xffffffff, phy_rtl8211x_eee_fixup);
+		if (ret)
+			pr_warn("Cannot register PHY board fixup.\n");
+	}
+#else
 	ret = phy_register_fixup_for_uid(RTL8211F_FI_VD_PHY_ID, 0xffffffff, phy_rtl8211x_eee_fixup);
 	if (ret)
 		pr_warn("Cannot register PHY board fixup.\n");
+#endif
 
 #ifdef CONFIG_DEBUG_FS
 	stmmac_init_fs(ndev);
