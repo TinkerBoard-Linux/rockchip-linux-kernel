@@ -99,6 +99,11 @@ static void _ps_ntfy_before_pwr_cfg(struct phl_info_t *phl_info, u8 ps_mode,
 	PHL_TRACE(COMP_PHL_PS, _PHL_DEBUG_, "[PS], %s(): \n", __func__);
 
 	if (cur_pwr_lvl == PS_PWR_LVL_PWRON) { /* enter ps */
+
+#ifdef RTW_WKARD_DYNAMIC_PCIE_GEN
+		rtw_hal_pcie_gen_set(phl_info->hal, RTW_PCIE_GEN_2);
+#endif
+
 		if (req_pwr_lvl == PS_PWR_LVL_PWROFF) {
 			#ifdef CONFIG_BTCOEX
 			rtw_hal_btc_radio_state_ntfy(phl_info->hal, BTC_RFCTRL_WL_OFF);
@@ -319,6 +324,9 @@ phl_ps_cfg_pwr_lvl(struct phl_info_t *phl_info, u8 ps_mode, u8 cur_pwr_lvl, u8 r
 	hstatus = rtw_hal_ps_pwr_lvl_cfg(phl_info->phl_com, phl_info->hal,
 				req_pwr_lvl);
 
+	if (cur_pwr_lvl == PS_PWR_LVL_PWR_GATED)
+		hstatus = rtw_hal_pg_redownload_fw(phl_info->phl_com, phl_info->hal);
+
 	_ps_ps_cfg_int(phl_info, ps_mode, _judge_ps_cfg_int_step(cur_pwr_lvl, req_pwr_lvl, false));
 
 	_ps_ntfy_after_pwr_cfg(phl_info, ps_mode, cur_pwr_lvl, req_pwr_lvl,
@@ -450,17 +458,20 @@ phl_ps_lps_cfg(struct phl_info_t *phl_info, struct ps_cfg *cfg, u8 en)
 		PHL_TRACE(COMP_PHL_PS, _PHL_WARNING_, "[PS], %s(): cannot get sta!\n", __func__);
 	}
 
-	status = phl_snd_cmd_ntfy_ps(phl_info, wrole, en);
-	if (RTW_PHL_STATUS_SUCCESS != status) {
-		status = RTW_PHL_STATUS_FAILURE;
-		return status;
+	if (cfg->wow == false) {
+		status = phl_snd_cmd_ntfy_ps(phl_info, wrole, en);
+		if (RTW_PHL_STATUS_SUCCESS != status) {
+			status = RTW_PHL_STATUS_FAILURE;
+			return status;
+		}
 	}
 
+	PHL_TRACE(COMP_PHL_PS, _PHL_INFO_, "[PS], %s(): %s lps, macid %d, wow %d.\n",
+		      __func__, (en ? "enter" : "leave") ,cfg->macid, cfg->wow);
+
 	if (en) {
-		PHL_TRACE(COMP_PHL_PS, _PHL_INFO_, "[PS], %s(): enter lps, macid %d.\n", __func__, cfg->macid);
 		_phl_lps_role_config_tbtt_agg(phl_info, wrole, 0);
 	} else {
-		PHL_TRACE(COMP_PHL_PS, _PHL_INFO_, "[PS], %s(): leave lps, macid %d.\n", __func__, cfg->macid);
 		_phl_lps_role_config_tbtt_agg(phl_info, wrole, RTW_MAC_TBTT_AGG_DEF);
 	}
 
@@ -470,6 +481,9 @@ phl_ps_lps_cfg(struct phl_info_t *phl_info, struct ps_cfg *cfg, u8 en)
 	lps_info.awake_interval = cfg->awake_interval;
 	lps_info.smart_ps_mode = cfg->smart_ps_mode;
 	lps_info.bcnnohit_en = cfg->bcnnohit_en;
+	lps_info.dyntxant_en = (cfg->lps_force_tx > 0)?1:0;
+	lps_info.maxtxant = phl_info->phl_com->phy_cap[0].tx_path_num;
+	lps_info.lpstxant = (cfg->lps_force_tx == 1)?1:0;
 
 	if (RTW_PHL_STATUS_SUCCESS !=
 		_ps_ntfy_before_lps_proto_cfg(phl_info, en, lps_info.macid)) {
@@ -499,7 +513,7 @@ static enum rtw_phl_status _lps_enter_proto_cfg(struct phl_info_t *phl_info, str
 	PHL_TRACE(COMP_PHL_PS, _PHL_INFO_, "[PS], %s(): \n", __func__);
 
 #ifdef CONFIG_PHL_PS_FW_DBG
-	rtw_hal_en_fw_log(phl_info->hal, FL_COMP_PS, true);
+	rtw_hal_en_fw_log_comp(phl_info->hal, FL_COMP_PS, true);
 #endif
 
 	phl_sta = rtw_phl_get_stainfo_by_macid(phl_info, cfg->macid);
@@ -613,7 +627,7 @@ enum rtw_phl_status phl_ps_ips_proto_cfg(struct phl_info_t *phl_info, struct ps_
 	PHL_TRACE(COMP_PHL_PS, _PHL_INFO_, "[PS], %s(): \n", __func__);
 
 #ifdef CONFIG_PHL_PS_FW_DBG
-	rtw_hal_en_fw_log(phl_info->hal, FL_COMP_PS, (ips_en ? true : false));
+	rtw_hal_en_fw_log_comp(phl_info->hal, FL_COMP_PS, (ips_en ? true : false));
 #endif
 
 	return phl_ps_ips_cfg(phl_info, cfg, ips_en);

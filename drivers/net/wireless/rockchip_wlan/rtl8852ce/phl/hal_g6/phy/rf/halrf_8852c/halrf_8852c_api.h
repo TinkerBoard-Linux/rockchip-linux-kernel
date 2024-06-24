@@ -54,6 +54,8 @@ void halrf_rxck_force_8852c(struct rf_info *rf, enum rf_path path, bool force, e
 
 void halrf_set_gpio_8852c(struct rf_info *rf, enum phl_phy_idx phy);
 
+void halrf_set_gpio_by_ch_8852c(struct rf_info *rf, enum phl_phy_idx phy, enum band_type band);
+
 void do_bkup_kip_8852c(struct rf_info *rf, u8 path);
 void do_bkup_bb_8852c(struct rf_info *rf);
 void do_bkup_rf_8852c(struct rf_info *rf, u8 path);
@@ -63,5 +65,6 @@ void do_reload_rf_8852c(struct rf_info *rf, u8 path);
 void halrf_set_regulation_from_driver_8852c(struct rf_info *rf, u8 regulation_idx);
 void halrf_adie_pow_ctrl_8852c(struct rf_info *rf, bool rf_off, bool others_off);
 void halrf_afe_pow_ctrl_8852c(struct rf_info *rf, bool adda_off, bool pll_off);
+bool halrf_chlk_reload_check_8852c(struct rf_info *rf, enum phl_phy_idx phy);
 #endif
 #endif /*  __INC_PHYDM_API_H_8852C__ */

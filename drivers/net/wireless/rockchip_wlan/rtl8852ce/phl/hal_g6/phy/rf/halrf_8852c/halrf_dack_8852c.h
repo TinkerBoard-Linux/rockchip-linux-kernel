@@ -26,13 +26,9 @@
 #define __HALRF_DACK_8852C_H__
 #ifdef RF_8852C_SUPPORT
 
-#define DACK_VER_8852C 0x8
+#define DACK_VER_8852C 0xc
 
-void halrf_dack_recover_8852c(struct rf_info *rf,
-			      u8 offset,
-			      enum rf_path path,
-			      u32 val,
-			      bool reload);
 void halrf_dac_cal_8852c(struct rf_info *rf, bool force);
+void halrf_dack_fwrpt_8852c(struct rf_info *rf, u16 len, u8 *c2h);
 #endif
 #endif /*  __INC_PHYDM_API_H_8852A__ */

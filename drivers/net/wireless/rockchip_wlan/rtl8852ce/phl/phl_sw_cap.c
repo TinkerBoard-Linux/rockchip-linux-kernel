@@ -39,21 +39,25 @@ _phl_sw_cap_para_free(
 
 static void
 _phl_pwrlmt_para_init(
-	struct rtw_phl_com_t* phl_com, struct rtw_para_pwrlmt_info_t *para_info)
+	struct rtw_phl_com_t* phl_com, struct rtw_para_pwrlmt_info_t *para_info,
+	enum band_type band)
 {
 	para_info->para_src = RTW_PARA_SRC_INTNAL;
 	para_info->para_data = NULL;
 	para_info->para_data_len = 0;
 	para_info->ext_regd_arridx = 0;
 	para_info->ext_reg_map_num = 0;
+
+	para_info->band = band;
 }
 
 static void
 _phl_pwrlmt_para_free(
-	struct rtw_phl_com_t* phl_com, struct rtw_para_pwrlmt_info_t *para_info)
+	struct rtw_phl_com_t* phl_com, struct rtw_para_pwrlmt_info_t *para_info,
+	bool tmp_data_only)
 {
 	u32 file_buf_sz = MAX_HWCONFIG_FILE_CONTENT;
-	u32 buf_sz = MAX_LINES_HWCONFIG_TXT;
+	u32 buf_sz = MAX_NUM_PWRLMT_EXT_REGD_MAP * sizeof(struct pwrlmt_ext_regd_map);
 	void *drv = phl_com->drv_priv;
 
 	if(para_info->para_data)
@@ -61,8 +65,19 @@ _phl_pwrlmt_para_free(
 	para_info->para_data = NULL;
 	para_info->para_data_len = 0;
 
-	if(para_info->ext_reg_codemap)
-		_os_mem_free(drv, para_info->ext_reg_codemap, buf_sz * sizeof(u8));
+	if (tmp_data_only)
+		return;
+
+#ifdef PHL_DYNAMIC_ALLOC_EXT_REGD_NAME
+	if (para_info->ext_regd_name)
+		_os_mem_free(drv, para_info->ext_regd_name, para_info->ext_regd_name_size);
+	para_info->ext_regd_name = NULL;
+	para_info->ext_regd_name_size = 0;
+#endif
+	para_info->ext_regd_arridx = 0;
+
+	if (para_info->ext_reg_codemap)
+		_os_mem_free(drv, para_info->ext_reg_codemap, buf_sz);
 	para_info->ext_reg_codemap = NULL;
 	para_info->ext_reg_map_num = 0;
 }
@@ -110,10 +125,14 @@ static void _phl_sw_cap_init_para_from_file(struct rtw_phl_com_t* phl_com)
 		_phl_sw_cap_para_init(phl_com, &phy_sw_cap->rf_txpwr_byrate_info);
 		_phl_sw_cap_para_init(phl_com, &phy_sw_cap->rf_txpwrtrack_info);
 
-		_phl_pwrlmt_para_init(phl_com, &phy_sw_cap->rf_txpwrlmt_info);
-		_phl_pwrlmt_para_init(phl_com, &phy_sw_cap->rf_txpwrlmt_ru_info);
-		_phl_pwrlmt_para_init(phl_com, &phy_sw_cap->rf_txpwrlmt_6g_info);
-		_phl_pwrlmt_para_init(phl_com, &phy_sw_cap->rf_txpwrlmt_ru_6g_info);
+ 		/* 2G and 5G use same file */
+		_phl_pwrlmt_para_init(phl_com, &phy_sw_cap->rf_txpwrlmt_info, BAND_ON_24G);
+		_phl_pwrlmt_para_init(phl_com, &phy_sw_cap->rf_txpwrlmt_ru_info, BAND_ON_24G);
+
+		/* 6G */
+		_phl_pwrlmt_para_init(phl_com, &phy_sw_cap->rf_txpwrlmt_6g_info, BAND_ON_6G);
+		_phl_pwrlmt_para_init(phl_com, &phy_sw_cap->rf_txpwrlmt_ru_6g_info, BAND_ON_6G);
+
 		phy_sw_cap->bfreed_para = false;
 	}
 
@@ -134,6 +153,7 @@ phl_sw_cap_init(struct rtw_phl_com_t* phl_com)
 #else
 	phl_com->dev_sw_cap.fw_cap.fw_src = RTW_FW_SRC_INTNAL;
 #endif
+	phl_com->dev_sw_cap.fw_cap.fw_type = RTW_FW_MAX;
 	phl_com->dev_sw_cap.btc_mode = BTC_MODE_NORMAL;
 	phl_com->dev_sw_cap.bypass_rfe_chk = false;
 	phl_com->dev_sw_cap.rf_board_opt = PHL_UNDEFINED_SW_CAP;
@@ -149,23 +169,25 @@ phl_sw_cap_init(struct rtw_phl_com_t* phl_com)
 	phl_com->phy_sw_cap[0].txagg_num = 0;
 	phl_com->phy_sw_cap[1].txagg_num = 0;
 
+#ifdef CONFIG_PHL_FW_DUMP_EFUSE
+	phl_com->dev_sw_cap.efuse_dump_ofld = true;
+	phl_com->dev_sw_cap.adie_efuse_dump_ofld = true;
+#endif
+
+	phl_com->dev_sw_cap.disable_dyn_txpwr = false;
 	return RTW_PHL_STATUS_SUCCESS;
 }
 
 enum rtw_phl_status
-phl_sw_cap_deinit(struct rtw_phl_com_t* phl_com)
+phl_sw_cap_deinit(struct rtw_phl_com_t* phl_com, bool full_deinit)
 {
 #ifdef CONFIG_LOAD_PHY_PARA_FROM_FILE
 	struct phy_sw_cap_t *phy_sw_cap = NULL;
 	u8	idx=0;
 
 	for (idx = 0; idx < 2; idx++) {
-		phy_sw_cap = &phl_com->phy_sw_cap[idx];
-		if (phy_sw_cap->bfreed_para == true) {
-			PHL_TRACE(COMP_PHL_DBG, _PHL_INFO_, "already bfreed para_info->para_data\n");
-			return RTW_PHL_STATUS_SUCCESS;
-		}
 		PHL_TRACE(COMP_PHL_DBG, _PHL_INFO_, "To free para_info->para_data phy %d\n", idx);
+		phy_sw_cap = &phl_com->phy_sw_cap[idx];
 
 		_phl_sw_cap_para_free(phl_com, &phy_sw_cap->mac_reg_info);
 		_phl_sw_cap_para_free(phl_com, &phy_sw_cap->bb_phy_reg_info);
@@ -177,10 +199,14 @@ phl_sw_cap_deinit(struct rtw_phl_com_t* phl_com)
 		_phl_sw_cap_para_free(phl_com, &phy_sw_cap->rf_txpwr_byrate_info);
 		_phl_sw_cap_para_free(phl_com, &phy_sw_cap->rf_txpwrtrack_info);
 
-		_phl_pwrlmt_para_free(phl_com, &phy_sw_cap->rf_txpwrlmt_info);
-		_phl_pwrlmt_para_free(phl_com, &phy_sw_cap->rf_txpwrlmt_ru_info);
-		_phl_pwrlmt_para_free(phl_com, &phy_sw_cap->rf_txpwrlmt_6g_info);
-		_phl_pwrlmt_para_free(phl_com, &phy_sw_cap->rf_txpwrlmt_ru_6g_info);
+		_phl_pwrlmt_para_free(phl_com, &phy_sw_cap->rf_txpwrlmt_info,
+			!full_deinit);
+		_phl_pwrlmt_para_free(phl_com, &phy_sw_cap->rf_txpwrlmt_ru_info,
+			!full_deinit);
+		_phl_pwrlmt_para_free(phl_com, &phy_sw_cap->rf_txpwrlmt_6g_info,
+			!full_deinit);
+		_phl_pwrlmt_para_free(phl_com, &phy_sw_cap->rf_txpwrlmt_ru_6g_info,
+			!full_deinit);
 
 		phy_sw_cap->bfreed_para = true;
 	}
@@ -194,7 +220,7 @@ void rtw_phl_init_free_para_buf(struct rtw_phl_com_t *phl_com)
 
 #ifdef CONFIG_LOAD_PHY_PARA_FROM_FILE
 	if (phl_com->dev_sw_cap.bfree_para_info == true)
-		phl_sw_cap_deinit(phl_com);
+		phl_sw_cap_deinit(phl_com, false);
 
 #endif
 }
@@ -493,11 +519,11 @@ _phl_init_protocol_cap(struct phl_info_t *phl_info,
 		protocol_cap->num_ampdu = rtw_hal_get_ampdu_num(phl_info->hal, hw_band);
 		protocol_cap->ampdu_density = 0;
 		protocol_cap->ampdu_len_exp = 0xff;
-		protocol_cap->amsdu_in_ampdu = 1;
+		protocol_cap->amsdu_in_ampdu = phl_com->proto_sw_cap[hw_band].amsdu_in_ampdu;
 		protocol_cap->max_amsdu_len =
 			phl_com->proto_sw_cap[hw_band].max_amsdu_len;
 		protocol_cap->htc_rx = 1;
-		protocol_cap->sm_ps = 0;
+		protocol_cap->sm_ps = 3;
 		protocol_cap->trig_padding = 0;
 #ifdef CONFIG_PHL_TWT
 		protocol_cap->twt =
@@ -686,7 +712,7 @@ _phl_init_protocol_cap(struct phl_info_t *phl_info,
 		protocol_cap->num_ampdu = rtw_hal_get_ampdu_num(phl_info->hal, hw_band);
 		protocol_cap->ampdu_density = 0;
 		protocol_cap->ampdu_len_exp = 0xff;
-		protocol_cap->amsdu_in_ampdu = 1;
+		protocol_cap->amsdu_in_ampdu = phl_com->proto_sw_cap[hw_band].amsdu_in_ampdu;
 		protocol_cap->max_amsdu_len =
 			phl_com->proto_sw_cap[hw_band].max_amsdu_len;
 		protocol_cap->htc_rx = 1;
@@ -694,7 +720,7 @@ _phl_init_protocol_cap(struct phl_info_t *phl_info,
 		protocol_cap->trig_padding = 2;
 #ifdef CONFIG_PHL_TWT
 		protocol_cap->twt =
-				phl_com->dev_cap.twt_sup & RTW_PHL_TWT_REQ_SUP;
+				phl_com->dev_cap.twt_sup & (RTW_PHL_TWT_REQ_SUP | RTW_PHL_TWT_BC_SUP);
 #else
 		protocol_cap->twt = 0;
 #endif /* CONFIG_PHL_TWT */
@@ -776,10 +802,17 @@ _phl_init_protocol_cap(struct phl_info_t *phl_info,
 		protocol_cap->ltf_gi = 0x3f;	// bit-x
 		protocol_cap->doppler_tx = 1;
 		protocol_cap->doppler_rx = 0;
+#ifdef RTW_WKARD_DISABLE_DCM
+		protocol_cap->dcm_max_const_tx = 0;
+		protocol_cap->dcm_max_nss_tx = 0;
+		protocol_cap->dcm_max_const_rx = 0;
+		protocol_cap->dcm_max_nss_rx = 0;
+#else
 		protocol_cap->dcm_max_const_tx = 3;
 		protocol_cap->dcm_max_nss_tx = 1;
 		protocol_cap->dcm_max_const_rx = 3;
 		protocol_cap->dcm_max_nss_rx = 0;
+#endif
 
 		_phl_update_sw_stbc_cap(phl_info, hw_band);
 		_phl_init_proto_stbc_cap(phl_info, hw_band, protocol_cap);

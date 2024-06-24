@@ -36,6 +36,26 @@ extern u32 hal_read_rfreg(struct hal_info_t *hal,
 extern void hal_write_rfreg(struct hal_info_t *hal,
 		enum rf_path path, u32 offset, u32 bit_mask, u32 data);
 
+static void _regu_ops_init(struct hal_regu_ops *regu_ops)
+{
+	if (!regu_ops)
+		return;
+
+	regu_ops->hal_query_group_cntry_num = hal_query_group_cntry_num_8852c;
+	regu_ops->hal_fill_group_cntry_list = hal_fill_group_cntry_list_8852c;
+	regu_ops->hal_get_cntry_idx = hal_get_cntry_idx_8852c;
+	regu_ops->hal_get_cntry_tbl_size = hal_get_cntry_tbl_size_8852c;
+	regu_ops->hal_get_chnlplan_ver = hal_get_chnlplan_ver_8852c;
+	regu_ops->hal_get_country_ver = hal_get_country_ver_8852c;
+	regu_ops->hal_qry_cntry_chnlplan = hal_qry_cntry_chnlplan_8852c;
+	regu_ops->hal_get_chplan_update_info = hal_get_chplan_update_info_8852c;
+	regu_ops->hal_get_chdef_6g = hal_get_chdef_6g_8852c;
+	regu_ops->hal_get_domain_regulation = hal_get_domain_regulation_8852c;
+	regu_ops->hal_get_6g_regulatory_info = hal_get_6g_regulatory_info_8852c;
+	regu_ops->hal_get_domain_idx = hal_get_domain_idx_8852c;
+	regu_ops->hal_get_cat6g_by_country = hal_get_cat6g_by_country_8852c;
+}
+
 void hal_set_ops_8852c(struct rtw_phl_com_t *phl_com,
 					struct hal_info_t *hal)
 {
@@ -52,11 +72,16 @@ void hal_set_ops_8852c(struct rtw_phl_com_t *phl_com,
 	ops->read_rfreg = hal_read_rfreg;
 	ops->write_rfreg = hal_write_rfreg;
 
+	/* regulation */
+	_regu_ops_init(&ops->regu_ops);
+
 #ifdef RTW_PHL_BCN
 	ops->cfg_bcn = hal_config_beacon_8852c;
 	ops->upt_bcn = hal_update_beacon_8852c;
 #endif
 	ops->get_path_from_ant_num = hal_get_path_from_ant_num_8852c;
+	ops->cfg_ppdu_sts = rtw_hal_mac_ppdu_stat_cfg;
+
 }
 
 #if 0

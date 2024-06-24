@@ -29,23 +29,47 @@
 #define HALBB_AX4RU_STA_NUM 4
 #define HALBB_AX8RU_STA_NUM 8
 #define HALBB_MAX_RU_STA_NUM 16
+#define HALBB_MAX_RUCMD_USR_NUM 16
 /*@--------------------------[Enum]------------------------------------------*/
+
+enum rtw_ru_op_cmd {
+	RUGRPCMD_ADD_USER = 0,
+	RUGRPCMD_DEL_USER  = 1,
+	RUGRPCMD_MAX
+};
+
 enum rtw_rua_tbl_hdr_rw {
-		RUA_TBL_RW_READ = 0,
-		RUA_TBL_RW_WRITE = 1
+	RUA_TBL_RW_READ = 0,
+	RUA_TBL_RW_WRITE = 1
 };
 enum rtw_rua_tbl_hdr_type {
-		RUA_TBL_TYPE_SW = 0,
-		RUA_TBL_TYPE_HW = 1
+	RUA_TBL_TYPE_SW = 0,
+	RUA_TBL_TYPE_HW = 1
 };
 enum rtw_rua_tbl_hdr_class {
-		RUA_TBL_CL_DLRU_SW = 0x0,
-		RUA_TBL_CL_ULRU_SW  = 0x1,
-		RUA_TBL_CL_RU_STA = 0x2,
-		RUA_TBL_CL_DLRU_SW_FIX = 0x3,
-		RUA_TBL_CL_ULRU_SW_FIX = 0x4,
-		RUA_TBL_CL_BA_INFO = 0x5
+	RUA_TBL_CL_DLRU_SW = 0x0,
+	RUA_TBL_CL_ULRU_SW  = 0x1,
+	RUA_TBL_CL_RU_STA = 0x2,
+	RUA_TBL_CL_DLRU_SW_FIX = 0x3,
+	RUA_TBL_CL_ULRU_SW_FIX = 0x4,
+	RUA_TBL_CL_BA_INFO = 0x5
 };
+
+enum rtw_ra_maksing_cmd {
+	OR_RA_MASKING = 0x0,
+	AND_RA_MASKING = 0x1,
+	RPLC_RA_MASKING = 0x2,
+	RST_RA_MASKING = 0x3,
+	MAX_RA_MASKING_CMD
+};
+
+enum rtw_ra_type {
+	RA_DLRU = 0x0,
+	RA_ULRU = 0x1,
+	RA_ULSU = 0x2,
+	MAX_RA_TYPE_NUM
+};
+
 /*@--------------------------[Structure]-------------------------------------*/
  struct rtw_rua_tbl_hdr {
 	u8 rw:1;
@@ -345,8 +369,6 @@ struct rtw_dlfix_sta_i_ext {
 
 	struct rtw_ru_rate_ent rate;
 	u8 rsvd2[3];
-
-	u32 rsvd3;
 };
 
 
@@ -366,7 +388,8 @@ struct rtw_dlru_fixtbl_univrsl {
 	u8 ru_swp_flg: 1;
 	u8 rsvd0: 7;
 
-	u32 rsvd3;
+	u16 ch20_with_data;
+	u16 rsvd2;
 	struct rtw_dlfix_sta_i_ext sta[HALBB_MAX_RU_STA_NUM];
 
 	struct rtw_rupos_fixtbl rupos_tbl;
@@ -484,8 +507,6 @@ struct rtw_ulfix_sta_i_ext {
 
 	struct rtw_ru_rate_ent rate;
 	u8 rsvd2[3];
-
-	u8 rsvd3[4];
 };
 
 struct rtw_ulru_fixtbl_univrsl {
@@ -522,12 +543,13 @@ struct rtw_ba_tbl_info {
 };
 
 struct rtw_sw_grp_bitmap {
-	u8 macid;
+	u16 macid;
 
 	u8 en_upd_dl_swgrp:1;
 	u8 en_upd_ul_swgrp:1;
 	u8 cmdend:1; // add for determine whether last user or not
 	u8 rsvd1:5;
+	u8 rsvd2;
 
 	u32 dl_sw_grp_bitmap;
 	u32 ul_sw_grp_bitmap;
@@ -538,17 +560,16 @@ struct rtw_sw_grp_set {
 };
 
 struct rtw_dl_macid_cfg {
-	u32 macid: 8;
+	u32 macid: 16;
 	u32 dl_su_rate_cfg: 1;
 	u32 dl_su_rate: 9;
 	u32 dl_su_bw: 2;
 	u32 dl_su_pwr_cfg: 1;
-	u32 dl_su_pwr: 6;
-	u32 rsvd0: 5;
+	u32 rsvd0: 3;
 
 	u32 gi_ltf_4x8_support: 1;
 	u32 gi_ltf_1x8_support: 1;
-	u32 rsvd1: 6;
+	u32 dl_su_pwr: 6;
 	u32 dl_su_info_en: 1;
 	u32 rsvd2: 2;
 	u32 dl_su_gi_ltf: 3;
@@ -582,22 +603,99 @@ struct rtw_dl_macid_cfg {
 };
 
 
+struct rtw_hecap {
+	u8 dev_cls: 1;          //Device Class
+	u8 ldpc: 1;             //LDPC Coding In Payload
+	u8 gi_ltf_1x0p8: 1;     //HE SU PPDU With 1x HE-LTF And 0.8 µs GI
+	u8 gi_ltf_4x0p8: 1;     //HE SU PPDU And HE MU PPDU With 4x HE-LTF And 0.8 µs GI
+	u8 ul_mu:1;             //Full Bandwidth UL MU-MIMO
+	u8 prtl_ul_mu:1;        //Partial Bandwidth UL MU-MIMO
+	u8 prtl_dl_mu:1;        //Partial Bandwidth DL MU-MIMO
+	u8 pwr_bst_fac: 1;      //Power Boost Factor Support
+
+	u8 tx_1024_le242: 1;    //Tx 1024-QAM < 242-tone RU Support
+	u8 rx_1024_le242: 1;    //Rx 1024-QAM < 242-tone RU Support
+	u8 rsvd0: 6;
+
+	u8 rsvd1;
+
+	u8 rsvd2;
+};
+
+struct rtw_ehtcap {
+	u8 rx_242_20only: 1;            //Support For 242-tone RU In BW Wider Than 20 MHz
+	u8 gi_ltf_4x0p8: 1;             //EHT MU PPDU With 4x EHT-LTF And 0.8 µs GI
+	u8 tx1024_4096_le242: 1;        //Tx 1024-QAM And 4096-QAM < 242-tone RU Support
+	u8 rx1024_4096_le242: 1;        //Rx 1024-QAM And 4096-QAM < 242-tone RU Support
+	u8 prtl_ul_mu: 1;               //Partial Bandwidth UL MU-MIMO
+	u8 prtl_dl_mu: 1;               //Partial BandwidthDL MU-MIMO
+	u8 pwr_bst_fac: 1;              //Power Boost Factor Support
+	u8 rsvd1: 1;
+
+	u8 rx1024_prtlbw_only: 1;       //Rx 1024-QAM In Wider Bandwidth DL OFDMA Support
+	u8 rx4096_prtlbw_only: 1;       //Rx 4096-QAM In Wider Bandwidth DL OFDMA Support
+	u8 rsvd2: 6;
+
+	u8 mcs15:4;                     //Support Of MCS 15
+	u8 mcs14_6g:1;                  //Support Of EHT DUP (MCS 14) In 6 GHz
+	u8 rsvd3:3;
+
+	u8 rsvd4;
+};
+
+struct rtw_macid_info {
+	u16 macid;
+	u8 rsvd0;
+	u8 rsvd1;
+
+	u8 sta_typ:3;
+	u8 is_mlo:1;
+	u8 band:2;
+	u8 rsvd2:2;
+
+	u8 ldpc:1;
+	u8 nss:3;
+	u8 bw:3;
+	u8 rsvd3:1;
+
+	u8 rsvd4;
+	u8 rsvd5;
+
+	struct rtw_hecap he;
+	struct rtw_ehtcap eht;
+};
+
 struct rtw_ul_macid_cfg {
-	u32 macid: 8;
+	u32 macid: 16;
 	u32 endcmd: 1;
-	u32 rsvd0: 23;
+	u32 rsvd0: 15;
 
 	u32 ul_su_info_en: 1;
-	u32 ul_su_bw: 2;
 	u32 ul_su_gi_ltf: 3;
+	u32 rsvd1: 2;
 	u32 ul_su_doppler_ctrl: 2;
 	u32 ul_su_dcm: 1;
 	u32 ul_su_ss: 3;
 	u32 ul_su_mcs: 4;
-	u32 rsvd2: 5;
+	u32 ul_su_bw: 3;
 	u32 ul_su_stbc: 1;
 	u32 ul_su_coding: 1;
+	u32 rsvd2: 2;
 	u32 ul_su_rssi_m: 9;
+
+	u32 fix_ru_pos: 1;
+	u32 fix_rate: 1;
+	u32 fix_dbw: 1;
+	u32 fix_giltf: 1;
+	u32 fix_tgt_rssi: 1;
+	u32 fix_coding: 1;
+	u32 rsvd3: 2;
+	u32 rsvd4: 8;
+	u32 tx_mode_ul: 2;
+	u32 rsvd5: 2;
+	u32 rsvd6: 3;
+	u32 ps160: 1;
+	u32 ru_pos: 8;
 };
 
 struct rtw_ul_macid_set {
@@ -605,19 +703,18 @@ struct rtw_ul_macid_set {
 };
 
 struct rtw_csiinfo_cfg {
-	u32 macid: 8;
-	u32 csi_info_bitmap: 8;
-	u32 rsvd0: 16;
+	u32 macid: 16;
+	u32 csi_info_bitmap: 16;
 };
 
 struct rtw_cqi_info {
-	u32 macid: 8;
+	u32 macid: 16;
 	u32 fw_cqi_flag: 1; /* UL or DL*/
 	u32 ru_rate_table_row_idx: 4; /* UL or DL*/
 	u32 ul_dl: 1; /*1'b0 means UL, 1'b1 means DL */
 	u32 endcmd: 1;
 	u32 rsvd0: 1;
-	u32 rsvd1: 16;
+	u32 rsvd1: 8;
 
 	s8 cqi_diff_table[19]; /* UL or DL*/
 	u8 rsvd2;
@@ -709,6 +806,75 @@ struct rtw_pwr_by_rt_tbl{
 	s16 pwr_by_rt[32];
 };
 
+struct rtw_ra_masking{
+	u16 macid;
+	u8 ra_sel:4;
+	u8 rsvd1:4;
+	u8 op_sel:4;
+	u8 rsvd2:4;
+
+	u32 mask_1ss;
+	u32 mask_2ss;
+	u32 mask_3ss;
+	u32 mask_4ss;
+};
+
+struct rtw_rucmd_usr {
+	u16 macid;
+	u16 rsvd;
+};
+
+struct rtw_dlru_cmd {
+	u8 fix_mode_flg: 1;
+	u8 is_hwgrp: 1;
+	u8 txpwr_ofld_en: 1;
+	u8 pwrlim_dis: 1;
+	u8 giltf_ctrl_en:1;
+	u8 stbc_permit: 1;
+	u8 rsvd1:2;
+	u8 rsvd2[3];
+
+	u8 band;
+	u8 tx_mode;
+	u8 grp_id;
+	u8 ppdu_bw;
+
+	u16 grp_tx_pwr;
+	u8 gi_ltf;
+	u8 rsvd4;
+
+	u8 op_cmd;
+	u8 usr_num;
+	u8 rsvd5[2];
+
+	struct rtw_rucmd_usr usr[HALBB_MAX_RUCMD_USR_NUM];
+};
+
+struct rtw_ulru_cmd {
+	u8 fix_mode_flg: 1;
+	u8 is_hwgrp: 1;
+	u8 giltf_ctrl_en:1;
+	u8 stbc_permit: 1;
+	u8 rsvd1:4;
+	u8 rsvd2[3];
+
+	u8 band;
+	u8 tx_mode;
+	u8 grp_id;
+	u8 ppdu_bw;
+
+	u8 gi_ltf;
+	u8 rsvd4;
+	u16 rsvd5;
+
+	u8 op_cmd;
+	u8 usr_num;
+	u8 rsvd6[2];
+
+	struct rtw_rucmd_usr usr[HALBB_MAX_RUCMD_USR_NUM];
+};
+
+
 /*@--------------------------[Prptotype]-------------------------------------*/
 struct bb_info;
 //u32 halbb_upd_dlru_fixtbl(struct bb_info *bb,
@@ -749,6 +915,13 @@ u32 halbb_ch_bw_notif(struct bb_info *bb, struct rtw_ch_bw_notif *cfg);
 
 u32 halbb_pwrtbl_notif(struct bb_info *bb, struct rtw_pwrtbl_notif *cfg);
 
+u32 halbb_macid_init(struct bb_info *bb, struct rtw_macid_info *cfg);
+
+u32 halbb_ra_masking(struct bb_info *bb, struct rtw_ra_masking *cfg);
+
+u32 halbb_dlru_cmd(struct bb_info *bb, struct  rtw_dlru_cmd *info);
+
+u32 halbb_ulru_cmd(struct bb_info *bb, struct  rtw_ulru_cmd *info);
 /*u32 halbb_rua_tbl_init(struct bb_info *bb);*/
 #endif
 #endif

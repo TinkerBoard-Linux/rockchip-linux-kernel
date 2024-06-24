@@ -64,10 +64,23 @@
 #define BAC_AUTOK_TAR_MSK		0xFFF
 
 /* PCIE CFG register */
+#define PCIE_CMD_OFFSET                 0x4
+#define PCIE_BAR_OFFSET                 0x18
+#define PCIE_D_STATE_OFFSET             0x44
 #define PCIE_L1_STS			0x80
 #define BCFG_LINK_SPEED_SH		16
 #define BCFG_LINK_SPEED_MSK		0xF
 #define PCIE_PHY_RATE			0x82
+#define PCIE_UNCORR_ERR_STS_OFFSET      0x104
+#define PCIE_UNCORR_ERR_MASK_OFFSET     0x108
+#define PCIE_UNCORR_ERR_SEV_OFFSET      0x10C
+#define PCIE_CORR_ERR_STS_OFFSET        0x110
+#define PCIE_CORR_ERR_MASK_OFFSET       0x114
+#define PCIE_ADV_ERR_CAP_CTRL_OFFSET    0x118
+#define PCIE_HDR_LOG_1_OFFSET           0x11C
+#define PCIE_HDR_LOG_2_OFFSET           0x120
+#define PCIE_HDR_LOG_3_OFFSET           0x124
+#define PCIE_HDR_LOG_4_OFFSET           0x128
 #define PCIE_L1SS_CTRL			0x718
 #define PCIE_L1_CTRL			0x719
 #define PCIE_ACK_NFTS			0x70D
@@ -83,15 +96,31 @@
 #define FILTER_OUT_EQ_MSK		0x1F
 #define REG_FILTER_OUT_SH		2
 #define REG_FILTER_OUT_MSK		0x1F
-#define PCIE_LINK_SPEED_32BIT   0x80
+#define PCIE_LINK_CAP                   0x7C
+#define PCIE_LINK_SPEED_32BIT           0x80
+#define PCIE_LINK_CTRL_STS_OFFSET       0x80
 
-/*PCIE SPEED*/
+/* PCIE Bus Master */
+#define PCIE_BUS_MASTER_SH              0
+#define PCIE_BUS_MASTER_BITS_MSK        0x7
+
+/* PCIE D-state */
+#define PCIE_D_STATE_SH              0
+#define PCIE_D_STATE_BITS_MSK        0x3
+
+/* PCIE SPEED */
 #define PCIE_LINK_SPEED_SH      16
-#define PCIE_LINK_SPEED_BITS_MSK 0XF
+#define PCIE_LINK_SPEED_BITS_MSK 0xF
 #define PCIE_CAPABILITY_SPEED    0x7C
 #define PCIE_SUPPORT_GEN_SH      0
 #define PCIE_LINK_CHANGE_SPEED   0xA0
 #define PCIE_POLLING_BIT         BIT(17)
+
+/* PCIE Link Width */
+#define PCIE_LINK_WIDTH_SH      20
+#define PCIE_LINK_WIDTH_MSK     0x3F
+#define PCIE_LANE_RESIZING_OFFSET      0x8C0
+#define PCIE_LANE_RESIZING_VAL      0xC0
 
 /* 8852C PCIE bit */
 #define PCIE_L1_STS_V1			0x2080
@@ -103,6 +132,9 @@
 /* PCIE CFG bit */
 #define PCIE_BIT_STS_L0S		BIT(0)
 #define PCIE_BIT_STS_L1			BIT(1)
+#define PCIE_BIT_STS_COMM_CLK_CFG	BIT(6)
+#define PCIE_BIT_STS_CLK_PM	        BIT(8)
+
 #define PCIE_BIT_WAKE			BIT(2)
 #define PCIE_BIT_L1			BIT(3)
 #define PCIE_BIT_CLK			BIT(4)

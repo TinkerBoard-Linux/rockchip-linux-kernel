@@ -33,6 +33,49 @@
 #define RPWM_DELAY_FOR_32K_TICK	64
 
 #define REQ_PWR_ST_XTAL_OFF_VAL	0x82ff0000
+
+#define MP_INTER_BCN_LPS_OP_PCIE	0x48151B2
+#define MP_INTER_BCN_LPS_OP_USB		0x4C151B2
+#define MP_INTER_BCN_LPS_OP_SDIO	0x48051B2
+
+#define RPWM_SEQ_NUM_MAX                3
+#define CPWM_SEQ_NUM_MAX                3
+
+//RPWM bit definition
+#define PS_RPWM_TOGGLE			BIT(15)
+#define PS_RPWM_ACK             BIT(14)
+#define PS_RPWM_SEQ_NUM_SH      12
+#define PS_RPWM_SEQ_NUM_MSK     0x3
+#define PS_RPWM_NOTIFY_WAKE     BIT(8)
+#define PS_RPWM_STATE_SH        0
+#define PS_RPWM_STATE_MSK       0x7
+
+//CPWM bit definition
+#define PS_CPWM_TOGGLE			BIT(15)
+#define PS_CPWM_ACK             BIT(14)
+#define PS_CPWM_SEQ_NUM_SH      12
+#define PS_CPWM_SEQ_NUM_MSK     0x3
+#define PS_CPWM_RSP_SEQ_NUM_SH  8
+#define PS_CPWM_RSP_SEQ_NUM_MSK 0x3
+#define PS_CPWM_STATE_SH        0
+#define PS_CPWM_STATE_MSK       0x7
+
+//(workaround) CPWM register is in OFF area
+//LPS debug message bit definition
+#define B_PS_LDM_32K_EN         BIT(31)
+#define B_PS_LDM_32K_EN_SH      31
+
+// Bcn rx rate
+#define R_RXBCNHIT_RATE R_AX_USER_DEFINED_0
+#define B_AX_BCN_RATE_SH 0
+#define B_AX_BCN_RATE_MSK 0xff
+#define B_AX_BCN_HIT_RATE_SH 8
+#define B_AX_BCN_HIT_RATE_MSK 0xff
+#define B_AX_BCN_NO_HIT_RATE_SH 16
+#define B_AX_BCN_NO_HIT_RATE_MSK 0xff
+#define B_AX_ROLE_IDX_SH 24
+#define B_AX_ROLE_IDX_MSK 0xff
+
 /**
  * @enum last_rpwm_mode
  *
@@ -46,6 +89,27 @@
 enum last_rpwm_mode {
 	LAST_RPWM_PS        = 0x0,
 	LAST_RPWM_ACTIVE    = 0x6,
+};
+
+/**
+ * @macid_grp_list
+ *
+ * @brief macid_grp_list
+ *
+ * @var macid_grp_list::MACID_GRP_0
+ * Please Place Description here.
+ * @var macid_grp_list::MACID_GRP_1
+ * Please Place Description here.
+ * @var macid_grp_list::MACID_GRP_2
+ * Please Place Description here.
+ * @var macid_grp_list::MACID_GRP_3
+ * Please Place Description here.
+ */
+enum macid_grp_list {
+	MACID_GRP_0	= 0,
+	MACID_GRP_1	= 1,
+	MACID_GRP_2	= 2,
+	MACID_GRP_3	= 3,
 };
 
 /**
@@ -121,27 +185,6 @@ struct ps_rpwm_parm {
 	enum mac_ax_rpwm_req_pwr_state req_pwr_state;
 	u32 notify_wake:1;
 	u32 rsvd0:31;
-};
-
-/**
- * @macid_grp_list
- *
- * @brief macid_grp_list
- *
- * @var macid_grp_list::MACID_GRP_0
- * Please Place Description here.
- * @var macid_grp_list::MACID_GRP_1
- * Please Place Description here.
- * @var macid_grp_list::MACID_GRP_2
- * Please Place Description here.
- * @var macid_grp_list::MACID_GRP_3
- * Please Place Description here.
- */
-enum macid_grp_list {
-	MACID_GRP_0	= 0,
-	MACID_GRP_1	= 1,
-	MACID_GRP_2	= 2,
-	MACID_GRP_3	= 3,
 };
 
 /**
@@ -520,7 +563,7 @@ u32 mac_req_pwr_lvl_cfg(struct mac_ax_adapter *adapter,
  * @retval u32
  */
 u32 mac_lps_option_cfg(struct mac_ax_adapter *adapter,
-		       struct mac_lps_option *lps_option);
+		       struct rtw_mac_lps_option *lps_option);
 /**
  * @}
  * @}

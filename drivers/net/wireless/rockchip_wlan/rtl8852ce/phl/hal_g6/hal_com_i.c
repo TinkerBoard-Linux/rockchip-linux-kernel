@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2019 Realtek Corporation.
+ * Copyright(c) 2019 - 2024 Realtek Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -161,8 +161,12 @@ rtw_hal_proc_cmd(void *hal, char proc_cmd, struct rtw_proc_cmd *incmd,
 			hal_status = RTW_HAL_STATUS_SUCCESS;
 	}
 	if(proc_cmd == RTW_PROC_CMD_MAC){
+#ifdef CONFIG_HAL_MAC_DBG
 		if(rtw_hal_mac_proc_cmd(hal_info, incmd, output, out_len))
 			hal_status = RTW_HAL_STATUS_SUCCESS;
+#else
+		hal_status = RTW_HAL_STATUS_NOT_SUPPORT;
+#endif
 	}
 #ifdef CONFIG_BTCOEX
 	if(proc_cmd == RTW_PROC_CMD_BTC){
@@ -185,6 +189,25 @@ void rtw_hal_get_mac_version(char *ver_str, u16 len)
 void rtw_hal_get_fw_ver(void *hal, char *ver_str, u16 len)
 {
 	rtw_hal_mac_get_fw_ver((struct hal_info_t *)hal, ver_str, len);
+}
+
+enum rtw_hal_status
+rtw_hal_antdiv_fix_ant(void *hal, u8 antIndex)
+{
+	struct hal_info_t *hal_info = (struct hal_info_t *)hal;
+	struct rtw_hal_com_t *hal_com = hal_info->hal_com;
+	enum rtw_hal_status hal_status = RTW_HAL_STATUS_FAILURE;
+
+	hal_status = rtw_hal_bb_antdiv_fix_ant(hal_com, antIndex);
+	return hal_status;
+}
+
+enum rf_path rtw_hal_get_path_from_ant_num(void *hal, u8 antnum)
+{
+	struct hal_info_t *hal_info = (struct hal_info_t *)hal;
+	struct hal_ops_t *hal_ops = hal_get_ops(hal_info);
+
+	return hal_ops->get_path_from_ant_num(antnum);
 }
 
 enum rtw_hal_status
@@ -254,8 +277,7 @@ _exit:
 	return hsts;
 }
 
-enum rtw_hal_status rtw_hal_ppdu_sts_init(void *hal, u8 band_idx,
-			bool en, u8 appen_info, u8 filter)
+enum rtw_hal_status rtw_hal_ppdu_sts_init(void *hal, struct hal_ppdu_sts_cfg *cfg)
 {
 	struct hal_info_t *hal_info = (struct hal_info_t *)hal;
 	struct rtw_hal_com_t *hal_com = hal_info->hal_com;
@@ -263,20 +285,18 @@ enum rtw_hal_status rtw_hal_ppdu_sts_init(void *hal, u8 band_idx,
 #ifdef DBG_DBCC_MONITOR_TIME
 	u32 start_t = 0;
 
-	phl_fun_monitor_start(&start_t, true, __FUNCTION__);
+	PHL_FUN_MON_START(&start_t);
 #endif /* DBG_DBCC_MONITOR_TIME */
-	hal_status = rtw_hal_mac_ppdu_stat_cfg(
-				hal_info, band_idx, en,
-				appen_info,
-				filter);
 
-	hal_com->band[band_idx].ppdu_sts_appen_info = appen_info;
-	hal_com->band[band_idx].ppdu_sts_filter = filter;
+	hal_status = hal_info->hal_ops.cfg_ppdu_sts(hal_info, cfg);
+
+	hal_com->band[cfg->band_idx].ppdu_sts_appen_info = cfg->appen_info;
+	hal_com->band[cfg->band_idx].ppdu_sts_filter = cfg->filter;
 
 	if (hal_status != RTW_HAL_STATUS_SUCCESS)
 		PHL_ERR("%s - failed\n", __func__);
 #ifdef DBG_DBCC_MONITOR_TIME
-	phl_fun_monitor_end(&start_t, __FUNCTION__);
+	PHL_FUNC_MON_END(hal_info->phl_com, &start_t, TIME_PHL_MAX);
 #endif /* DBG_DBCC_MONITOR_TIME */
 	return hal_status;
 }
@@ -286,15 +306,16 @@ enum rtw_hal_status rtw_hal_ppdu_sts_cfg(void *hal, u8 band_idx, bool en)
 	struct hal_info_t *hal_info = (struct hal_info_t *)hal;
 	struct rtw_hal_com_t *hal_com = hal_info->hal_com;
 	enum rtw_hal_status hal_status = RTW_HAL_STATUS_SUCCESS;
+	struct hal_ppdu_sts_cfg cfg = {0};
 
-	if (en) {
-		hal_status = rtw_hal_mac_ppdu_stat_cfg(
-			hal_info, band_idx, true,
-			hal_com->band[band_idx].ppdu_sts_appen_info,
-			hal_com->band[band_idx].ppdu_sts_filter);
-	} else {
-		hal_status = rtw_hal_mac_ppdu_stat_cfg(hal_info, band_idx, false, 0, 0);
+	cfg.band_idx = band_idx;
+	cfg.ppdu_stat_en = en;
+	if(en) {
+		cfg.appen_info = hal_com->band[band_idx].ppdu_sts_appen_info;
+		cfg.filter = hal_com->band[band_idx].ppdu_sts_filter;
 	}
+
+	hal_status = hal_info->hal_ops.cfg_ppdu_sts(hal_info, &cfg);
 
 	if (hal_status != RTW_HAL_STATUS_SUCCESS)
 		PHL_ERR("%s (en %d) - failed\n", __func__, en);
@@ -311,7 +332,7 @@ rtw_hal_reset(struct rtw_hal_com_t *hal_com, enum phl_phy_idx phy_idx, u8 band_i
 #ifdef DBG_DBCC_MONITOR_TIME
 	u32 start_t = 0;
 
-	phl_fun_monitor_start(&start_t, true, __FUNCTION__);
+	PHL_FUN_MON_START(&start_t);
 #endif /* DBG_DBCC_MONITOR_TIME */
 	PHL_INFO("%s: phy_idx(%d) band_idx(%d)\n", __FUNCTION__, phy_idx, band_idx);
 
@@ -330,7 +351,7 @@ rtw_hal_reset(struct rtw_hal_com_t *hal_com, enum phl_phy_idx phy_idx, u8 band_i
 			return status;
 		}
 
-		rtw_hal_bb_bb_reset_cmn(hal_info, true, phy_idx);
+		rtw_hal_bb_bb_reset_cmn(hal_com, true, phy_idx);
 	}else{
 		/*enable ppdu_sts*/
 		status = rtw_hal_ppdu_sts_cfg(hal_info, band_idx, true);
@@ -340,7 +361,7 @@ rtw_hal_reset(struct rtw_hal_com_t *hal_com, enum phl_phy_idx phy_idx, u8 band_i
 			return status;
 		}
 
-		rtw_hal_bb_bb_reset_cmn(hal_info, false, phy_idx);
+		rtw_hal_bb_bb_reset_cmn(hal_com, false, phy_idx);
 
 		status = rtw_hal_tx_pause(hal_com, band_idx, false, PAUSE_RSON_RESET);
 		if(status != RTW_HAL_STATUS_SUCCESS){
@@ -349,7 +370,7 @@ rtw_hal_reset(struct rtw_hal_com_t *hal_com, enum phl_phy_idx phy_idx, u8 band_i
 		}
 	}
 #ifdef DBG_DBCC_MONITOR_TIME
-	phl_fun_monitor_end(&start_t, __FUNCTION__);
+	PHL_FUNC_MON_END(hal_info->phl_com, &start_t, TIME_PHL_MAX);
 #endif /* DBG_DBCC_MONITOR_TIME */
 	return status;
 }
@@ -418,14 +439,6 @@ rtw_hal_init_hw_band_info(void *hal, enum phl_band_idx band_idx)
 			0, sizeof(struct rtw_hw_band));
 	rtw_phl_init_chdef(hal_i->phl_com, &hw_band_i->cur_chandef);
 }
-
-void rtw_hal_get_mac_sel_tx_status(void *hal, enum phl_band_idx bidx, void *out_tx_cnt)
-{
-	struct hal_info_t *hal_info = (struct hal_info_t *)hal;
-
-	rtw_hal_mac_get_sel_tx_cnt(hal_info, bidx, out_tx_cnt);
-}
-
 #ifdef DBG_DUMP_TX_COUNTER
 void rtw_hal_dump_tx_status(void *hal, enum phl_band_idx bidx)
 {

@@ -43,10 +43,6 @@ struct pci_priv {
 	u8	pcibridge_linkctrlreg;
 
 	u8	amd_l1_patch;
-
-#ifdef CONFIG_PCI_DYNAMIC_ASPM
-	u8	aspm_mode;
-#endif
 };
 
 typedef struct _RT_ISR_CONTENT {

@@ -156,7 +156,7 @@ exit:
 	return ret;
 }
 
-bool rtw_rfctl_hwband_is_tx_blocked_by_ch_waiting(struct rf_ctl_t *rfctl, enum phl_band_idx hwband)
+static bool rtw_rfctl_hwband_is_tx_blocked_by_ch_waiting(struct rf_ctl_t *rfctl, enum phl_band_idx hwband)
 {
 	if (hwband >= HW_BAND_MAX)
 		return false;
@@ -737,12 +737,11 @@ cac_status_chk:
 		if (m_iface) {
 			if (!rtw_mi_check_fwstate_by_hwband(dvobj, hwband, WIFI_UNDER_LINKING|WIFI_UNDER_SURVEY)) {
 				struct _ADAPTER_LINK *alink = rtw_get_adapter_link_by_hwband(m_iface, hwband);
-				u8 do_rfk = _TRUE;
 				enum band_type u_band;
 				u8 u_ch, u_bw, u_offset;
 
 				if (rtw_mi_get_bch_setting_union_by_hwband(dvobj, hwband, &u_band, &u_ch, &u_bw, &u_offset))
-					set_bch_bwmode(m_iface, alink, u_band, u_ch, u_offset, u_bw, do_rfk);
+					set_bch_bwmode(m_iface, alink, u_band, u_ch, u_offset, u_bw, RFK_TYPE_FORCE_DO);
 				else
 					rtw_warn_on(1);
 			}
@@ -1237,8 +1236,10 @@ apply:
 					return;
 				}
 
-				if (0) {
-					/* TODO: do CSA if supported */
+				if (rtw_hal_is_csa_support(m_iface) && !rtw_mr_is_ecsa_running(m_iface)) {
+					if (!rtw_hal_dfs_trigger_csa(m_iface, CSA_STA_DISCONNECT_ON_DFS,
+											band_idx, u_ch, u_bw, u_offset))
+						RTW_ERR(FUNC_HWBAND_FMT" trigger ECSA fail", FUNC_HWBAND_ARG(band_idx));
 				} else {
 					rtw_change_bss_bchbw_cmd(m_iface, RTW_CMDF_DIRECTLY
 						, ifbmp_m, ifbmp_s, REQ_BAND_NONE, REQ_CH_NONE, REQ_BW_ORI, REQ_OFFSET_NONE);
@@ -1408,6 +1409,7 @@ static bool rtw_choose_shortest_waiting_ch(struct rf_ctl_t *rfctl
 	int i, j;
 	u32 min_waiting_ms = 0;
 	u16 int_factor_c = 0;
+	bool within_same_band = rfctl->ch_sel_within_same_band;
 
 	if (!dec_ch || !dec_bw || !dec_offset) {
 		rtw_warn_on(1);
@@ -1416,8 +1418,15 @@ static bool rtw_choose_shortest_waiting_ch(struct rf_ctl_t *rfctl
 
 	RTW_INFO("%s: sel_ch:%s-%u(%u) max_bw:%u e_flags:0x%02x d_flags:0x%02x cur_ch:%s-%u(%u) within_sb:%d%s%s\n"
 		, __func__, band_str(sel_band), sel_ch, sel_offset, max_bw, e_flags, d_flags
-		, band_str(cur_band), cur_ch, cur_offset, rfctl->ch_sel_within_same_band
+		, band_str(cur_band), cur_ch, cur_offset, within_same_band
 		, by_int_info ? " int" : "", mesh_only ? " mesh_only" : "");
+
+	if (sel_band != BAND_MAX && rtw_rfctl_is_regu_forbid_bss(rfctl, sel_band))
+		goto exit;
+	if (sel_band == BAND_MAX && within_same_band && rtw_rfctl_is_regu_forbid_bss(rfctl, cur_band)) {
+		RTW_INFO("%s: cancel within_sb because REGU_FORBID for %s BSS", __func__, band_str(cur_band));
+		within_same_band = false;
+	}
 
 	/* full search and narrow bw judegement first to avoid potetial judegement timing issue */
 	for (bw = CHANNEL_WIDTH_20; bw <= max_bw; bw++) {
@@ -1436,10 +1445,12 @@ static bool rtw_choose_shortest_waiting_ch(struct rf_ctl_t *rfctl
 
 			band = chset->chs[i].band;
 			ch = chset->chs[i].ChannelNum;
+			if (rtw_rfctl_is_regu_forbid_bss(rfctl, band))
+				continue;
 			if (sel_band != BAND_MAX) {
 				if (band != sel_band)
 					continue;
-			} else if (rfctl->ch_sel_within_same_band && cur_band != band)
+			} else if (within_same_band && cur_band != band)
 				continue;
 			if (sel_ch) {
 				if (ch != sel_ch)
@@ -1525,6 +1536,7 @@ static bool rtw_choose_shortest_waiting_ch(struct rf_ctl_t *rfctl
 		}
 	}
 
+exit:
 	if (ch_c != 0) {
 		RTW_INFO("%s: select %s,%u,%u,%u waiting_ms:%u\n"
 			, __func__, band_str(band_c), ch_c, bw_c, offset_c, min_waiting_ms);

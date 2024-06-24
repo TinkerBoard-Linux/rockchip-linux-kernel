@@ -2,10 +2,10 @@
 
 ifeq ($(CONFIG_PHL_ARCH), y)
 phl_path := phl/
-phl_path_d1 := $(srctree)/$(src)/phl/$(HAL)
+phl_path_d1 := $(src)/phl/$(HAL)
 else
 phl_path :=
-phl_path_d1 := $(srctree)/$(src)/$(HAL)
+phl_path_d1 := $(src)/$(HAL)
 endif
 
 _HAL_FILES :=	$(phl_path)$(HAL)/hal_api_mac.o \
@@ -86,12 +86,20 @@ ifeq ($(CONFIG_RTL8852A), y)
 include $(phl_path_d1)/$(IC_NAME)/rtl8852a.mk
 endif
 ########### HAL_RTL8852B #################################
-ifneq ($(filter y,$(CONFIG_RTL8852B) $(CONFIG_RTL8852BP)),)
+ifneq ($(filter y,$(CONFIG_RTL8852B) $(CONFIG_RTL8852BP) $(CONFIG_RTL8852BPT) $(CONFIG_RTL8852BT)),)
 include $(phl_path_d1)/rtl8852b/rtl8852b.mk
 endif
 ########### HAL_RTL8852C #################################
 ifeq ($(CONFIG_RTL8852C), y)
 include $(phl_path_d1)/rtl8852c/rtl8852c.mk
+endif
+########### HAL_RTL8842A #################################
+ifeq ($(CONFIG_RTL8842A), y)
+include $(phl_path_d1)/rtl8842a/rtl8842a.mk
+endif
+########### HAL_RTL8852D #################################
+ifeq ($(CONFIG_RTL8852D), y)
+include $(phl_path_d1)/rtl8852d/rtl8852d.mk
 endif
 ########### HAL_RTL8192XB #################################
 ifneq ($(filter y,$(CONFIG_RTL8832BR) $(CONFIG_RTL8192XB)),)

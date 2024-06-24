@@ -10,7 +10,7 @@
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
  * more details.
- * 8852C V008
+ * 8852C V009
  ******************************************************************************/
 
 #include "../pwr.h"
@@ -22,6 +22,9 @@
 #define MAC_AX_HCI_SEL_PCIE_UART 2
 #define MAC_AX_HCI_SEL_PCIE_USB 3
 #define MAC_AX_HCI_SEL_MULTI_SDIO 4
+
+#define PWR_K_CHK_OFFSET 0x5E9
+#define PWR_K_CHK_VALUE 0xAA
 
 u32 mac_pwr_on_sdio_8852c(struct mac_ax_adapter *adapter)
 {
@@ -227,6 +230,16 @@ u32 mac_pwr_on_sdio_8852c(struct mac_ax_adapter *adapter)
 	adapter->sm.pwr = MAC_AX_PWR_ON;
 	adapter->sm.plat = MAC_AX_PLAT_ON;
 	adapter->sm.io_st = MAC_AX_IO_ST_NORM;
+
+	/* get fv & cv */
+	ret = get_fv_info(adapter);
+	if (ret)
+		PLTFM_MSG_ERR("[ERR]get_fv_info error\n");
+
+	/* get aid */
+	ret = get_aid_info(adapter);
+	if (ret)
+		PLTFM_MSG_ERR("[ERR]get_aid_info error\n");
 
 	/*enable dmac , 0x8400*/
 	val32 = MAC_REG_R32(R_AX_DMAC_FUNC_EN);
@@ -465,6 +478,16 @@ u32 mac_pwr_on_usb_8852c(struct mac_ax_adapter *adapter)
 	adapter->sm.plat = MAC_AX_PLAT_ON;
 	adapter->sm.io_st = MAC_AX_IO_ST_NORM;
 
+	/* get fv & cv */
+	ret = get_fv_info(adapter);
+	if (ret)
+		PLTFM_MSG_ERR("[ERR]get_fv_info error\n");
+
+	/* get aid */
+	ret = get_aid_info(adapter);
+	if (ret)
+		PLTFM_MSG_ERR("[ERR]get_aid_info error\n");
+
 	/*enable dmac , 0x8400*/
 	val32 = MAC_REG_R32(R_AX_DMAC_FUNC_EN);
 	MAC_REG_W32(R_AX_DMAC_FUNC_EN,
@@ -516,6 +539,7 @@ u32 mac_pwr_on_ap_pcie_8852c(struct mac_ax_adapter *adapter)
 	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
 	u32 val32;
 	u32 ret;
+	u8 pwr_k_chk_value = 0;
 	u8 val8;
 
 	/* 0x218[16] = 1 */
@@ -702,16 +726,47 @@ u32 mac_pwr_on_ap_pcie_8852c(struct mac_ax_adapter *adapter)
 	val32 = MAC_REG_R32(R_AX_PMC_DBG_CTRL2);
 	MAC_REG_W32(R_AX_PMC_DBG_CTRL2, val32 & ~B_AX_SYSON_DIS_PMCR_AX_WRMSK);
 
-	/* enable GPIO16 GPIO17 GPIO18 internal weakly pull low */
+	/* enable GPIO3 GPIO6 GPIO16 GPIO17 GPIO18 internal weakly pull low */
 	val32 = MAC_REG_R32(R_AX_GPIO0_15_EECS_EESK_LED1_PULL_LOW_EN);
 	MAC_REG_W32(R_AX_GPIO0_15_EECS_EESK_LED1_PULL_LOW_EN,
-		    val32 | B_AX_EECS_PULL_LOW_EN |
-			B_AX_EESK_PULL_LOW_EN |
-			B_AX_LED1_PULL_LOW_EN);
+		    val32 | B_AX_GPIO3_PULL_LOW_EN |
+			B_AX_GPIO6_PULL_LOW_EN |
+			B_AX_GPIO16_PULL_LOW_EN |
+			B_AX_GPIO17_PULL_LOW_EN |
+			B_AX_GPIO18_PULL_LOW_EN);
+
+	/* check power calibration is done or not */
+	ret = mac_read_efuse_plus(adapter, PWR_K_CHK_OFFSET, 0x1, &pwr_k_chk_value,
+				  MAC_AX_EFUSE_BANK_WIFI);
+	if (ret)
+		PLTFM_MSG_ERR("%s: read efuse fail\n", __func__);
+
+	if (pwr_k_chk_value != PWR_K_CHK_VALUE) {
+		/* 0x220[3:0]=0xA */
+		val32 = MAC_REG_R32(R_AX_SPSANA_ON_CTRL0);
+		val32 = SET_CLR_WORD(val32, 0xA, B_AX_VOL_L1_ANA);
+		MAC_REG_W32(R_AX_SPSANA_ON_CTRL0, val32);
+
+		ret = chk_patch_ck_buf_level(adapter);
+		if (ret) {
+			PLTFM_MSG_ERR("chk_patch_ck_buf_level fail !\n");
+			return ret;
+		}
+	}
 
 	adapter->sm.pwr = MAC_AX_PWR_ON;
 	adapter->sm.plat = MAC_AX_PLAT_ON;
 	adapter->sm.io_st = MAC_AX_IO_ST_NORM;
+
+	/* get fv & cv */
+	ret = get_fv_info(adapter);
+	if (ret)
+		PLTFM_MSG_ERR("[ERR]get_fv_info error\n");
+
+	/* get aid */
+	ret = get_aid_info(adapter);
+	if (ret)
+		PLTFM_MSG_ERR("[ERR]get_aid_info error\n");
 
 	/*enable dmac , 0x8400*/
 	val32 = MAC_REG_R32(R_AX_DMAC_FUNC_EN);
@@ -959,13 +1014,23 @@ u32 mac_pwr_on_nic_pcie_8852c(struct mac_ax_adapter *adapter)
 	/* enable GPIO16 GPIO17 GPIO18 internal weakly pull low */
 	val32 = MAC_REG_R32(R_AX_GPIO0_15_EECS_EESK_LED1_PULL_LOW_EN);
 	MAC_REG_W32(R_AX_GPIO0_15_EECS_EESK_LED1_PULL_LOW_EN,
-		    val32 | B_AX_EECS_PULL_LOW_EN |
-			B_AX_EESK_PULL_LOW_EN |
-			B_AX_LED1_PULL_LOW_EN);
+		    val32 | B_AX_GPIO16_PULL_LOW_EN |
+			B_AX_GPIO17_PULL_LOW_EN |
+			B_AX_GPIO18_PULL_LOW_EN);
 
 	adapter->sm.pwr = MAC_AX_PWR_ON;
 	adapter->sm.plat = MAC_AX_PLAT_ON;
 	adapter->sm.io_st = MAC_AX_IO_ST_NORM;
+
+	/* get fv & cv */
+	ret = get_fv_info(adapter);
+	if (ret)
+		PLTFM_MSG_ERR("[ERR]get_fv_info error\n");
+
+	/* get aid */
+	ret = get_aid_info(adapter);
+	if (ret)
+		PLTFM_MSG_ERR("[ERR]get_aid_info error\n");
 
 	/*enable dmac , 0x8400*/
 	val32 = MAC_REG_R32(R_AX_DMAC_FUNC_EN);
@@ -1524,8 +1589,8 @@ u32 mac_pwr_off_nic_pcie_8852c(struct mac_ax_adapter *adapter)
 	//val32 = MAC_REG_R32(R_AX_WLLPS_CTRL);
 	//MAC_REG_W32(R_AX_WLLPS_CTRL, val32 & ~B_AX_LPSOP_DSWR);
 
-	/* 0x90[31:0] = 0x00_01_A0_B0 */
-	MAC_REG_W32(R_AX_WLLPS_CTRL, 0x0001A0B0);
+	/* 0x90[31:0] = 0x00_01_A0_B2 */
+	MAC_REG_W32(R_AX_WLLPS_CTRL, 0x0001A0B2);
 
 	/* 0x04[22] = 1 */
 	val32 = MAC_REG_R32(R_AX_SYS_PW_CTRL);
@@ -2333,3 +2398,4 @@ u32 mac_leave_lps_pcie_8852c(struct mac_ax_adapter *adapter)
 #endif
 
 #endif /* #if MAC_AX_8852C_SUPPORT */
+

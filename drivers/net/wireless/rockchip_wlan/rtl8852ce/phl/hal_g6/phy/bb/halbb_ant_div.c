@@ -34,6 +34,43 @@
 
 #ifdef HALBB_ANT_DIV_SUPPORT
 
+bool halbb_antdiv_abort(struct bb_info *bb)
+{
+	struct bb_antdiv_info *bb_ant_div = &bb->bb_ant_div_i;
+	struct bb_link_info *bb_link = &bb->bb_link_i;
+
+	/* Early return */
+	if (bb->pause_ability & BB_ANT_DIV) {
+		BB_DBG(bb, DBG_ANT_DIV, "Return ant diversity pause!\n");
+		if (bb_ant_div->antdiv_mode == FIX_MAIN_ANT)
+			BB_DBG(bb, DBG_ANT_DIV, "Pause Antenna at (( MAIN ))\n");
+		else if (bb_ant_div->antdiv_mode == FIX_AUX_ANT)
+			BB_DBG(bb, DBG_ANT_DIV, "Pause Antenna at (( AUX ))\n");
+		else 
+			BB_DBG(bb, DBG_ANT_DIV, "Pause Antenna at pre ANT.\n");
+		return true;
+	}
+	if (phl_is_mp_mode(bb->phl_com)) {
+		BB_DBG(bb, DBG_ANT_DIV, "Early return - MP mode\n");
+		return true;
+	}
+	if (!(bb->support_ability & BB_ANT_DIV)) {
+		BB_DBG(bb, DBG_ANT_DIV, "Early return - Not support antenna diversity\n");
+		return true;
+	}
+	if (!(bb_link->is_linked) || !(bb_link->is_one_entry_only)) {
+		BB_DBG(bb, DBG_ANT_DIV, "Early return - is_linked=%d, one_entry_only=%d\n",
+			  bb_link->is_linked, bb_link->is_one_entry_only);
+		return true;
+	}
+	if (bb_link->at_least_one_bfee) {
+		BB_DBG(bb, DBG_ANT_DIV, "Early return - at least one macid rx bfee=%d\n",
+		       bb_link->at_least_one_bfee);
+		return true;
+	}
+	return false;
+}
+
 void halbb_antdiv_reset_training_stat(struct bb_info *bb)
 {
 	struct bb_antdiv_info *bb_ant_div = &bb->bb_ant_div_i;
@@ -63,19 +100,22 @@ void halbb_antdiv_reg_init(struct bb_info *bb)
 {
 	struct bb_antdiv_info *bb_ant_div = &bb->bb_ant_div_i;
 	struct bb_link_info *bb_link = &bb->bb_link_i;
-	struct bb_antdiv_cr_info *cr = &bb->bb_ant_div_i.bb_antdiv_cr_i;
+	struct bb_antdiv_cr_info *cr = &bb->bb_cmn_hooker->bb_antdiv_cr_i;
+	struct rtw_phl_com_t *phl = bb->phl_com;
+	struct dev_cap_t *dev = &phl->dev_cap;
 
 	/* dis r_ant_train_en */
 	halbb_set_reg_cmn(bb, cr->path0_r_ant_train_en, cr->path0_r_ant_train_en_m, 0x0, HW_PHY_0);
 
 	/* force r_tx_ant_sel instead of from FW CMAC table */
-	halbb_set_reg_cmn(bb, cr->path0_r_tx_ant_sel, cr->path0_r_tx_ant_sel_m, 0x0, HW_PHY_0);
+	if (!(dev->rfe_type > 50)) { // only iFEM can set TX ant by r_tx_antdix, eFEM set by RFE control source ZERO
+		halbb_set_reg_cmn(bb, cr->path0_r_tx_ant_sel, cr->path0_r_tx_ant_sel_m, 0x0, HW_PHY_0);
+	}
 
 	/* r_trsw_tx_extend = 0us */
 	halbb_set_reg_cmn(bb, 0x728, 0xf, 0x0, HW_PHY_0);
 	/* dis r_hw_antsw_dis_by_gnt_bt */
 	halbb_set_reg_cmn(bb, 0x728, BIT(12), 0x0, HW_PHY_0);
-
 
 	/* dis r_bt_force_en */
 	halbb_set_reg_cmn(bb, cr->path0_r_bt_force_antidx_en, cr->path0_r_bt_force_antidx_en_m, 0x0, HW_PHY_0);
@@ -87,7 +127,7 @@ void halbb_antdiv_reg_init(struct bb_info *bb)
 	halbb_set_reg_cmn(bb, cr->path0_r_antsel, BIT(21), 0x1, HW_PHY_0);
 
 	/* "antsel" is controlled by HWs*/
-	halbb_set_reg_cmn(bb, cr->path0_r_antsel, BIT(16), 0x1, HW_PHY_0);
+	halbb_set_reg_cmn(bb, cr->path0_r_antsel, BIT(16), 0x0, HW_PHY_0);
 	/* r_ANT_DIV_SW_2G_S, 2G "CS/CG switching" is controlled by HWs */
 	halbb_set_reg_cmn(bb, cr->path0_r_antsel, BIT(23), 0x0, HW_PHY_0);
 	/* r_ANT_DIV_SW_5G_S, 5G "CS/CG switching" is controlled by HWs */
@@ -99,8 +139,8 @@ void halbb_antdiv_reg_init(struct bb_info *bb)
 	else if (bb->ic_type == BB_RTL8851B) {
 		/*RFE control, GPIO set by halrf*/
 		/*51B two pin control swtich*/ /*set BB RFE control pin*/
-		//halbb_gpio_setting(bb, 16, BB_PATH_A, true, ANTSEL_0);
-		//halbb_gpio_setting(bb, 17, BB_PATH_A, false, ANTSEL_0);
+		//halbb_gpio_setting(bb, 16, BB_PATH_A, false, ANTSEL_0);
+		//halbb_gpio_setting(bb, 17, BB_PATH_A, true, ANTSEL_0);
 		/*Set MAC GPIO*/
 		//rtw_hal_mac_set_gpio_func(bb->hal_com, RTW_MAC_GPIO_WL_RFE_CTRL, 16);
 		//rtw_hal_mac_set_gpio_func(bb->hal_com, RTW_MAC_GPIO_WL_RFE_CTRL, 17);
@@ -116,13 +156,11 @@ void halbb_antdiv_init(struct bb_info *bb)
 
 	BB_DBG(bb, DBG_ANT_DIV, "%s ======>\n", __func__);
 
-	if ((bb->support_ability & BB_ANT_DIV) || (phl_is_mp_mode(bb->phl_com) &&
+	if ((bb->support_ability & BB_ANT_DIV) || (dev->antdiv_sup == true) ||
+		(phl_is_mp_mode(bb->phl_com) &&
 		((bb->ic_type == BB_RTL8851B) && ((dev->rfe_type % 3) == 2)))) {
 		/* HW reg. init to set mux & ctrler for antdiv */
 		halbb_antdiv_reg_init(bb);
-	} else {
-		BB_DBG(bb, DBG_ANT_DIV, "Early return - Not support antenna diversity\n");
-		return;
 	}
 
 	/* Mode setting*/
@@ -130,6 +168,7 @@ void halbb_antdiv_init(struct bb_info *bb)
 	bb_ant_div->pre_antdiv_mode = AUTO_ANT;
 	bb_ant_div->antdiv_method = EVM_BASED_ANTDIV;
 	bb_ant_div->evm_decision_method = EVM_LINEAR_AVG;
+	bb_ant_div->tx_by_ext_pwr_lmt = false;
 
 	/* Algorithm parameter setting */
 	bb_ant_div->tp_diff_th_high = ANTDIV_DEC_TP_HIGH;
@@ -168,47 +207,205 @@ void halbb_antdiv_init(struct bb_info *bb)
 	bb_ant_div->target_ant_tp = ANTDIV_INIT;
 	bb_ant_div->target_ant_rssi =  ANTDIV_INIT;
 	bb_ant_div->training_ant = ANTDIV_INIT;
-	bb_ant_div->pre_target_ant = MAIN_ANT;
+	bb_ant_div->pre_target_ant = ANTDIV_INIT;
+	/* use new MCS based code*/
+	bb_ant_div->ant_div_new = false;
 
 	halbb_antdiv_reset(bb);
 
 	BB_DBG(bb, DBG_INIT, "Init ant_diversity timer");
 }
 
+u8 halbb_antdiv_get_targetant(struct bb_info *bb)
+{
+	struct bb_antdiv_info *bb_ant_div = &bb->bb_ant_div_i;
+
+	return bb_ant_div->target_ant;
+}
+
+u8 halbb_antdiv_sel_tx_ant_by_ext_pwr_lmt(struct bb_info *bb)
+{
+	struct rtw_tpu_info *tpu = &bb->hal_com->band[bb->bb_phy_idx].rtw_tpu_i;
+	struct rtw_phl_ext_pwr_lmt_info *ext_pwr_info = &bb->hal_com->band[bb->bb_phy_idx].rtw_tpu_i.ext_pwr_lmt_i;
+	struct rtw_tpu_pwr_imt_info *lmt = &tpu->rtw_tpu_pwr_imt_i;
+	u8 ch = bb->hal_com->band[bb->bb_phy_idx].cur_chandef.center_ch;
+	s8 ant1_pw = 0;
+	s8 ant2_pw = 0;
+	u8 ret = 255;
+
+	if (tpu->ext_pwr_lmt_en == false)
+		return ret;
+
+	if ((ch >= 1) && (ch <= 14)) {
+		ant1_pw = ext_pwr_info->ext_pwr_lmt_ant_2_4g[0];
+		ant2_pw = ext_pwr_info->ext_pwr_lmt_ant_2_4g[1];
+	} else if ((ch >= 36) && (ch <= 48)) {
+		ant1_pw = ext_pwr_info->ext_pwr_lmt_ant_5g_band1[0];
+		ant2_pw = ext_pwr_info->ext_pwr_lmt_ant_5g_band1[1];
+	} else if ((ch >= 50) && (ch <= 64)) {
+		ant1_pw = ext_pwr_info->ext_pwr_lmt_ant_5g_band2[0];
+		ant2_pw = ext_pwr_info->ext_pwr_lmt_ant_5g_band2[1];
+	} else if ((ch >= 100) && (ch <= 144)) {
+		ant1_pw = ext_pwr_info->ext_pwr_lmt_ant_5g_band3[0];
+		ant2_pw = ext_pwr_info->ext_pwr_lmt_ant_5g_band3[1];
+	} else if ((ch >= 149) && (ch <= 177)) {
+		ant1_pw = ext_pwr_info->ext_pwr_lmt_ant_5g_band4[0];
+		ant2_pw = ext_pwr_info->ext_pwr_lmt_ant_5g_band4[1];
+	}
+
+	if (ant1_pw > ant2_pw)
+		ret = MAIN_ANT;
+	else
+		ret = AUX_ANT;
+
+	BB_DBG(bb, DBG_ANT_DIV, "ch=%d, ant1=%d, ant2=%d, ret=%d\n",
+	       ch, ant1_pw, ant2_pw, ret);
+
+	return ret;
+}
+
+void halbb_antdiv_set_tx_ant(struct bb_info *bb, u8 ant)
+{
+	struct bb_antdiv_cr_info *cr = &bb->bb_cmn_hooker->bb_antdiv_cr_i;
+	u8 default_ant;
+
+	if (ant == MAIN_ANT)
+		default_ant = ANT1_2G;
+	else
+		default_ant = ANT2_2G;
+
+	halbb_set_reg_cmn(bb, cr->path0_r_antsel, 0xf000, default_ant, HW_PHY_0);
+
+	BB_DBG(bb, DBG_ANT_DIV, "Set Tx Antenna=%s\n",
+	       (ant == MAIN_ANT) ? "MAIN_ANT" : "AUX_ANT");
+
+	#ifdef HALBB_DUAL_SAR_LMT_TB_8851B
+	if (bb->ic_type == BB_RTL8851B)
+		rtw_hal_rf_set_pwr_lmt_main_or_aux(bb->hal_com, default_ant);
+	#endif
+}
+
+void halbb_antdiv_fix_ant(struct bb_info *bb, u8 ant)
+{
+	struct bb_antdiv_info *bb_ant_div = &bb->bb_ant_div_i;
+
+	if (bb->support_ability & BB_ANT_DIV) {
+		if (ant == MAIN_ANT) {
+			bb_ant_div->antdiv_mode = FIX_MAIN_ANT;
+			halbb_antdiv_set_ant(bb, MAIN_ANT);
+			bb_ant_div->target_ant = MAIN_ANT;
+			bb_ant_div->pre_target_ant = MAIN_ANT;
+		} else if (ant == AUX_ANT) {
+			bb_ant_div->antdiv_mode = FIX_AUX_ANT;
+			halbb_antdiv_set_ant(bb, AUX_ANT);
+			bb_ant_div->target_ant = AUX_ANT;
+			bb_ant_div->pre_target_ant = AUX_ANT;
+		} else {
+			bb_ant_div->antdiv_mode = AUTO_ANT;
+		}
+	} else {
+		return;
+	}
+}
+
 void halbb_antdiv_set_ant(struct bb_info *bb, u8 ant)
 {
 	struct bb_antdiv_info *bb_ant_div = &bb->bb_ant_div_i;
 	struct bb_link_info *bb_link = &bb->bb_link_i;
-	struct bb_antdiv_cr_info *cr = &bb->bb_ant_div_i.bb_antdiv_cr_i;
+	struct bb_antdiv_cr_info *cr = &bb->bb_cmn_hooker->bb_antdiv_cr_i;
 	struct rtw_hal_com_t *hal = bb->hal_com;
+	struct rtw_phl_com_t *phl = bb->phl_com;
+	struct dev_cap_t *dev = &phl->dev_cap;
 	u8 band = bb->hal_com->band[0].cur_chandef.band;
 	u8 default_ant, optional_ant;
+	u8 tx_ant = 0;
 
 	if ((bb_ant_div->pre_target_ant != ant) || (bb_ant_div->training_ant != ant) ) {
-		BB_DBG(bb, DBG_ANT_DIV, "Set Antenna =%s\n",
-			  (ant == MAIN_ANT) ? "MAIN_ANT" : "AUX_ANT");
-		if(ant == MAIN_ANT) {
+		BB_DBG(bb, DBG_ANT_DIV, "Set Antenna=%s\n",
+		       (ant == MAIN_ANT) ? "MAIN_ANT" : "AUX_ANT");
+		if (ant == MAIN_ANT) {
 			default_ant = ANT1_2G;
 			optional_ant = ANT2_2G;
+			if (bb->ic_sub_type == BB_IC_SUB_TYPE_8192XB_8192XB && dev->rfe_type == 50) {  //92XB A-Die only can swtich ant by RF.
+				//halbb_write_rf_reg(bb, RF_PATH_A, 0x2, 0x20000, 0x0);
+				//halbb_write_rf_reg(bb, RF_PATH_A, 0x2, 0x8000, 0x0);
+				rtw_hal_rf_set_ant_main_or_aux(hal->hal_priv, RF_PATH_A, true);
+			}
 		} else {
 			default_ant = ANT2_2G;
 			optional_ant = ANT1_2G;
+			if (bb->ic_sub_type == BB_IC_SUB_TYPE_8192XB_8192XB && dev->rfe_type == 50) {
+				//halbb_write_rf_reg(bb, RF_PATH_A, 0x2, 0x20000, 0x1);
+				//halbb_write_rf_reg(bb, RF_PATH_A, 0x2, 0x8000, 0x1);
+				rtw_hal_rf_set_ant_main_or_aux(hal->hal_priv, RF_PATH_A, false);
+			}
 		}
 
 		/* Original Rx antenna */
-		//halbb_set_reg_cmn(bb, cr->path0_r_antsel, 0x20000, default_ant, HW_PHY_0);
-		halbb_set_reg_cmn(bb, cr->path0_r_antsel, 0xf0, default_ant, HW_PHY_0);
+		halbb_set_reg_cmn(bb, cr->path0_r_antsel, 0x20000, default_ant, HW_PHY_0);  //set ant by CG.CS
+		halbb_set_reg_cmn(bb, cr->path0_r_antsel, 0xf0, default_ant,
+				  HW_PHY_0);
 		/* Alternative Rx antenna */
-		halbb_set_reg_cmn(bb, cr->path0_r_antsel, 0xf00, optional_ant, HW_PHY_0);
-		/* Tx antenna, same as orig. rx ant. */
-		halbb_set_reg_cmn(bb, cr->path0_r_antsel, 0xf000, default_ant, HW_PHY_0);
-		
+		halbb_set_reg_cmn(bb, cr->path0_r_antsel, 0xf00, optional_ant,
+				  HW_PHY_0);
 		/*#ifdef BB_8852A_2_SUPPORT
 			if (bb->ic_type == BB_RTL8852A)
 				rtw_hal_rf_rx_ant(hal, ant);
 		#endif*/
+
+		/* Tx antenna, same as orig. rx ant. */
+		if (bb_ant_div->tx_by_ext_pwr_lmt == false) {
+			tx_ant = ant;
+			halbb_antdiv_set_tx_ant(bb, tx_ant);
+		}
 	} else {
 		BB_DBG(bb, DBG_ANT_DIV, "Stay in Ori-ant\n");
+	}
+
+	if (bb_ant_div->tx_by_ext_pwr_lmt) {
+		if (bb_ant_div->antdiv_mode == FIX_MAIN_ANT) {
+			tx_ant = MAIN_ANT;
+		} else if (bb_ant_div->antdiv_mode == FIX_AUX_ANT) {
+			tx_ant = AUX_ANT;
+		} else {
+			tx_ant = halbb_antdiv_sel_tx_ant_by_ext_pwr_lmt(bb);
+			if (tx_ant == 255) /*follow rx*/
+				tx_ant = ant;
+		}
+
+		halbb_antdiv_set_tx_ant(bb, tx_ant);
+	}
+}
+
+void halbb_set_antdiv_pause_val(struct bb_info *bb, u32 *val_buf, u8 val_len)
+{
+	struct bb_antdiv_info *bb_ant_div = &bb->bb_ant_div_i;
+	struct bb_link_info *bb_link = &bb->bb_link_i;
+	struct bb_antdiv_cr_info *cr = &bb->bb_cmn_hooker->bb_antdiv_cr_i;
+	u8 i = 0, pause_result = 0;
+	u32 val = 0;
+
+	if (val_len != 1) {
+		BB_DBG(bb, DBG_ANT_DIV, "[Error][AntDiv]Need val_len=1\n");
+		return;
+	}
+	BB_DBG(bb, DBG_ANT_DIV, "[%s] len=%d, val[0]=0x%x\n", __func__, val_len, val_buf[0]);
+
+	 if (val_buf[0] == MAIN_ANT) {
+	 	BB_DBG(bb, DBG_ANT_DIV, "[Pause Antiv in Main ANT.\n");
+		halbb_antdiv_set_ant(bb, MAIN_ANT);
+		bb_ant_div->antdiv_mode = FIX_MAIN_ANT;
+		bb_ant_div->target_ant = MAIN_ANT;
+		bb_ant_div->pre_target_ant = MAIN_ANT;
+	} else if (val_buf[0] == AUX_ANT) {
+		BB_DBG(bb, DBG_ANT_DIV, "[Pause Antiv in AUX ANT.\n");
+		halbb_antdiv_set_ant(bb, AUX_ANT);
+		bb_ant_div->antdiv_mode = FIX_AUX_ANT;
+		bb_ant_div->target_ant = AUX_ANT;
+		bb_ant_div->pre_target_ant = AUX_ANT;
+	} else {
+		BB_DBG(bb, DBG_ANT_DIV, "[Pause Antiv in pre ANT.\n");
+		bb_ant_div->antdiv_mode = AUTO_ANT;
 	}
 }
 
@@ -348,7 +545,7 @@ void halbb_antdiv_get_cn_target_ant(struct bb_info *bb)
 }
 
 
-void halbb_antdiv_get_highest_mcs(struct bb_info *bb)
+void halbb_antdiv_get_highest_mcs_old(struct bb_info *bb)
 {
 	struct bb_antdiv_info *bb_ant_div = &bb->bb_ant_div_i;
 	struct bb_link_info *bb_link = &bb->bb_link_i;
@@ -396,11 +593,11 @@ void halbb_antdiv_get_highest_mcs(struct bb_info *bb)
 					aux_max_idx = i;
 				}
 			} else if (bb_ant_div->tp_decision_method == TP_HIGHEST_DOMINATION) {
-				if (bb_rate_i->main_pkt_cnt_he[i] > 0) {
+				if (bb_rate_i->main_pkt_cnt_he[i] > bb_ant_div->tp_lb) {
 					main_max_cnt = bb_rate_i->main_pkt_cnt_he[i];
 					main_max_idx = i;
 				}
-				if (bb_rate_i->aux_pkt_cnt_he[i] > 0) {
+				if (bb_rate_i->aux_pkt_cnt_he[i] > bb_ant_div->tp_lb) {
 					aux_max_cnt = bb_rate_i->aux_pkt_cnt_he[i];
 					aux_max_idx = i;
 				}
@@ -458,11 +655,11 @@ void halbb_antdiv_get_highest_mcs(struct bb_info *bb)
 					aux_max_idx = i;
 				}
 			} else if (bb_ant_div->tp_decision_method == TP_HIGHEST_DOMINATION) {
-				if (bb_rate_i->main_pkt_cnt_vht[i] > 0) {
+				if (bb_rate_i->main_pkt_cnt_vht[i] > bb_ant_div->tp_lb) {
 					main_max_cnt = bb_rate_i->main_pkt_cnt_vht[i];
 					main_max_idx = i;
 				}
-				if (bb_rate_i->aux_pkt_cnt_vht[i] > 0) {
+				if (bb_rate_i->aux_pkt_cnt_vht[i] > bb_ant_div->tp_lb) {
 					aux_max_cnt = bb_rate_i->aux_pkt_cnt_vht[i];
 					aux_max_idx = i;
 				}
@@ -519,11 +716,11 @@ void halbb_antdiv_get_highest_mcs(struct bb_info *bb)
 					aux_max_idx = i;
 				}
 			} else if (bb_ant_div->tp_decision_method == TP_HIGHEST_DOMINATION) {
-				if (bb_rate_i->main_pkt_cnt_ht[i] > 0) {
+				if (bb_rate_i->main_pkt_cnt_ht[i] > bb_ant_div->tp_lb) {
 					main_max_cnt = bb_rate_i->main_pkt_cnt_ht[i];
 					main_max_idx = i;
 				}
-				if (bb_rate_i->aux_pkt_cnt_ht[i] > 0) {
+				if (bb_rate_i->aux_pkt_cnt_ht[i] > bb_ant_div->tp_lb) {
 					aux_max_cnt = bb_rate_i->aux_pkt_cnt_ht[i];
 					aux_max_idx = i;
 				}
@@ -562,7 +759,7 @@ void halbb_antdiv_get_highest_mcs(struct bb_info *bb)
 
 	/* Compute all throughput*/
 	if (bb_ant_div->tp_decision_method == TP_AVG_DOMINATION) {
-		BB_DBG(bb, DBG_ANT_DIV, "Main_tp = %lld, Aux_tp = %lld\n", 
+		BB_DBG(bb, DBG_ANT_DIV, "Main_tp = %d, Aux_tp = %d\n", 
 					 bb_rate_i->main_tp, bb_rate_i->aux_tp);
 
 		if (bb_rate_i->main_tp > bb_rate_i->aux_tp) {
@@ -579,7 +776,7 @@ void halbb_antdiv_get_highest_mcs(struct bb_info *bb)
 
 		BB_DBG(bb, DBG_ANT_DIV, "MCS based TargetAnt= [%s]\n", 
 		(bb_ant_div->target_ant_tp == MAIN_ANT) ? "MAIN_ANT" : "AUX_ANT");
-		BB_DBG(bb, DBG_ANT_DIV, "TP Confidence= [%lld]\n", bb_rate_i->tp_diff);
+		BB_DBG(bb, DBG_ANT_DIV, "TP Confidence= [%d]\n", bb_rate_i->tp_diff);
 
 		return;
 	}
@@ -623,7 +820,634 @@ void halbb_antdiv_get_highest_mcs(struct bb_info *bb)
 
 	BB_DBG(bb, DBG_ANT_DIV, "MCS based TargetAnt= [%s]\n", 
 		(bb_ant_div->target_ant_tp == MAIN_ANT) ? "MAIN_ANT" : "AUX_ANT");
-	BB_DBG(bb, DBG_ANT_DIV, "TP Confidence= [%lld]\n", bb_rate_i->tp_diff);
+	BB_DBG(bb, DBG_ANT_DIV, "TP Confidence= [%d]\n", bb_rate_i->tp_diff);
+}
+
+void halbb_antdiv_get_highest_mcs_new_log(struct bb_info *bb)
+{
+	struct bb_antdiv_rate_info *bb_rate_i = &bb->bb_ant_div_i.bb_rate_i;
+	u8 ss_ofst = 0;
+	u8 i;
+
+	BB_DBG(bb, DBG_ANT_DIV, "*Main-Ant CCK    cnt:{%d, %d, %d, %d}\n",
+	       bb_rate_i->main_pkt_cnt_legacy[0], bb_rate_i->main_pkt_cnt_legacy[1],
+	       bb_rate_i->main_pkt_cnt_legacy[2], bb_rate_i->main_pkt_cnt_legacy[3]);
+
+	BB_DBG(bb, DBG_ANT_DIV, "*Aux-Ant CCK    cnt:{%d, %d, %d, %d}\n",
+	       bb_rate_i->aux_pkt_cnt_legacy[0], bb_rate_i->aux_pkt_cnt_legacy[1],
+	       bb_rate_i->aux_pkt_cnt_legacy[2], bb_rate_i->aux_pkt_cnt_legacy[3]);
+
+	BB_DBG(bb, DBG_ANT_DIV, "*Main-Ant OFDM    cnt:{%d, %d, %d, %d, %d, %d, %d, %d}\n",
+	       bb_rate_i->main_pkt_cnt_legacy[4], bb_rate_i->main_pkt_cnt_legacy[5],
+	       bb_rate_i->main_pkt_cnt_legacy[6], bb_rate_i->main_pkt_cnt_legacy[7],
+	       bb_rate_i->main_pkt_cnt_legacy[8], bb_rate_i->main_pkt_cnt_legacy[9],
+	       bb_rate_i->main_pkt_cnt_legacy[10], bb_rate_i->main_pkt_cnt_legacy[11]);
+
+	BB_DBG(bb, DBG_ANT_DIV, "*Aux-Ant OFDM    cnt:{%d, %d, %d, %d, %d, %d, %d, %d}\n",
+	       bb_rate_i->aux_pkt_cnt_legacy[4], bb_rate_i->aux_pkt_cnt_legacy[5],
+	       bb_rate_i->aux_pkt_cnt_legacy[6], bb_rate_i->aux_pkt_cnt_legacy[7],
+	       bb_rate_i->aux_pkt_cnt_legacy[8], bb_rate_i->aux_pkt_cnt_legacy[9],
+	       bb_rate_i->aux_pkt_cnt_legacy[10], bb_rate_i->aux_pkt_cnt_legacy[11]);
+
+	if ((bb_rate_i->main_he_pkt_not_zero == true) || (bb_rate_i->aux_he_pkt_not_zero == true)) {
+		for (i = 0; i < bb->num_rf_path; i++) {
+			ss_ofst = HE_VHT_NUM_MCS * i;
+
+			BB_DBG(bb, DBG_ANT_DIV,
+					"*Main-Ant HE %d-SS BW-160 cnt:{%d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d}\n",
+					(i + 1),
+					bb_rate_i->main_pkt_cnt_he[ss_ofst + 0],
+					bb_rate_i->main_pkt_cnt_he[ss_ofst + 1],
+					bb_rate_i->main_pkt_cnt_he[ss_ofst + 2],
+					bb_rate_i->main_pkt_cnt_he[ss_ofst + 3],
+					bb_rate_i->main_pkt_cnt_he[ss_ofst + 4],
+					bb_rate_i->main_pkt_cnt_he[ss_ofst + 5],
+					bb_rate_i->main_pkt_cnt_he[ss_ofst + 6],
+					bb_rate_i->main_pkt_cnt_he[ss_ofst + 7],
+					bb_rate_i->main_pkt_cnt_he[ss_ofst + 8],
+					bb_rate_i->main_pkt_cnt_he[ss_ofst + 9],
+					bb_rate_i->main_pkt_cnt_he[ss_ofst + 10],
+					bb_rate_i->main_pkt_cnt_he[ss_ofst + 11]);
+			BB_DBG(bb, DBG_ANT_DIV,
+					"*Main-Ant HE %d-SS BW-80 cnt:{%d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d}\n",
+					(i + 1),
+					bb_rate_i->main_pkt_cnt_he_sc80[ss_ofst + 0],
+					bb_rate_i->main_pkt_cnt_he_sc80[ss_ofst + 1],
+					bb_rate_i->main_pkt_cnt_he_sc80[ss_ofst + 2],
+					bb_rate_i->main_pkt_cnt_he_sc80[ss_ofst + 3],
+					bb_rate_i->main_pkt_cnt_he_sc80[ss_ofst + 4],
+					bb_rate_i->main_pkt_cnt_he_sc80[ss_ofst + 5],
+					bb_rate_i->main_pkt_cnt_he_sc80[ss_ofst + 6],
+					bb_rate_i->main_pkt_cnt_he_sc80[ss_ofst + 7],
+					bb_rate_i->main_pkt_cnt_he_sc80[ss_ofst + 8],
+					bb_rate_i->main_pkt_cnt_he_sc80[ss_ofst + 9],
+					bb_rate_i->main_pkt_cnt_he_sc80[ss_ofst + 10],
+					bb_rate_i->main_pkt_cnt_he_sc80[ss_ofst + 11]);
+			BB_DBG(bb, DBG_ANT_DIV,
+					"*Main-Ant HE %d-SS BW-40 cnt:{%d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d}\n",
+					(i + 1),
+					bb_rate_i->main_pkt_cnt_he_sc40[ss_ofst + 0],
+					bb_rate_i->main_pkt_cnt_he_sc40[ss_ofst + 1],
+					bb_rate_i->main_pkt_cnt_he_sc40[ss_ofst + 2],
+					bb_rate_i->main_pkt_cnt_he_sc40[ss_ofst + 3],
+					bb_rate_i->main_pkt_cnt_he_sc40[ss_ofst + 4],
+					bb_rate_i->main_pkt_cnt_he_sc40[ss_ofst + 5],
+					bb_rate_i->main_pkt_cnt_he_sc40[ss_ofst + 6],
+					bb_rate_i->main_pkt_cnt_he_sc40[ss_ofst + 7],
+					bb_rate_i->main_pkt_cnt_he_sc40[ss_ofst + 8],
+					bb_rate_i->main_pkt_cnt_he_sc40[ss_ofst + 9],
+					bb_rate_i->main_pkt_cnt_he_sc40[ss_ofst + 10],
+					bb_rate_i->main_pkt_cnt_he_sc40[ss_ofst + 11]);
+			BB_DBG(bb, DBG_ANT_DIV,
+					"*Main-Ant HE %d-SS BW-20 cnt:{%d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d}\n",
+					(i + 1),
+					bb_rate_i->main_pkt_cnt_he_sc20[ss_ofst + 0],
+					bb_rate_i->main_pkt_cnt_he_sc20[ss_ofst + 1],
+					bb_rate_i->main_pkt_cnt_he_sc20[ss_ofst + 2],
+					bb_rate_i->main_pkt_cnt_he_sc20[ss_ofst + 3],
+					bb_rate_i->main_pkt_cnt_he_sc20[ss_ofst + 4],
+					bb_rate_i->main_pkt_cnt_he_sc20[ss_ofst + 5],
+					bb_rate_i->main_pkt_cnt_he_sc20[ss_ofst + 6],
+					bb_rate_i->main_pkt_cnt_he_sc20[ss_ofst + 7],
+					bb_rate_i->main_pkt_cnt_he_sc20[ss_ofst + 8],
+					bb_rate_i->main_pkt_cnt_he_sc20[ss_ofst + 9],
+					bb_rate_i->main_pkt_cnt_he_sc20[ss_ofst + 10],
+					bb_rate_i->main_pkt_cnt_he_sc20[ss_ofst + 11]);
+
+			BB_DBG(bb, DBG_ANT_DIV,
+					"*Aux-Ant HE %d-SS BW-160 cnt:{%d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d}\n",
+					(i + 1),
+					bb_rate_i->aux_pkt_cnt_he[ss_ofst + 0],
+					bb_rate_i->aux_pkt_cnt_he[ss_ofst + 1],
+					bb_rate_i->aux_pkt_cnt_he[ss_ofst + 2],
+					bb_rate_i->aux_pkt_cnt_he[ss_ofst + 3],
+					bb_rate_i->aux_pkt_cnt_he[ss_ofst + 4],
+					bb_rate_i->aux_pkt_cnt_he[ss_ofst + 5],
+					bb_rate_i->aux_pkt_cnt_he[ss_ofst + 6],
+					bb_rate_i->aux_pkt_cnt_he[ss_ofst + 7],
+					bb_rate_i->aux_pkt_cnt_he[ss_ofst + 8],
+					bb_rate_i->aux_pkt_cnt_he[ss_ofst + 9],
+					bb_rate_i->aux_pkt_cnt_he[ss_ofst + 10],
+					bb_rate_i->aux_pkt_cnt_he[ss_ofst + 11]);
+			BB_DBG(bb, DBG_ANT_DIV,
+					"*Aux-Ant HE %d-SS BW-80 cnt:{%d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d}\n",
+					(i + 1),
+					bb_rate_i->aux_pkt_cnt_he_sc80[ss_ofst + 0],
+					bb_rate_i->aux_pkt_cnt_he_sc80[ss_ofst + 1],
+					bb_rate_i->aux_pkt_cnt_he_sc80[ss_ofst + 2],
+					bb_rate_i->aux_pkt_cnt_he_sc80[ss_ofst + 3],
+					bb_rate_i->aux_pkt_cnt_he_sc80[ss_ofst + 4],
+					bb_rate_i->aux_pkt_cnt_he_sc80[ss_ofst + 5],
+					bb_rate_i->aux_pkt_cnt_he_sc80[ss_ofst + 6],
+					bb_rate_i->aux_pkt_cnt_he_sc80[ss_ofst + 7],
+					bb_rate_i->aux_pkt_cnt_he_sc80[ss_ofst + 8],
+					bb_rate_i->aux_pkt_cnt_he_sc80[ss_ofst + 9],
+					bb_rate_i->aux_pkt_cnt_he_sc80[ss_ofst + 10],
+					bb_rate_i->aux_pkt_cnt_he_sc80[ss_ofst + 11]);
+			BB_DBG(bb, DBG_ANT_DIV,
+					"*Aux-Ant HE %d-SS BW-40 cnt:{%d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d}\n",
+					(i + 1),
+					bb_rate_i->aux_pkt_cnt_he_sc40[ss_ofst + 0],
+					bb_rate_i->aux_pkt_cnt_he_sc40[ss_ofst + 1],
+					bb_rate_i->aux_pkt_cnt_he_sc40[ss_ofst + 2],
+					bb_rate_i->aux_pkt_cnt_he_sc40[ss_ofst + 3],
+					bb_rate_i->aux_pkt_cnt_he_sc40[ss_ofst + 4],
+					bb_rate_i->aux_pkt_cnt_he_sc40[ss_ofst + 5],
+					bb_rate_i->aux_pkt_cnt_he_sc40[ss_ofst + 6],
+					bb_rate_i->aux_pkt_cnt_he_sc40[ss_ofst + 7],
+					bb_rate_i->aux_pkt_cnt_he_sc40[ss_ofst + 8],
+					bb_rate_i->aux_pkt_cnt_he_sc40[ss_ofst + 9],
+					bb_rate_i->aux_pkt_cnt_he_sc40[ss_ofst + 10],
+					bb_rate_i->aux_pkt_cnt_he_sc40[ss_ofst + 11]);
+			BB_DBG(bb, DBG_ANT_DIV,
+					"*Aux-Ant HE %d-SS BW-20 cnt:{%d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d}\n",
+					(i + 1),
+					bb_rate_i->aux_pkt_cnt_he_sc20[ss_ofst + 0],
+					bb_rate_i->aux_pkt_cnt_he_sc20[ss_ofst + 1],
+					bb_rate_i->aux_pkt_cnt_he_sc20[ss_ofst + 2],
+					bb_rate_i->aux_pkt_cnt_he_sc20[ss_ofst + 3],
+					bb_rate_i->aux_pkt_cnt_he_sc20[ss_ofst + 4],
+					bb_rate_i->aux_pkt_cnt_he_sc20[ss_ofst + 5],
+					bb_rate_i->aux_pkt_cnt_he_sc20[ss_ofst + 6],
+					bb_rate_i->aux_pkt_cnt_he_sc20[ss_ofst + 7],
+					bb_rate_i->aux_pkt_cnt_he_sc20[ss_ofst + 8],
+					bb_rate_i->aux_pkt_cnt_he_sc20[ss_ofst + 9],
+					bb_rate_i->aux_pkt_cnt_he_sc20[ss_ofst + 10],
+					bb_rate_i->aux_pkt_cnt_he_sc20[ss_ofst + 11]);
+
+		}
+	} else if ((bb_rate_i->main_vht_pkt_not_zero == true) || (bb_rate_i->aux_vht_pkt_not_zero == true)) {
+		for (i = 0; i < bb->num_rf_path; i++) {
+			ss_ofst = HE_VHT_NUM_MCS * i;
+
+			BB_DBG(bb, DBG_ANT_DIV,
+				  "*Main-Ant VHT %d-SS BW-160 cnt:{%d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d}\n",
+				  (i + 1),
+				  bb_rate_i->main_pkt_cnt_vht[ss_ofst + 0],
+				  bb_rate_i->main_pkt_cnt_vht[ss_ofst + 1],
+				  bb_rate_i->main_pkt_cnt_vht[ss_ofst + 2],
+				  bb_rate_i->main_pkt_cnt_vht[ss_ofst + 3],
+				  bb_rate_i->main_pkt_cnt_vht[ss_ofst + 4],
+				  bb_rate_i->main_pkt_cnt_vht[ss_ofst + 5],
+				  bb_rate_i->main_pkt_cnt_vht[ss_ofst + 6],
+				  bb_rate_i->main_pkt_cnt_vht[ss_ofst + 7],
+				  bb_rate_i->main_pkt_cnt_vht[ss_ofst + 8],
+				  bb_rate_i->main_pkt_cnt_vht[ss_ofst + 9],
+				  bb_rate_i->main_pkt_cnt_vht[ss_ofst + 10],
+				  bb_rate_i->main_pkt_cnt_vht[ss_ofst + 11]);
+			BB_DBG(bb, DBG_ANT_DIV,
+				  "*Main-Ant VHT %d-SS BW-80 cnt:{%d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d}\n",
+				  (i + 1),
+				  bb_rate_i->main_pkt_cnt_vht_sc80[ss_ofst + 0],
+				  bb_rate_i->main_pkt_cnt_vht_sc80[ss_ofst + 1],
+				  bb_rate_i->main_pkt_cnt_vht_sc80[ss_ofst + 2],
+				  bb_rate_i->main_pkt_cnt_vht_sc80[ss_ofst + 3],
+				  bb_rate_i->main_pkt_cnt_vht_sc80[ss_ofst + 4],
+				  bb_rate_i->main_pkt_cnt_vht_sc80[ss_ofst + 5],
+				  bb_rate_i->main_pkt_cnt_vht_sc80[ss_ofst + 6],
+				  bb_rate_i->main_pkt_cnt_vht_sc80[ss_ofst + 7],
+				  bb_rate_i->main_pkt_cnt_vht_sc80[ss_ofst + 8],
+				  bb_rate_i->main_pkt_cnt_vht_sc80[ss_ofst + 9],
+				  bb_rate_i->main_pkt_cnt_vht_sc80[ss_ofst + 10],
+				  bb_rate_i->main_pkt_cnt_vht_sc80[ss_ofst + 11]);
+			BB_DBG(bb, DBG_ANT_DIV,
+				  "*Main-Ant VHT %d-SS BW-40 cnt:{%d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d}\n",
+				  (i + 1),
+				  bb_rate_i->main_pkt_cnt_vht_sc40[ss_ofst + 0],
+				  bb_rate_i->main_pkt_cnt_vht_sc40[ss_ofst + 1],
+				  bb_rate_i->main_pkt_cnt_vht_sc40[ss_ofst + 2],
+				  bb_rate_i->main_pkt_cnt_vht_sc40[ss_ofst + 3],
+				  bb_rate_i->main_pkt_cnt_vht_sc40[ss_ofst + 4],
+				  bb_rate_i->main_pkt_cnt_vht_sc40[ss_ofst + 5],
+				  bb_rate_i->main_pkt_cnt_vht_sc40[ss_ofst + 6],
+				  bb_rate_i->main_pkt_cnt_vht_sc40[ss_ofst + 7],
+				  bb_rate_i->main_pkt_cnt_vht_sc40[ss_ofst + 8],
+				  bb_rate_i->main_pkt_cnt_vht_sc40[ss_ofst + 9],
+				  bb_rate_i->main_pkt_cnt_vht_sc40[ss_ofst + 10],
+				  bb_rate_i->main_pkt_cnt_vht_sc40[ss_ofst + 11]);
+			BB_DBG(bb, DBG_ANT_DIV,
+				  "*Main-Ant VHT %d-SS BW-20 cnt:{%d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d}\n",
+				  (i + 1),
+				  bb_rate_i->main_pkt_cnt_vht_sc20[ss_ofst + 0],
+				  bb_rate_i->main_pkt_cnt_vht_sc20[ss_ofst + 1],
+				  bb_rate_i->main_pkt_cnt_vht_sc20[ss_ofst + 2],
+				  bb_rate_i->main_pkt_cnt_vht_sc20[ss_ofst + 3],
+				  bb_rate_i->main_pkt_cnt_vht_sc20[ss_ofst + 4],
+				  bb_rate_i->main_pkt_cnt_vht_sc20[ss_ofst + 5],
+				  bb_rate_i->main_pkt_cnt_vht_sc20[ss_ofst + 6],
+				  bb_rate_i->main_pkt_cnt_vht_sc20[ss_ofst + 7],
+				  bb_rate_i->main_pkt_cnt_vht_sc20[ss_ofst + 8],
+				  bb_rate_i->main_pkt_cnt_vht_sc20[ss_ofst + 9],
+				  bb_rate_i->main_pkt_cnt_vht_sc20[ss_ofst + 10],
+				  bb_rate_i->main_pkt_cnt_vht_sc20[ss_ofst + 11]);
+
+			BB_DBG(bb, DBG_ANT_DIV,
+				  "*Aux-Ant VHT %d-SS BW-160 cnt:{%d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d}\n",
+				  (i + 1),
+				  bb_rate_i->aux_pkt_cnt_vht[ss_ofst + 0],
+				  bb_rate_i->aux_pkt_cnt_vht[ss_ofst + 1],
+				  bb_rate_i->aux_pkt_cnt_vht[ss_ofst + 2],
+				  bb_rate_i->aux_pkt_cnt_vht[ss_ofst + 3],
+				  bb_rate_i->aux_pkt_cnt_vht[ss_ofst + 4],
+				  bb_rate_i->aux_pkt_cnt_vht[ss_ofst + 5],
+				  bb_rate_i->aux_pkt_cnt_vht[ss_ofst + 6],
+				  bb_rate_i->aux_pkt_cnt_vht[ss_ofst + 7],
+				  bb_rate_i->aux_pkt_cnt_vht[ss_ofst + 8],
+				  bb_rate_i->aux_pkt_cnt_vht[ss_ofst + 9],
+				  bb_rate_i->aux_pkt_cnt_vht[ss_ofst + 10],
+				  bb_rate_i->aux_pkt_cnt_vht[ss_ofst + 11]);
+			BB_DBG(bb, DBG_ANT_DIV,
+				  "*Aux-Ant VHT %d-SS BW-80 cnt:{%d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d}\n",
+				  (i + 1),
+				  bb_rate_i->aux_pkt_cnt_vht_sc80[ss_ofst + 0],
+				  bb_rate_i->aux_pkt_cnt_vht_sc80[ss_ofst + 1],
+				  bb_rate_i->aux_pkt_cnt_vht_sc80[ss_ofst + 2],
+				  bb_rate_i->aux_pkt_cnt_vht_sc80[ss_ofst + 3],
+				  bb_rate_i->aux_pkt_cnt_vht_sc80[ss_ofst + 4],
+				  bb_rate_i->aux_pkt_cnt_vht_sc80[ss_ofst + 5],
+				  bb_rate_i->aux_pkt_cnt_vht_sc80[ss_ofst + 6],
+				  bb_rate_i->aux_pkt_cnt_vht_sc80[ss_ofst + 7],
+				  bb_rate_i->aux_pkt_cnt_vht_sc80[ss_ofst + 8],
+				  bb_rate_i->aux_pkt_cnt_vht_sc80[ss_ofst + 9],
+				  bb_rate_i->aux_pkt_cnt_vht_sc80[ss_ofst + 10],
+				  bb_rate_i->aux_pkt_cnt_vht_sc80[ss_ofst + 11]);
+			BB_DBG(bb, DBG_ANT_DIV,
+				  "*Aux-Ant VHT %d-SS BW-40 cnt:{%d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d}\n",
+				  (i + 1),
+				  bb_rate_i->aux_pkt_cnt_vht_sc40[ss_ofst + 0],
+				  bb_rate_i->aux_pkt_cnt_vht_sc40[ss_ofst + 1],
+				  bb_rate_i->aux_pkt_cnt_vht_sc40[ss_ofst + 2],
+				  bb_rate_i->aux_pkt_cnt_vht_sc40[ss_ofst + 3],
+				  bb_rate_i->aux_pkt_cnt_vht_sc40[ss_ofst + 4],
+				  bb_rate_i->aux_pkt_cnt_vht_sc40[ss_ofst + 5],
+				  bb_rate_i->aux_pkt_cnt_vht_sc40[ss_ofst + 6],
+				  bb_rate_i->aux_pkt_cnt_vht_sc40[ss_ofst + 7],
+				  bb_rate_i->aux_pkt_cnt_vht_sc40[ss_ofst + 8],
+				  bb_rate_i->aux_pkt_cnt_vht_sc40[ss_ofst + 9],
+				  bb_rate_i->aux_pkt_cnt_vht_sc40[ss_ofst + 10],
+				  bb_rate_i->aux_pkt_cnt_vht_sc40[ss_ofst + 11]);
+			BB_DBG(bb, DBG_ANT_DIV,
+				  "*Aux-Ant VHT %d-SS BW-20 cnt:{%d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d}\n",
+				  (i + 1),
+				  bb_rate_i->aux_pkt_cnt_vht_sc20[ss_ofst + 0],
+				  bb_rate_i->aux_pkt_cnt_vht_sc20[ss_ofst + 1],
+				  bb_rate_i->aux_pkt_cnt_vht_sc20[ss_ofst + 2],
+				  bb_rate_i->aux_pkt_cnt_vht_sc20[ss_ofst + 3],
+				  bb_rate_i->aux_pkt_cnt_vht_sc20[ss_ofst + 4],
+				  bb_rate_i->aux_pkt_cnt_vht_sc20[ss_ofst + 5],
+				  bb_rate_i->aux_pkt_cnt_vht_sc20[ss_ofst + 6],
+				  bb_rate_i->aux_pkt_cnt_vht_sc20[ss_ofst + 7],
+				  bb_rate_i->aux_pkt_cnt_vht_sc20[ss_ofst + 8],
+				  bb_rate_i->aux_pkt_cnt_vht_sc20[ss_ofst + 9],
+				  bb_rate_i->aux_pkt_cnt_vht_sc20[ss_ofst + 10],
+				  bb_rate_i->aux_pkt_cnt_vht_sc20[ss_ofst + 11]);
+		}
+	}else if ((bb_rate_i->main_ht_pkt_not_zero == true) || (bb_rate_i->aux_ht_pkt_not_zero == true)) {
+		for (i = 0; i < bb->num_rf_path; i++) {
+			ss_ofst = (i << 3);
+
+			BB_DBG(bb, DBG_ANT_DIV,
+			       "* Main-Ant HT%02d:%02d BW-40 cnt:{%d, %d, %d, %d, %d, %d, %d, %d}\n",
+			       (ss_ofst), (ss_ofst + 7),
+			       bb_rate_i->main_pkt_cnt_ht[ss_ofst + 0],
+			       bb_rate_i->main_pkt_cnt_ht[ss_ofst + 1],
+			       bb_rate_i->main_pkt_cnt_ht[ss_ofst + 2],
+			       bb_rate_i->main_pkt_cnt_ht[ss_ofst + 3],
+			       bb_rate_i->main_pkt_cnt_ht[ss_ofst + 4],
+			       bb_rate_i->main_pkt_cnt_ht[ss_ofst + 5],
+			       bb_rate_i->main_pkt_cnt_ht[ss_ofst + 6],
+			       bb_rate_i->main_pkt_cnt_ht[ss_ofst + 7]);
+
+			BB_DBG(bb, DBG_ANT_DIV,
+			       "* Main-Ant HT%02d:%02d BW-20 cnt:{%d, %d, %d, %d, %d, %d, %d, %d}\n",
+			       (ss_ofst), (ss_ofst + 7),
+			       bb_rate_i->main_pkt_cnt_ht_sc20[ss_ofst + 0],
+			       bb_rate_i->main_pkt_cnt_ht_sc20[ss_ofst + 1],
+			       bb_rate_i->main_pkt_cnt_ht_sc20[ss_ofst + 2],
+			       bb_rate_i->main_pkt_cnt_ht_sc20[ss_ofst + 3],
+			       bb_rate_i->main_pkt_cnt_ht_sc20[ss_ofst + 4],
+			       bb_rate_i->main_pkt_cnt_ht_sc20[ss_ofst + 5],
+			       bb_rate_i->main_pkt_cnt_ht_sc20[ss_ofst + 6],
+			       bb_rate_i->main_pkt_cnt_ht_sc20[ss_ofst + 7]);
+
+			BB_DBG(bb, DBG_ANT_DIV,
+			       "* Aux-Ant HT%02d:%02d BW-40 cnt:{%d, %d, %d, %d, %d, %d, %d, %d}\n",
+			       (ss_ofst), (ss_ofst + 7),
+			       bb_rate_i->aux_pkt_cnt_ht[ss_ofst + 0],
+			       bb_rate_i->aux_pkt_cnt_ht[ss_ofst + 1],
+			       bb_rate_i->aux_pkt_cnt_ht[ss_ofst + 2],
+			       bb_rate_i->aux_pkt_cnt_ht[ss_ofst + 3],
+			       bb_rate_i->aux_pkt_cnt_ht[ss_ofst + 4],
+			       bb_rate_i->aux_pkt_cnt_ht[ss_ofst + 5],
+			       bb_rate_i->aux_pkt_cnt_ht[ss_ofst + 6],
+			       bb_rate_i->aux_pkt_cnt_ht[ss_ofst + 7]);
+
+			BB_DBG(bb, DBG_ANT_DIV,
+			       "* Aux-Ant HT%02d:%02d BW-20 cnt:{%d, %d, %d, %d, %d, %d, %d, %d}\n",
+			       (ss_ofst), (ss_ofst + 7),
+			       bb_rate_i->aux_pkt_cnt_ht_sc20[ss_ofst + 0],
+			       bb_rate_i->aux_pkt_cnt_ht_sc20[ss_ofst + 1],
+			       bb_rate_i->aux_pkt_cnt_ht_sc20[ss_ofst + 2],
+			       bb_rate_i->aux_pkt_cnt_ht_sc20[ss_ofst + 3],
+			       bb_rate_i->aux_pkt_cnt_ht_sc20[ss_ofst + 4],
+			       bb_rate_i->aux_pkt_cnt_ht_sc20[ss_ofst + 5],
+			       bb_rate_i->aux_pkt_cnt_ht_sc20[ss_ofst + 6],
+			       bb_rate_i->aux_pkt_cnt_ht_sc20[ss_ofst + 7]);
+		}
+	}
+}
+
+void halbb_antdiv_get_highest_mcs_new(struct bb_info *bb)
+{
+	struct bb_antdiv_info *bb_ant_div = &bb->bb_ant_div_i;
+	struct bb_link_info *bb_link = &bb->bb_link_i;
+	struct bb_cmn_rpt_info	*cmn_rpt = &bb->bb_cmn_rpt_i;
+	struct bb_rate_info *rate_i = &cmn_rpt->bb_rate_i;
+	struct bb_antdiv_rate_info *bb_rate_i = &bb_ant_div->bb_rate_i;
+	struct bb_sub_bw_tp_info *bb_sub_bw_tp = &bb_ant_div->bb_sub_bw_tp_i;
+	enum channel_width main_max_bw;
+	enum channel_width aux_max_bw;
+
+	u16 main_max_cnt = 1;
+	u16 aux_max_cnt = 1;
+	u16 main_max_idx = 0;
+	u16 aux_max_idx = 0;
+	u8 ss_ofst = 0;
+	u8 i, j;
+
+	Cnt_info cnt_info[4] = {
+		{&bb_sub_bw_tp->main_max_tp_20, &bb_sub_bw_tp->aux_max_tp_20, &bb_sub_bw_tp->main_max_cnt_20, &bb_sub_bw_tp->aux_max_cnt_20, &bb_sub_bw_tp->main_max_idx_20, &bb_sub_bw_tp->aux_max_idx_20},
+		{&bb_sub_bw_tp->main_max_tp_40, &bb_sub_bw_tp->aux_max_tp_40, &bb_sub_bw_tp->main_max_cnt_40, &bb_sub_bw_tp->aux_max_cnt_40, &bb_sub_bw_tp->main_max_idx_40, &bb_sub_bw_tp->aux_max_idx_40},
+		{&bb_sub_bw_tp->main_max_tp_80, &bb_sub_bw_tp->aux_max_tp_80, &bb_sub_bw_tp->main_max_cnt_80, &bb_sub_bw_tp->aux_max_cnt_80, &bb_sub_bw_tp->main_max_idx_80, &bb_sub_bw_tp->aux_max_idx_80},
+		{&bb_sub_bw_tp->main_max_tp_160, &bb_sub_bw_tp->aux_max_tp_160, &bb_sub_bw_tp->main_max_cnt_160, &bb_sub_bw_tp->aux_max_cnt_160, &bb_sub_bw_tp->main_max_idx_160, &bb_sub_bw_tp->aux_max_idx_160}
+	};
+
+	/*reset sub BW TP info*/
+	halbb_mem_set(bb, bb_sub_bw_tp, 0, sizeof(struct bb_sub_bw_tp_info));
+
+	if ((bb_rate_i->main_he_pkt_not_zero == true) || (bb_rate_i->aux_he_pkt_not_zero == true)) {
+		for (i = 0; i < HE_RATE_NUM; i++) {
+			bb_sub_bw_tp->COUNT_MAIN_HE[0][i] = bb_rate_i->main_pkt_cnt_he_sc20[i];
+			bb_sub_bw_tp->COUNT_MAIN_HE[1][i] = bb_rate_i->main_pkt_cnt_he_sc40[i];
+			bb_sub_bw_tp->COUNT_MAIN_HE[2][i] = bb_rate_i->main_pkt_cnt_he_sc80[i];
+			bb_sub_bw_tp->COUNT_MAIN_HE[3][i] = bb_rate_i->main_pkt_cnt_he[i];
+			bb_sub_bw_tp->COUNT_AUX_HE[0][i] = bb_rate_i->aux_pkt_cnt_he_sc20[i];
+			bb_sub_bw_tp->COUNT_AUX_HE[1][i] = bb_rate_i->aux_pkt_cnt_he_sc40[i];
+			bb_sub_bw_tp->COUNT_AUX_HE[2][i] = bb_rate_i->aux_pkt_cnt_he_sc80[i];
+			bb_sub_bw_tp->COUNT_AUX_HE[3][i] = bb_rate_i->aux_pkt_cnt_he[i];
+
+			if (bb_ant_div->tp_decision_method == TP_MAX_DOMINATION) {
+				for(j = 0; j < 4; j++) {
+					if (bb_sub_bw_tp->COUNT_MAIN_HE[j][i] >= main_max_cnt) {
+						main_max_cnt = bb_sub_bw_tp->COUNT_MAIN_HE[j][i];
+						main_max_idx = i;
+						main_max_bw = j;
+					}
+					if (bb_sub_bw_tp->COUNT_AUX_HE[j][i] >= aux_max_cnt) {
+						aux_max_cnt = bb_sub_bw_tp->COUNT_AUX_HE[j][i];
+						aux_max_idx = i;
+						aux_max_bw = j;
+					}
+				}
+				BB_DBG(bb, DBG_ANT_DIV,
+				  "(HE) Main ant MAX MCS CNT in BW-%d MCS-%d, cnt = %d",
+				  main_max_bw, main_max_idx, main_max_cnt);
+				BB_DBG(bb, DBG_ANT_DIV,
+				  "(HE) Aux ant MAX MCS CNT in BW-%d MCS-%d, cnt = %d",
+				  aux_max_bw, aux_max_idx, aux_max_cnt);
+			} else if  (bb_ant_div->tp_decision_method == TP_HIGHEST_DOMINATION) {
+				const int MULTIPLIERS_HE[4] = {113, 226, 474, 947};
+
+				for(j = 0; j < 4; j++) {
+					if (bb_sub_bw_tp->COUNT_MAIN_HE[j][i] >= bb_ant_div->tp_lb) {
+						*(cnt_info[j].sub_main_max_cnt) = bb_sub_bw_tp->COUNT_MAIN_HE[j][i];
+						*(cnt_info[j].sub_main_max_idx) = i;
+						*(cnt_info[j].sub_main_max_tp) = 
+							MULTIPLIERS_HE[j] * bb_phy_rate_table[i + LEGACY_RATE_NUM];
+						main_max_bw = j;
+					}
+					if (bb_sub_bw_tp->COUNT_AUX_HE[j][i] >= bb_ant_div->tp_lb) {
+						*(cnt_info[j].sub_aux_max_cnt) = bb_sub_bw_tp->COUNT_AUX_HE[j][i];
+						*(cnt_info[j].sub_aux_max_idx) = i;
+						*(cnt_info[j].sub_aux_max_tp) = 
+							MULTIPLIERS_HE[j] * bb_phy_rate_table[i + LEGACY_RATE_NUM];
+						aux_max_bw = j;
+					}
+				}
+			}
+		}
+
+	} else if ((bb_rate_i->main_vht_pkt_not_zero == true) || (bb_rate_i->aux_vht_pkt_not_zero == true)) {
+
+		for (i = 0; i < VHT_RATE_NUM; i++) {
+			bb_sub_bw_tp->COUNT_MAIN_VHT[0][i] = bb_rate_i->main_pkt_cnt_vht_sc20[i];
+			bb_sub_bw_tp->COUNT_MAIN_VHT[1][i] = bb_rate_i->main_pkt_cnt_vht_sc40[i];
+			bb_sub_bw_tp->COUNT_MAIN_VHT[2][i] = bb_rate_i->main_pkt_cnt_vht_sc80[i];
+			bb_sub_bw_tp->COUNT_MAIN_VHT[3][i] = bb_rate_i->main_pkt_cnt_vht[i];
+			bb_sub_bw_tp->COUNT_AUX_VHT[0][i] = bb_rate_i->aux_pkt_cnt_vht_sc20[i];
+			bb_sub_bw_tp->COUNT_AUX_VHT[1][i] = bb_rate_i->aux_pkt_cnt_vht_sc40[i];
+			bb_sub_bw_tp->COUNT_AUX_VHT[2][i] = bb_rate_i->aux_pkt_cnt_vht_sc80[i];
+			bb_sub_bw_tp->COUNT_AUX_VHT[3][i] = bb_rate_i->aux_pkt_cnt_vht[i];
+
+			if (bb_ant_div->tp_decision_method == TP_MAX_DOMINATION) {
+				for(j = 0; j < 4; j++) {
+					if (bb_sub_bw_tp->COUNT_MAIN_VHT[j][i] >= main_max_cnt) {
+						main_max_cnt = bb_sub_bw_tp->COUNT_MAIN_VHT[j][i];
+						main_max_idx = i;
+						main_max_bw = j;
+					}
+					if (bb_sub_bw_tp->COUNT_AUX_VHT[j][i] >= aux_max_cnt) {
+						aux_max_cnt = bb_sub_bw_tp->COUNT_AUX_VHT[j][i];
+						aux_max_idx = i;
+						aux_max_bw = j;
+					}
+				}
+				BB_DBG(bb, DBG_ANT_DIV,
+				  "(VHT) Main ant MAX MCS CNT in BW-%d MCS-%d, cnt = %d",
+				  main_max_bw, main_max_idx, main_max_cnt);
+				BB_DBG(bb, DBG_ANT_DIV,
+				  "(VHT) Aux ant MAX MCS CNT in BW-%d MCS-%d, cnt = %d",
+				  aux_max_bw, aux_max_idx, aux_max_cnt);
+			} else if (bb_ant_div->tp_decision_method == TP_HIGHEST_DOMINATION) {
+				const int MULTIPLIERS_VHT[4] = {100, 208, 450, 900};
+
+				for(j = 0; j < 4; j++) {
+					if (bb_sub_bw_tp->COUNT_MAIN_VHT[j][i] >= bb_ant_div->tp_lb) {
+						*(cnt_info[j].sub_main_max_cnt) = bb_sub_bw_tp->COUNT_MAIN_VHT[j][i];
+						*(cnt_info[j].sub_main_max_idx) = i;
+						*(cnt_info[j].sub_main_max_tp) = MULTIPLIERS_VHT[j] * bb_phy_rate_table[i + LEGACY_RATE_NUM];
+						main_max_bw = j;
+					}
+					if (bb_sub_bw_tp->COUNT_AUX_VHT[j][i] >= bb_ant_div->tp_lb) {
+						*(cnt_info[j].sub_aux_max_cnt) = bb_sub_bw_tp->COUNT_AUX_VHT[j][i];
+						*(cnt_info[j].sub_aux_max_idx) = i;
+						*(cnt_info[j].sub_aux_max_tp) = MULTIPLIERS_VHT[j] * bb_phy_rate_table[i + LEGACY_RATE_NUM];
+						aux_max_bw = j;
+					}
+				}
+			}
+		}
+
+	} else if ((bb_rate_i->main_ht_pkt_not_zero == true) || (bb_rate_i->aux_ht_pkt_not_zero == true)) {
+		for (i = 0; i < HT_RATE_NUM; i++) {
+			bb_sub_bw_tp->COUNT_MAIN_HT[0][i] = bb_rate_i->main_pkt_cnt_ht_sc20[i];
+			bb_sub_bw_tp->COUNT_MAIN_HT[1][i] = bb_rate_i->main_pkt_cnt_ht[i];
+			bb_sub_bw_tp->COUNT_AUX_HT[0][i] = bb_rate_i->aux_pkt_cnt_ht_sc20[i];
+			bb_sub_bw_tp->COUNT_AUX_HT[1][i] = bb_rate_i->aux_pkt_cnt_ht[i];
+
+			if (bb_ant_div->tp_decision_method == TP_MAX_DOMINATION) {
+				for(j = 0; j < 2; j++) {
+					if (bb_sub_bw_tp->COUNT_MAIN_HT[j][i] >= main_max_cnt) {
+						main_max_cnt = bb_sub_bw_tp->COUNT_MAIN_HT[j][i];
+						main_max_idx = i;
+						main_max_bw = j;
+					}
+					if (bb_sub_bw_tp->COUNT_AUX_HT[j][i] >= aux_max_cnt) {
+						aux_max_cnt = bb_sub_bw_tp->COUNT_AUX_HT[j][i];
+						aux_max_idx = i;
+						aux_max_bw = j;
+					}
+				}
+				BB_DBG(bb, DBG_ANT_DIV,
+				  "(HT) Main ant MAX MCS CNT in BW-%d MCS-%d, cnt = %d",
+				  main_max_bw, main_max_idx, main_max_cnt);
+				BB_DBG(bb, DBG_ANT_DIV,
+				  "(HT) Aux ant MAX MCS CNT in BW-%d MCS-%d, cnt = %d",
+				  aux_max_bw, aux_max_idx, aux_max_cnt);
+			} else if (bb_ant_div->tp_decision_method == TP_HIGHEST_DOMINATION) {
+				const int MULTIPLIERS_HT[2] = {100, 208};
+
+				for(j = 0; j < 2; j++) {
+					if (bb_sub_bw_tp->COUNT_MAIN_HT[j][i] >= bb_ant_div->tp_lb) {
+						*(cnt_info[j].sub_main_max_cnt) = bb_sub_bw_tp->COUNT_MAIN_HT[j][i];
+						*(cnt_info[j].sub_main_max_idx) = i;
+						*(cnt_info[j].sub_main_max_tp) = MULTIPLIERS_HT[j] * bb_phy_rate_table[i + LEGACY_RATE_NUM];
+						main_max_bw = j;
+					}
+					if (bb_sub_bw_tp->COUNT_AUX_HT[j][i] >= bb_ant_div->tp_lb) {
+						*(cnt_info[j].sub_aux_max_cnt) = bb_sub_bw_tp->COUNT_AUX_HT[j][i];
+						*(cnt_info[j].sub_aux_max_idx) = i;
+						*(cnt_info[j].sub_aux_max_tp) = MULTIPLIERS_HT[j] * bb_phy_rate_table[i + LEGACY_RATE_NUM];
+						aux_max_bw = j;
+					}
+				}
+			}
+		}
+	}
+
+	halbb_antdiv_get_highest_mcs_new_log(bb);
+
+	//max TP
+	if (bb_ant_div->tp_decision_method == TP_HIGHEST_DOMINATION) {
+		if((bb_sub_bw_tp->main_max_tp_160 >= bb_sub_bw_tp->main_max_tp_80) && (bb_sub_bw_tp->main_max_tp_160 >= bb_sub_bw_tp->main_max_tp_40) && (bb_sub_bw_tp->main_max_tp_160 >= bb_sub_bw_tp->main_max_tp_20)){
+			main_max_cnt = bb_sub_bw_tp->main_max_cnt_160;
+			main_max_idx = bb_sub_bw_tp->main_max_idx_160;
+		}else if((bb_sub_bw_tp->main_max_tp_80 >= bb_sub_bw_tp->main_max_tp_40) && ((bb_sub_bw_tp->main_max_tp_80 >= bb_sub_bw_tp->main_max_tp_20))){
+			main_max_cnt = bb_sub_bw_tp->main_max_cnt_80;
+			main_max_idx = bb_sub_bw_tp->main_max_idx_80;
+		}else if((bb_sub_bw_tp->main_max_tp_40 >= bb_sub_bw_tp->main_max_tp_20)){
+			main_max_cnt =bb_sub_bw_tp-> main_max_cnt_40;
+			main_max_idx = bb_sub_bw_tp->main_max_idx_40;
+		}else{
+			main_max_cnt = bb_sub_bw_tp->main_max_cnt_20;
+			main_max_idx = bb_sub_bw_tp->main_max_idx_20;
+		}
+		if((bb_sub_bw_tp->aux_max_tp_160 >= bb_sub_bw_tp->aux_max_tp_80) && (bb_sub_bw_tp->aux_max_tp_160 >= bb_sub_bw_tp->aux_max_tp_40) && (bb_sub_bw_tp->aux_max_tp_160 >= bb_sub_bw_tp->aux_max_tp_20)){
+			aux_max_cnt = bb_sub_bw_tp->aux_max_cnt_160;
+			aux_max_idx = bb_sub_bw_tp->aux_max_idx_160;
+		}else if((bb_sub_bw_tp->aux_max_tp_80 >= bb_sub_bw_tp->aux_max_tp_40) && ((bb_sub_bw_tp->aux_max_tp_80 >= bb_sub_bw_tp->aux_max_tp_20))){
+			aux_max_cnt = bb_sub_bw_tp->aux_max_cnt_80;
+			aux_max_idx = bb_sub_bw_tp->aux_max_idx_80;
+		}else if((bb_sub_bw_tp->aux_max_tp_40 >= bb_sub_bw_tp->aux_max_tp_20)){
+			aux_max_cnt = bb_sub_bw_tp->aux_max_cnt_40;
+			aux_max_idx = bb_sub_bw_tp->aux_max_idx_40;
+		}else{
+			aux_max_cnt = bb_sub_bw_tp->aux_max_cnt_20;
+			aux_max_idx = bb_sub_bw_tp->aux_max_idx_20;
+		}
+	}
+	/* Compute all throughput*/
+	if (bb_ant_div->tp_decision_method == TP_AVG_DOMINATION) {
+		
+		bb_rate_i->main_tp = HALBB_DIV(bb_rate_i->main_tp, (u32)bb_rate_i->main_pkt_cnt_t);
+		bb_rate_i->aux_tp = HALBB_DIV(bb_rate_i->aux_tp, (u32)bb_rate_i->aux_pkt_cnt_t);
+
+		BB_DBG(bb, DBG_ANT_DIV, "Main_tp*100 = %d, Aux_tp*100 = %d\n", 
+					 bb_rate_i->main_tp, bb_rate_i->aux_tp);
+		BB_DBG(bb, DBG_ANT_DIV, "main_pkt_cnt_t = %d, aux_pkt_cnt_t = %d\n", 
+					 bb_rate_i->main_pkt_cnt_t, bb_rate_i->aux_pkt_cnt_t);
+
+		if (bb_rate_i->main_tp > bb_rate_i->aux_tp) {
+			bb_ant_div->target_ant_tp = MAIN_ANT;
+			bb_rate_i->tp_diff = bb_rate_i->main_tp - bb_rate_i->aux_tp;
+		} else if (bb_rate_i->main_tp < bb_rate_i->aux_tp) {
+			bb_ant_div->target_ant_tp = AUX_ANT;
+			bb_rate_i->tp_diff = bb_rate_i->aux_tp - bb_rate_i->main_tp;
+		} else {
+			bb_ant_div->target_ant_tp = bb_ant_div->pre_target_ant;
+			bb_rate_i->no_change_flag = true;
+			BB_DBG(bb, DBG_ANT_DIV, "TP based TargetAnt= Pre-TargetAnt\n");
+		}
+
+		BB_DBG(bb, DBG_ANT_DIV, "MCS based TargetAnt= [%s]\n", 
+		(bb_ant_div->target_ant_tp == MAIN_ANT) ? "MAIN_ANT" : "AUX_ANT");
+		BB_DBG(bb, DBG_ANT_DIV, "TP Confidence= [%d]\n", bb_rate_i->tp_diff);
+
+		return;
+	}
+	if (bb_ant_div->tp_decision_method != TP_AVG_DOMINATION) {
+		bb_rate_i->main_max_cnt = main_max_cnt;
+		bb_rate_i->main_max_idx = main_max_idx;
+		bb_rate_i->aux_max_cnt = aux_max_cnt;
+		bb_rate_i->aux_max_idx = aux_max_idx;
+
+		/* Decision Tput based target ant using MCS rate instead of phy data rate */
+		if ((main_max_cnt > bb_ant_div->tp_lb) || (aux_max_cnt > bb_ant_div->tp_lb)) {
+			if (main_max_idx > aux_max_idx) {
+				bb_ant_div->target_ant_tp = MAIN_ANT;
+				bb_rate_i->tp_diff = 100;
+			} else if (main_max_idx < aux_max_idx) {
+				bb_ant_div->target_ant_tp = AUX_ANT;
+				bb_rate_i->tp_diff = 100;
+			} else {
+				if (main_max_cnt > aux_max_cnt)
+					bb_ant_div->target_ant_tp = MAIN_ANT;
+				else if (main_max_cnt < aux_max_cnt)
+					bb_ant_div->target_ant_tp = AUX_ANT;
+				else {
+					bb_ant_div->target_ant_tp = bb_ant_div->pre_target_ant;
+					bb_rate_i->no_change_flag = true;
+				}
+				/* Calc. TP confidence*/
+				bb_rate_i->tp_diff = DIFF_2(main_max_cnt, aux_max_cnt);
+			}
+		} else {
+			bb_ant_div->target_ant_tp = bb_ant_div->pre_target_ant;
+			bb_rate_i->no_change_flag = true;
+			BB_DBG(bb, DBG_ANT_DIV, "MCS based TargetAnt= Pre-TargetAnt\n");
+		}
+	}
+
+	if (bb_rate_i->no_change_flag == true)
+		bb_rate_i->tp_diff = 0;
+
+	if (bb_rate_i->tp_diff > 100)
+		bb_rate_i->tp_diff = 100;
+
+	BB_DBG(bb, DBG_ANT_DIV, "MCS based TargetAnt= [%s]\n", 
+		(bb_ant_div->target_ant_tp == MAIN_ANT) ? "MAIN_ANT" : "AUX_ANT");
+	BB_DBG(bb, DBG_ANT_DIV, "TP Confidence= [%d]\n", bb_rate_i->tp_diff);
+}
+
+void halbb_antdiv_get_highest_mcs(struct bb_info *bb)
+{
+	struct bb_antdiv_info *bb_ant_div = &bb->bb_ant_div_i;
+
+	if (bb_ant_div->ant_div_new == 1)
+		halbb_antdiv_get_highest_mcs_new(bb);
+	else
+		halbb_antdiv_get_highest_mcs_old(bb);
+
 }
 
 void halbb_antdiv_get_evm_target_ant(struct bb_info *bb)
@@ -664,9 +1488,6 @@ void halbb_antdiv_get_evm_target_ant(struct bb_info *bb)
 		aux_1ss_evm =  (u8)HALBB_DIV(bb_evm_i->aux_evm_1ss, 
 			(bb_rate_i->aux_pkt_cnt_1ss + bb_rate_i->aux_pkt_cnt_ofdm));
 	}
-
-	target_ant_evm_1ss = (main_1ss_evm == aux_1ss_evm) ? 
-	(bb_ant_div->pre_target_ant) : ((main_1ss_evm >= aux_1ss_evm) ? MAIN_ANT : AUX_ANT);
 
 	if (main_1ss_evm == aux_1ss_evm) {
 		target_ant_evm_1ss = bb_ant_div->pre_target_ant;
@@ -865,15 +1686,15 @@ void halbb_antdiv_decision_state(struct bb_info *bb)
 		bb_ant_div->target_ant = bb_ant_div->target_ant_evm;
 	} else {
 		if (bb_rate_i->tp_diff >= bb_ant_div->tp_diff_th_high) {
-			BB_DBG(bb, DBG_ANT_DIV, "TP confidence is %lld > %d, Decided by MCS based\n"
-			,bb_rate_i->tp_diff, bb_ant_div->tp_diff_th_low);
+			BB_DBG(bb, DBG_ANT_DIV, "TP confidence is %d > %d, Decided by MCS based\n"
+			,bb_rate_i->tp_diff, bb_ant_div->tp_diff_th_high);
 			bb_ant_div->target_ant = bb_ant_div->target_ant_tp;
 		} else if (bb_evm_i->evm_diff >= bb_ant_div->evm_diff_th) {
 			BB_DBG(bb, DBG_ANT_DIV, "EVM confidence is more than %d, Decided by EVM based\n"
 						,bb_ant_div->evm_diff_th);
 			bb_ant_div->target_ant = bb_ant_div->target_ant_evm;
 		} else if (bb_rate_i->tp_diff >= bb_ant_div->tp_diff_th_low) {
-			BB_DBG(bb, DBG_ANT_DIV, "TP confidence is %lld > %d, Decided by MCS based\n"
+			BB_DBG(bb, DBG_ANT_DIV, "TP confidence is %d > %d, Decided by MCS based\n"
 			,bb_rate_i->tp_diff, bb_ant_div->tp_diff_th_low);
 			bb_ant_div->target_ant = bb_ant_div->target_ant_tp;
 		} else {
@@ -936,7 +1757,7 @@ void halbb_antdiv_1ss_decision_state(struct bb_info * bb)
 		bb_ant_div->target_ant = bb_ant_div->target_ant_rssi;
 	} else {
 		if (bb_rate_i->tp_diff >= bb_ant_div->tp_diff_th_high) {
-			BB_DBG(bb, DBG_ANT_DIV, "TP confidence is %lld >= %d, Decided by MCS based\n"
+			BB_DBG(bb, DBG_ANT_DIV, "TP confidence is %d >= %d, Decided by MCS based\n"
 			,bb_rate_i->tp_diff, bb_ant_div->tp_diff_th_high);
 			bb_ant_div->target_ant = bb_ant_div->target_ant_tp;
 		} else if (bb_evm_i->evm_diff >= bb_ant_div->evm_diff_th) {
@@ -944,7 +1765,7 @@ void halbb_antdiv_1ss_decision_state(struct bb_info * bb)
 			,bb_ant_div->evm_diff_th);
 			bb_ant_div->target_ant = bb_ant_div->target_ant_evm;
 		} else if (bb_rate_i->tp_diff >= bb_ant_div->tp_diff_th_low) {
-			BB_DBG(bb, DBG_ANT_DIV, "TP confidence is %lld > %d, Decided by MCS based\n"
+			BB_DBG(bb, DBG_ANT_DIV, "TP confidence is %d > %d, Decided by MCS based\n"
 			,bb_rate_i->tp_diff, bb_ant_div->tp_diff_th_low);
 			bb_ant_div->target_ant = bb_ant_div->target_ant_tp;
 		} else if (!bb_rssi_i->no_change_flag) {
@@ -1016,32 +1837,13 @@ void halbb_antenna_diversity(struct bb_info *bb)
 	struct dev_cap_t *dev = &phl->dev_cap;
 	u8 rssi, rssi_pre;
 
-	BB_DBG(bb, DBG_ANT_DIV, "%s ======>\n", __func__);
+	halbb_show_cr_cnt(bb, BB_WD_ANT_DIV);
 
+	BB_DBG(bb, DBG_ANT_DIV, "%s ======>\n", __func__);
 	BB_DBG(bb, DBG_ANT_DIV, "RFE_TYPE = %d\n", dev->rfe_type);
 
-	/* Early return */
-	if (phl_is_mp_mode(bb->phl_com)) {
-		BB_DBG(bb, DBG_ANT_DIV, "Early return - MP mode\n");
+	if (halbb_antdiv_abort(bb))
 		return;
-	}
-
-	if (!(bb->support_ability & BB_ANT_DIV)) {
-		BB_DBG(bb, DBG_ANT_DIV, "Early return - Not support antenna diversity\n");
-		return;
-	}
-
-	if (!(bb_link->is_linked) || !(bb_link->is_one_entry_only)) {
-		BB_DBG(bb, DBG_ANT_DIV, "Early return - is_linked=%d, one_entry_only=%d\n",
-			  bb_link->is_linked, bb_link->is_one_entry_only);
-		return;
-	}
-
-	if (bb_link->at_least_one_bfee) {
-		BB_DBG(bb, DBG_ANT_DIV, "Early return - at least one macid rx bfee=%d\n",
-		       bb_link->at_least_one_bfee);
-		return;
-	}
 
 	halbb_antdiv_get_rssi(bb);
 	rssi = rssi_stat->rssi_final >> 1;
@@ -1259,7 +2061,7 @@ void halbb_antdiv_get_cn_stat(struct bb_info *bb)
 	}
 }
 
-void halbb_antdiv_get_rate_stat(struct bb_info *bb)
+void halbb_antdiv_get_rate_stat_old(struct bb_info *bb, struct physts_rxd *desc, enum channel_width rx_bw)
 {
 	struct bb_cmn_rpt_info	*cmn_rpt = &bb->bb_cmn_rpt_i;
 	//struct bb_pkt_cnt_su_info *pkt_cnt = &cmn_rpt->bb_pkt_cnt_su_i;
@@ -1268,6 +2070,8 @@ void halbb_antdiv_get_rate_stat(struct bb_info *bb)
 	struct bb_antdiv_info *bb_ant_div = &bb->bb_ant_div_i;
 	struct bb_antdiv_rate_info *bb_rate_i = &bb_ant_div->bb_rate_i;
 	struct bb_link_info *bb_link = &bb->bb_link_i;
+	enum channel_width bw_curr; /*max bw in current link mode*/
+	u8 band_idx;
 	u8 ofst = rate_i->idx;
 
 	/* Only get stats @ training period */
@@ -1284,6 +2088,16 @@ void halbb_antdiv_get_rate_stat(struct bb_info *bb)
 
 	//BB_DBG(bb, DBG_ANT_DIV, "Rate mode= %d\n", rate_i->mode);
 	//BB_DBG(bb, DBG_ANT_DIV, "Training antenna= %d\n", bb_ant_div->training_ant);
+
+#ifdef HALBB_DBCC_SUPPORT
+	if (bb->hal_com->dbcc_en && bb->bb_phy_idx == HW_PHY_1) {
+		bw_curr = rx_bw;
+	} else
+#endif
+	{
+		band_idx = (desc->phy_idx == HW_PHY_0) ? 0 : 1;
+		bw_curr = bb->hal_com->band[band_idx].cur_chandef.bw;
+	}
 
 	if(bb_ant_div->training_ant == MAIN_ANT) {
 		/* pkt_cnt acc */
@@ -1315,23 +2129,29 @@ void halbb_antdiv_get_rate_stat(struct bb_info *bb)
 		if (rate_i->mode == BB_HT_MODE) {
 			bb_rate_i->main_ht_pkt_not_zero = true;
 			ofst = NOT_GREATER(ofst, HT_RATE_NUM - 1);
-			bb_rate_i->main_pkt_cnt_ht[ofst]++;
-			/* shift ofst due to mismatch of HT/VHT rate num*/
-			ofst += ((ofst << 3) >> 2);
-			bb_rate_i->main_tp += 
-				      bb_phy_rate_table[ofst + LEGACY_RATE_NUM];
+			if (rx_bw == bw_curr) {
+				bb_rate_i->main_pkt_cnt_ht[ofst]++;
+				/* shift ofst due to mismatch of HT/VHT rate num*/
+				ofst += ((ofst << 3) >> 2);
+				bb_rate_i->main_tp +=
+					      bb_phy_rate_table[ofst + LEGACY_RATE_NUM];
+			}
 		} else if (rate_i->mode == BB_VHT_MODE) {
 			bb_rate_i->main_vht_pkt_not_zero = true;
 			ofst = NOT_GREATER(ofst, VHT_RATE_NUM - 1);
-			bb_rate_i->main_pkt_cnt_vht[ofst]++;
-			bb_rate_i->main_tp += 
-				      bb_phy_rate_table[ofst + LEGACY_RATE_NUM];
+			if (rx_bw == bw_curr) {
+				bb_rate_i->main_pkt_cnt_vht[ofst]++;
+				bb_rate_i->main_tp +=
+					      bb_phy_rate_table[ofst + LEGACY_RATE_NUM];
+			}
 		} else if (rate_i->mode == BB_HE_MODE) {
 			bb_rate_i->main_he_pkt_not_zero = true;
 			ofst = NOT_GREATER(ofst, HE_RATE_NUM - 1);
-			bb_rate_i->main_pkt_cnt_he[ofst]++;
-			bb_rate_i->main_tp += 
-				      bb_phy_rate_table[ofst + LEGACY_RATE_NUM];
+			if (rx_bw == bw_curr) {
+				bb_rate_i->main_pkt_cnt_he[ofst]++;
+				bb_rate_i->main_tp +=
+					      bb_phy_rate_table[ofst + LEGACY_RATE_NUM];
+			}
 		}
 
 	} else if(bb_ant_div->training_ant == AUX_ANT) {
@@ -1362,35 +2182,329 @@ void halbb_antdiv_get_rate_stat(struct bb_info *bb)
 		if (rate_i->mode == BB_HT_MODE) {
 			bb_rate_i->aux_ht_pkt_not_zero = true;
 			ofst = NOT_GREATER(ofst, HT_RATE_NUM - 1);
-			bb_rate_i->aux_pkt_cnt_ht[ofst]++;
-			/* shift ofst due to mismatch of HT/VHT rate num*/
-			ofst += ((ofst >> 3) << 2);
-			bb_rate_i->aux_tp += 
-				      bb_phy_rate_table[ofst + LEGACY_RATE_NUM];
+			if (rx_bw == bw_curr) {
+				bb_rate_i->aux_pkt_cnt_ht[ofst]++;
+				/* shift ofst due to mismatch of HT/VHT rate num*/
+				ofst += ((ofst >> 3) << 2);
+				bb_rate_i->aux_tp +=
+					      bb_phy_rate_table[ofst + LEGACY_RATE_NUM];
+			}
 		} else if (rate_i->mode == BB_VHT_MODE) {
 			bb_rate_i->aux_vht_pkt_not_zero = true;
 			ofst = NOT_GREATER(ofst, VHT_RATE_NUM - 1);
-			bb_rate_i->aux_pkt_cnt_vht[ofst]++;
-			bb_rate_i->aux_tp += 
-				      bb_phy_rate_table[ofst + LEGACY_RATE_NUM];
+			if (rx_bw == bw_curr) {
+				bb_rate_i->aux_pkt_cnt_vht[ofst]++;
+				bb_rate_i->aux_tp +=
+					      bb_phy_rate_table[ofst + LEGACY_RATE_NUM];
+			}
 		} else if (rate_i->mode == BB_HE_MODE) {
 			bb_rate_i->aux_he_pkt_not_zero = true;
 			ofst = NOT_GREATER(ofst, HE_RATE_NUM - 1);
-			bb_rate_i->aux_pkt_cnt_he[ofst]++;
-			bb_rate_i->aux_tp += 
-				      bb_phy_rate_table[ofst + LEGACY_RATE_NUM];
+			if (rx_bw == bw_curr) {
+				bb_rate_i->aux_pkt_cnt_he[ofst]++;
+				bb_rate_i->aux_tp +=
+					      bb_phy_rate_table[ofst + LEGACY_RATE_NUM];
+			}
 		}
 	}
+}
+
+void halbb_antdiv_get_rate_stat_new(struct bb_info *bb, struct physts_rxd *desc, enum channel_width rx_bw)
+{
+	struct bb_cmn_rpt_info	*cmn_rpt = &bb->bb_cmn_rpt_i;
+	//struct bb_pkt_cnt_su_info *pkt_cnt = &cmn_rpt->bb_pkt_cnt_su_i;
+	struct bb_rate_info *rate_i = &cmn_rpt->bb_rate_i;
+	struct bb_antdiv_info *bb_ant_div = &bb->bb_ant_div_i;
+	struct bb_antdiv_rate_info *bb_rate_i = &bb_ant_div->bb_rate_i;
+	struct bb_link_info *bb_link = &bb->bb_link_i;
+	enum channel_width bw_curr; /*max bw in current link mode*/
+	u8 band_idx;
+	u8 ofst = rate_i->idx;
+
+	/* Only get stats @ training period */
+	if (!bb_ant_div->get_stats)
+		return;
+
+	/* Data frame only */
+	#if 0
+	if (bb_ant_div->antdiv_use_ctrl_frame) {
+		if (!bb_link->is_match_bssid)
+			return;
+	}
+	#endif
+
+	//BB_DBG(bb, DBG_ANT_DIV, "Rate mode= %d\n", rate_i->mode);
+	//BB_DBG(bb, DBG_ANT_DIV, "Training antenna= %d\n", bb_ant_div->training_ant);
+
+#ifdef HALBB_DBCC_SUPPORT
+	if (bb->hal_com->dbcc_en && bb->bb_phy_idx == HW_PHY_1) {
+		bw_curr = rx_bw;
+	} else
+#endif
+	{
+		band_idx = (desc->phy_idx == HW_PHY_0) ? 0 : 1;
+		bw_curr = bb->hal_com->band[band_idx].cur_chandef.bw;
+	}
+
+	if(bb_ant_div->training_ant == MAIN_ANT) {
+		/* pkt_cnt acc */
+		//BB_DBG(bb, DBG_ANT_DIV, "MAIN_ANT rate!\n");
+		bb_rate_i->main_cnt_all++;
+		if (rate_i->mode == BB_LEGACY_MODE) {
+			if (cmn_rpt->is_cck_rate)
+				bb_rate_i->main_pkt_cnt_cck++;
+			else
+				bb_rate_i->main_pkt_cnt_ofdm++;
+		} else {
+			bb_rate_i->main_pkt_cnt_t++;
+			if (rate_i->ss == 1)
+				bb_rate_i->main_pkt_cnt_1ss++;
+			else if (rate_i->ss == 2)
+				bb_rate_i->main_pkt_cnt_2ss++;
+		}
+
+		/* rate cnt acc*/
+		if (rate_i->mode == BB_LEGACY_MODE) {
+			bb_rate_i->main_pkt_cnt_legacy[ofst]++;
+			return;
+		}
+
+
+		if (rate_i->ss >= 2 && rate_i->mode >= BB_VHT_MODE)
+			ofst += (HE_VHT_NUM_MCS * (rate_i->ss - 1));
+
+		if (rate_i->mode == BB_HT_MODE) {
+			bb_rate_i->main_ht_pkt_not_zero = true;
+			ofst = NOT_GREATER(ofst, HT_RATE_NUM - 1);
+			switch(rx_bw){
+				case CHANNEL_WIDTH_20:
+					bb_rate_i->main_pkt_cnt_he_sc20[ofst]++;
+					bb_rate_i->main_sc20_occur = true;
+					/* shift ofst due to mismatch of HT/VHT rate num*/
+					ofst += ((ofst << 3) >> 2);
+					bb_rate_i->main_tp +=
+						100 * bb_phy_rate_table[ofst + LEGACY_RATE_NUM];
+				break;
+				case CHANNEL_WIDTH_40:
+					bb_rate_i->main_pkt_cnt_ht[ofst]++;
+					/* shift ofst due to mismatch of HT/VHT rate num*/
+					ofst += ((ofst << 3) >> 2);
+					bb_rate_i->main_tp +=
+						208 * bb_phy_rate_table[ofst + LEGACY_RATE_NUM];
+				break;
+				default:
+					bb_rate_i->main_pkt_cnt_ht[ofst]++;
+					/* shift ofst due to mismatch of HT/VHT rate num*/
+					ofst += ((ofst << 3) >> 2);
+					bb_rate_i->main_tp +=
+						208 * bb_phy_rate_table[ofst + LEGACY_RATE_NUM];
+			}
+		} else if (rate_i->mode == BB_VHT_MODE) {
+			bb_rate_i->main_vht_pkt_not_zero = true;
+			ofst = NOT_GREATER(ofst, VHT_RATE_NUM - 1);
+			switch(rx_bw){
+				case CHANNEL_WIDTH_20:
+					bb_rate_i->main_pkt_cnt_vht_sc20[ofst]++;
+					bb_rate_i->main_sc20_occur = true;
+					bb_rate_i->main_tp +=
+					      100 * bb_phy_rate_table[ofst + LEGACY_RATE_NUM];
+				break;
+				case CHANNEL_WIDTH_40:
+					bb_rate_i->main_pkt_cnt_vht_sc40[ofst]++;
+					bb_rate_i->main_sc40_occur = true;
+					bb_rate_i->main_tp +=
+					      208 * bb_phy_rate_table[ofst + LEGACY_RATE_NUM];
+				break;
+				case CHANNEL_WIDTH_80:
+					bb_rate_i->main_pkt_cnt_vht_sc80[ofst]++;
+					bb_rate_i->main_sc80_occur = true;
+					bb_rate_i->main_tp +=
+					      450 * bb_phy_rate_table[ofst + LEGACY_RATE_NUM];
+				break;
+				case CHANNEL_WIDTH_160:
+					bb_rate_i->main_pkt_cnt_vht[ofst]++;
+					bb_rate_i->main_tp +=
+					   	900 * bb_phy_rate_table[ofst + LEGACY_RATE_NUM];
+				break;
+				default:
+					bb_rate_i->main_pkt_cnt_vht[ofst]++;
+					bb_rate_i->main_tp +=
+					   	900 * bb_phy_rate_table[ofst + LEGACY_RATE_NUM];
+			}
+		} else if (rate_i->mode == BB_HE_MODE) {
+			bb_rate_i->main_he_pkt_not_zero = true;
+			ofst = NOT_GREATER(ofst, HE_RATE_NUM - 1);
+			switch(rx_bw){
+				case CHANNEL_WIDTH_20:
+					bb_rate_i->main_sc20_occur = true;
+					bb_rate_i->main_pkt_cnt_he_sc20[ofst]++;
+					bb_rate_i->main_tp +=
+						113 *bb_phy_rate_table[ofst + LEGACY_RATE_NUM];
+				break;
+				case CHANNEL_WIDTH_40:
+					bb_rate_i->main_sc40_occur = true;
+					bb_rate_i->main_pkt_cnt_he_sc40[ofst]++;
+					bb_rate_i->main_tp +=
+							226 * bb_phy_rate_table[ofst + LEGACY_RATE_NUM];
+				break;
+				case CHANNEL_WIDTH_80:
+					bb_rate_i->main_sc80_occur = true;
+					bb_rate_i->main_pkt_cnt_he_sc80[ofst]++;
+					bb_rate_i->main_tp +=
+						474 * bb_phy_rate_table[ofst + LEGACY_RATE_NUM];//1.13 * 4.19
+				break;
+				case CHANNEL_WIDTH_160:
+					bb_rate_i->main_pkt_cnt_he[ofst]++;
+					bb_rate_i->main_tp +=
+						947 * bb_phy_rate_table[ofst + LEGACY_RATE_NUM]; //1.13 * 8.38
+				break;
+				default:
+					bb_rate_i->main_pkt_cnt_he[ofst]++;
+					bb_rate_i->main_tp +=
+						947 * bb_phy_rate_table[ofst + LEGACY_RATE_NUM]; //1.13 * 8.38
+			}
+		}
+
+	} else if(bb_ant_div->training_ant == AUX_ANT) {
+		bb_rate_i->aux_cnt_all++;
+		//BB_DBG(bb, DBG_ANT_DIV, "Aux_ANT rate!\n");
+		/* pkt_cnt acc */
+		if (rate_i->mode == BB_LEGACY_MODE) {
+			if (cmn_rpt->is_cck_rate)
+				bb_rate_i->aux_pkt_cnt_cck++;
+			else
+				bb_rate_i->aux_pkt_cnt_ofdm++;
+		} else {
+			bb_rate_i->aux_pkt_cnt_t++;
+			if (rate_i->ss == 1)
+				bb_rate_i->aux_pkt_cnt_1ss++;
+			else if (rate_i->ss == 2)
+				bb_rate_i->aux_pkt_cnt_2ss++;
+		}
+
+		if (rate_i->mode == BB_LEGACY_MODE) {
+			bb_rate_i->aux_pkt_cnt_legacy[ofst]++;
+			return;
+		}
+
+		if (rate_i->ss >= 2 && rate_i->mode >= BB_VHT_MODE)
+			ofst += (HE_VHT_NUM_MCS * (rate_i->ss - 1));
+
+		if (rate_i->mode == BB_HT_MODE) {
+			bb_rate_i->aux_ht_pkt_not_zero = true;
+			ofst = NOT_GREATER(ofst, HT_RATE_NUM - 1);
+			switch(rx_bw){
+				case CHANNEL_WIDTH_20:
+					bb_rate_i->aux_pkt_cnt_he_sc20[ofst]++;
+					bb_rate_i->aux_sc20_occur = true;
+					/* shift ofst due to mismatch of HT/VHT rate num*/
+					ofst += ((ofst >> 3) << 2);
+					bb_rate_i->aux_tp +=
+					    100 * bb_phy_rate_table[ofst + LEGACY_RATE_NUM];
+				break;
+				case CHANNEL_WIDTH_40:
+					bb_rate_i->aux_pkt_cnt_ht[ofst]++;
+					/* shift ofst due to mismatch of HT/VHT rate num*/
+					ofst += ((ofst >> 3) << 2);
+					bb_rate_i->aux_tp +=
+						208 * bb_phy_rate_table[ofst + LEGACY_RATE_NUM];
+				break;
+				default:
+					bb_rate_i->aux_pkt_cnt_ht[ofst]++;
+					/* shift ofst due to mismatch of HT/VHT rate num*/
+					ofst += ((ofst >> 3) << 2);
+					bb_rate_i->aux_tp +=
+						208 * bb_phy_rate_table[ofst + LEGACY_RATE_NUM];
+			}
+		} else if (rate_i->mode == BB_VHT_MODE) {
+			bb_rate_i->aux_vht_pkt_not_zero = true;
+			ofst = NOT_GREATER(ofst, VHT_RATE_NUM - 1);
+			switch(rx_bw){
+				case CHANNEL_WIDTH_20:
+					bb_rate_i->aux_pkt_cnt_vht_sc20[ofst]++;
+					bb_rate_i->aux_sc20_occur = true;
+					bb_rate_i->aux_tp +=
+					      100 * bb_phy_rate_table[ofst + LEGACY_RATE_NUM];
+				break;
+				case CHANNEL_WIDTH_40:
+					bb_rate_i->aux_pkt_cnt_vht_sc40[ofst]++;
+					bb_rate_i->aux_sc40_occur = true;
+					bb_rate_i->aux_tp +=
+					      208 * bb_phy_rate_table[ofst + LEGACY_RATE_NUM];
+				break;
+				case CHANNEL_WIDTH_80:
+					bb_rate_i->aux_pkt_cnt_vht_sc80[ofst]++;
+					bb_rate_i->aux_sc80_occur = true;
+					bb_rate_i->aux_tp +=
+					      450 * bb_phy_rate_table[ofst + LEGACY_RATE_NUM];
+				break;
+				case CHANNEL_WIDTH_160:
+					bb_rate_i->aux_pkt_cnt_vht[ofst]++;
+					bb_rate_i->aux_tp +=
+						900 * bb_phy_rate_table[ofst + LEGACY_RATE_NUM];
+				break;
+				default:
+					bb_rate_i->aux_pkt_cnt_vht[ofst]++;
+					bb_rate_i->aux_tp +=
+						900 * bb_phy_rate_table[ofst + LEGACY_RATE_NUM];
+			}
+		} else if (rate_i->mode == BB_HE_MODE) {
+			bb_rate_i->aux_he_pkt_not_zero = true;
+			ofst = NOT_GREATER(ofst, HE_RATE_NUM - 1);
+			switch(rx_bw){
+				case CHANNEL_WIDTH_20:
+					bb_rate_i->aux_sc20_occur = true;
+					bb_rate_i->aux_pkt_cnt_he_sc20[ofst]++;
+					bb_rate_i->aux_tp +=
+						113 * bb_phy_rate_table[ofst + LEGACY_RATE_NUM];
+				break;
+				case CHANNEL_WIDTH_40:
+					bb_rate_i->aux_sc40_occur = true;
+					bb_rate_i->aux_pkt_cnt_he_sc40[ofst]++;
+					bb_rate_i->aux_tp +=
+					      226 * bb_phy_rate_table[ofst + LEGACY_RATE_NUM];
+				break;
+				case CHANNEL_WIDTH_80:
+					bb_rate_i->aux_sc80_occur = true;
+					bb_rate_i->aux_pkt_cnt_he_sc80[ofst]++;
+					bb_rate_i->aux_tp +=
+						474 * bb_phy_rate_table[ofst + LEGACY_RATE_NUM];
+				break;
+				case CHANNEL_WIDTH_160:
+					bb_rate_i->aux_pkt_cnt_he[ofst]++;
+					bb_rate_i->aux_tp +=
+						947 * bb_phy_rate_table[ofst + LEGACY_RATE_NUM];
+				break;
+				default:
+					bb_rate_i->aux_pkt_cnt_he[ofst]++;
+					bb_rate_i->aux_tp +=
+						947 * bb_phy_rate_table[ofst + LEGACY_RATE_NUM];
+			}
+		}
+	}
+}
+
+void halbb_antdiv_get_rate_stat(struct bb_info *bb, struct physts_rxd *desc, enum channel_width rx_bw)
+{
+	struct bb_antdiv_info *bb_ant_div = &bb->bb_ant_div_i;
+
+	if (bb_ant_div->ant_div_new == 1)
+		halbb_antdiv_get_rate_stat_new(bb, desc, rx_bw);
+	else
+		halbb_antdiv_get_rate_stat_old(bb, desc, rx_bw);
+
 }
 
 void halbb_antdiv_phy_sts(struct bb_info *bb, u32 physts_bitmap,
 		       struct physts_rxd *desc) {
 
 	struct bb_physts_info	*physts = &bb->bb_physts_i;
+	struct bb_physts_rslt_1_info *psts_1 = &physts->bb_physts_rslt_1_i;
 	struct dev_cap_t *dev = &bb->phl_com->dev_cap;
 	struct rtw_phl_stainfo_t *sta;
 	struct rtw_cfo_info *cfo_t = NULL;
-	u8 bb_macid;
+	enum channel_width rx_bw = psts_1->bw_idx;
+	u16 bb_macid;
 
 	halbb_antdiv_get_rssi_stat(bb);
 
@@ -1398,20 +2512,22 @@ void halbb_antdiv_phy_sts(struct bb_info *bb, u32 physts_bitmap,
 	    physts->bb_physts_rslt_hdr_i.ie_map_type >= LEGACY_OFDM_PKT))
 		return;
 
-	if (desc->macid_su > PHL_MAX_STA_NUM)
+	if (desc->macid_su >= PHL_MAX_STA_NUM) {
 		BB_WARNING("[%s] macid_su=%d\n", __func__, desc->macid_su);
-
+		return;
+	}
 	bb_macid = bb->phl2bb_macid_table[desc->macid_su];
 
-	if (bb_macid > PHL_MAX_STA_NUM)
+	if (bb_macid >= PHL_MAX_STA_NUM) {
 		BB_WARNING("[%s] bb_macid=%d\n", __func__, bb_macid);
-
+		return;
+	}
 	sta = bb->phl_sta_info[bb_macid];
 
 	if (!is_sta_active(sta))
 		return;
 
-	if (sta->macid > PHL_MAX_STA_NUM)
+	if (sta->macid >= PHL_MAX_STA_NUM)
 		return;
 
 	if (!sta->hal_sta)
@@ -1420,7 +2536,7 @@ void halbb_antdiv_phy_sts(struct bb_info *bb, u32 physts_bitmap,
 	if ((dev->rfe_type >= 50) && (bb_macid == 0)) /* No need to cnt AP Rx boardcast pkt*/
 		return;
 
-	halbb_antdiv_get_rate_stat(bb);
+	halbb_antdiv_get_rate_stat(bb, desc, rx_bw);
 	halbb_antdiv_get_evm_stat(bb);
 	halbb_antdiv_get_cn_stat(bb);
 }
@@ -1429,7 +2545,7 @@ void halbb_antdiv_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 			      char *output, u32 *_out_len)
 {
 	struct bb_antdiv_info *bb_ant_div = &bb->bb_ant_div_i;
-	struct bb_antdiv_cr_info *cr = &bb->bb_ant_div_i.bb_antdiv_cr_i;
+	struct bb_antdiv_cr_info *cr = &bb->bb_cmn_hooker->bb_antdiv_cr_i;
 
 	char help[] = "-h";
 	u32 var[10] = {0};
@@ -1464,6 +2580,10 @@ void halbb_antdiv_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
 			 "Set fix_ant_rssi_diff_th: {12} {th}\n");
 		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
+			 "Set tx_by_ext_pwr_lmt: {13} {en}\n");
+		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
+			 "New ant_div method enable: {14} {0}:old code. {1}: new code: extend to sub BW MCS.\n");
+		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
 			 "Show all parameter: {100}\n");
 		BB_DBG_CNSL(out_len, used, output + used, out_len - used,
 			 "[ONLY DEBUG] {101} 0x586c[16]={0,1}\n");
@@ -1481,9 +2601,11 @@ void halbb_antdiv_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 				 "Ant-Div Mode=%d\n", bb_ant_div->antdiv_mode);
 			if (bb_ant_div->antdiv_mode == FIX_MAIN_ANT) {
 				halbb_antdiv_set_ant(bb, MAIN_ANT);
+				bb_ant_div->target_ant = MAIN_ANT;
 				bb_ant_div->pre_target_ant = MAIN_ANT;
 			} else if (bb_ant_div->antdiv_mode == FIX_AUX_ANT) {
 				halbb_antdiv_set_ant(bb, AUX_ANT);
+				bb_ant_div->target_ant = AUX_ANT;
 				bb_ant_div->pre_target_ant = AUX_ANT;
 			} else if (bb_ant_div->antdiv_mode == AUTO_ANT)
 				halbb_antdiv_set_ant(bb, bb_ant_div->pre_target_ant);
@@ -1554,6 +2676,17 @@ void halbb_antdiv_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 			bb_ant_div->fixant_rssi_diff = (u8)var[1];
 			BB_DBG_CNSL(out_len, used, output + used, out_len - used,
 				 "fixant_rssi_diff_th =%d\n", bb_ant_div->fixant_rssi_diff);
+		} else if (var[0] == 13) {
+			HALBB_SCAN(input[2], DCMD_DECIMAL, &var[1]);
+			bb_ant_div->tx_by_ext_pwr_lmt = (bool)var[1];
+			BB_DBG_CNSL(out_len, used, output + used, out_len - used,
+				    "tx_by_ext_pwr_lmt=%d\n",
+				    bb_ant_div->tx_by_ext_pwr_lmt);
+		} else if (var[0] == 14) {
+			HALBB_SCAN(input[2], DCMD_DECIMAL, &var[1]);
+			bb_ant_div->ant_div_new = (bool)var[1];
+			BB_DBG(bb, DBG_ANT_DIV, "New ant_div method enable =(( %d ))\n",
+						bb_ant_div->ant_div_new);
 		} else if (var[0] == 100) {
 			BB_DBG_CNSL(out_len, used, output + used, out_len - used,
 				 "Ant-Div Mode = {%d}\n", bb_ant_div->antdiv_mode);
@@ -1583,6 +2716,8 @@ void halbb_antdiv_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 				 bb_ant_div->rssi_diff_th);
 			BB_DBG_CNSL(out_len, used, output + used, out_len - used,
 				 "TP lower bound = {%d}\n", bb_ant_div->tp_lb);
+			BB_DBG_CNSL(out_len, used, output + used, out_len - used,
+				 "New ant_div method enable = {%d}\n", bb_ant_div->ant_div_new);
 		} else if (var[0] == 101) {
 			HALBB_SCAN(input[2], DCMD_DECIMAL, &var[1]);
 			halbb_set_reg_cmn(bb, cr->path0_r_antsel, BIT(16), var[1], HW_PHY_0);
@@ -1609,10 +2744,7 @@ void halbb_antdiv_callback(void *context)
 	BB_DBG(bb, DBG_ANT_DIV, "[%s]===>\n", __func__);
 	timer->timer_state = BB_TIMER_IDLE;
 
-	if (bb->phl_com->hci_type == RTW_HCI_PCIE)
-		halbb_antdiv_io_en(bb);
-	else
-		rtw_hal_cmd_notify(bb->phl_com, MSG_EVT_NOTIFY_BB, (void *)(&timer->event_idx), bb->bb_phy_idx);
+	rtw_hal_cmd_notify(bb->phl_com, MSG_EVT_NOTIFY_BB, (void *)(&timer->event_idx), bb->bb_phy_idx);
 }
 
 void halbb_antdiv_timer_init(struct bb_info *bb)
@@ -1629,7 +2761,7 @@ void halbb_antdiv_timer_init(struct bb_info *bb)
 
 void halbb_cr_cfg_antdiv_init(struct bb_info *bb)
 {
-	struct bb_antdiv_cr_info *cr = &bb->bb_ant_div_i.bb_antdiv_cr_i;
+	struct bb_antdiv_cr_info *cr = &bb->bb_cmn_hooker->bb_antdiv_cr_i;
 
 	switch (bb->cr_type) {
 	#ifdef HALBB_COMPILE_AP_SERIES

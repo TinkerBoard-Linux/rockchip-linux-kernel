@@ -16,6 +16,7 @@
 #include <drv_types.h>
 
 #ifdef CONFIG_IOCTL_CFG80211
+#if !RTW_PER_ADAPTER_WIPHY
 void rtw_chset_hook_os_channels(struct rtw_chset *chset, void *os_ref)
 {
 	struct wiphy *wiphy = os_ref;
@@ -31,6 +32,7 @@ void rtw_chset_hook_os_channels(struct rtw_chset *chset, void *os_ref)
 		chset->chs[i].os_chan = ch;
 	}
 }
+#endif
 
 #if CONFIG_RTW_CFG80211_CAC_EVENT
 static void rtw_regd_set_du_chdef(struct wiphy *wiphy)
@@ -147,7 +149,16 @@ static void rtw_regd_schedule_dfs_chan_update(struct wiphy *wiphy)
 		rtw_regd_set_du_chdef(wiphy);
 	}
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 9, 0))
+	cfg80211_ch_switch_notify(wiphy_data->du_wdev->netdev, &wiphy_data->du_chdef, 0);
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 3, 0)) || defined(CONFIG_MLD_KERNEL_PATCH)
+	/* ToDo CONFIG_RTW_MLD */
+	cfg80211_ch_switch_notify(wiphy_data->du_wdev->netdev, &wiphy_data->du_chdef, 0, 0);
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 19, 2))
+	cfg80211_ch_switch_notify(wiphy_data->du_wdev->netdev, &wiphy_data->du_chdef, 0);
+#else
 	cfg80211_ch_switch_notify(wiphy_data->du_wdev->netdev, &wiphy_data->du_chdef);
+#endif
 }
 
 static void rtw_regd_override_dfs_state(struct wiphy *wiphy, struct get_chplan_resp *chplan, bool non_ocp_only)
@@ -438,7 +449,11 @@ static void rtw_regd_overide_flags(struct wiphy *wiphy, struct get_chplan_resp *
 	for (i = 0; i < chs_len; i++) {
 		if (chs[i].flags & RTW_CHF_DIS)
 			continue;
+		#if RTW_PER_ADAPTER_WIPHY
+		ch = ieee80211_get_channel(wiphy, rtw_bch2freq(chs[i].band, chs[i].ChannelNum));
+		#else
 		ch = chs[i].os_chan;
+		#endif
 		if (!ch)
 			continue;
 
@@ -563,6 +578,17 @@ void rtw_chset_apply_from_os(struct rtw_chset *chset, u8 d_flags)
 	rtw_chset_apply_wiphy_chans(chset, d_flags);
 }
 
+enum country_ie_slave_en_mode rtw_os_get_cis_en_mode(_adapter *adapter)
+{
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0))
+	struct wiphy *wiphy = adapter_to_wiphy(adapter);
+
+	if (wiphy->regulatory_flags & REGULATORY_COUNTRY_IE_IGNORE)
+		return CISEM_DISABLE;
+#endif
+	return CISEM_ENABLE;
+}
+
 s16 rtw_os_get_total_txpwr_regd_lmt_mbm(_adapter *adapter, enum band_type band, u8 cch, enum channel_width bw)
 {
 	struct wiphy *wiphy = adapter_to_wiphy(adapter);
@@ -611,6 +637,20 @@ static enum rtw_dfs_regd nl80211_dfs_regions_to_rtw_dfs_region(enum nl80211_dfs_
 	}
 };
 #endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 3, 0)) */
+
+static enum rtw_env_t environment_cap_to_rtw_env(enum environment_cap env)
+{
+	switch (env) {
+	case ENVIRON_INDOOR:
+		return RTW_ENV_INDOOR;
+	case ENVIRON_OUTDOOR:
+		return RTW_ENV_OUTDOOR;
+	case ENVIRON_ANY:
+		return RTW_ENV_ANY;
+	}
+	rtw_warn_on(1);
+	return RTW_ENV_NUM;
+}
 #endif /* CONFIG_REGD_SRC_FROM_OS */
 
 static enum rtw_regd_inr nl80211_reg_initiator_to_rtw_regd_inr(enum nl80211_reg_initiator initiator)
@@ -627,7 +667,7 @@ static enum rtw_regd_inr nl80211_reg_initiator_to_rtw_regd_inr(enum nl80211_reg_
 	}
 	rtw_warn_on(1);
 	return RTW_REGD_SET_BY_NUM;
-};
+}
 
 #ifdef CONFIG_RTW_DEBUG
 static const char *nl80211_reg_initiator_str(enum nl80211_reg_initiator initiator)
@@ -756,13 +796,17 @@ static void rtw_reg_notifier(struct wiphy *wiphy, struct regulatory_request *req
 #ifdef CONFIG_REGD_SRC_FROM_OS
 	if (REGSTY_REGD_SRC_FROM_OS(regsty)) {
 		enum rtw_dfs_regd dfs_region =  RTW_DFS_REGD_NONE;
+		enum rtw_env_t env = RTW_ENV_NUM;
 
 		#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 3, 0))
 		dfs_region = nl80211_dfs_regions_to_rtw_dfs_region(request->dfs_region);
 		#endif
 
+		if (request->initiator == NL80211_REGDOM_SET_BY_COUNTRY_IE)
+			env = environment_cap_to_rtw_env(request->country_ie_env);
+
 		/* trigger command to sync regulatory form OS */
-		rtw_sync_os_regd_cmd(wiphy_to_adapter(wiphy), RTW_CMDF_WAIT_ACK, request->alpha2, dfs_region, inr);
+		rtw_sync_os_regd_cmd(wiphy_to_adapter(wiphy), RTW_CMDF_WAIT_ACK, request->alpha2, dfs_region, env, inr);
 	} else
 #endif
 	{
@@ -771,7 +815,7 @@ static void rtw_reg_notifier(struct wiphy *wiphy, struct regulatory_request *req
 
 		switch (request->initiator) {
 		case NL80211_REGDOM_SET_BY_USER:
-			rtw_set_country(wiphy_to_adapter(wiphy), request->alpha2, inr);
+			rtw_set_country(wiphy_to_adapter(wiphy), request->alpha2, RTW_ENV_NUM, inr);
 			break;
 		case NL80211_REGDOM_SET_BY_DRIVER:
 		case NL80211_REGDOM_SET_BY_CORE:
@@ -1041,7 +1085,11 @@ static void rtw_cfg80211_cac_event(struct rf_ctl_t *rfctl, u8 band_idx
 			continue;
 		if (!iface->rtw_wdev)
 			continue;
+#if defined(CONFIG_MLD_KERNEL_PATCH) || (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 19, 2))
+		async = !((iface->rtw_wdev)->links[0].ap.chandef.chan);
+#else
 		async = !iface->rtw_wdev->chandef.chan;
+#endif
 		RTW_INFO(FUNC_ADPT_FMT" async:%d\n", caller, ADPT_ARG(iface), async);
 		if (async)
 			cfg80211_cac_event_async(iface->pnetdev, &chdef, event);
@@ -1192,6 +1240,7 @@ void rtw_cfg80211_cac_force_finished(struct rf_ctl_t *rfctl, u8 band_idx
 		if (!iface->rtw_wdev) {
 			finished_ifbmp &= ~BIT(iface->iface_id);
 			started_ifbmp &= ~BIT(iface->iface_id);
+			continue;
 		}
 		if (need_start && iface->rtw_wdev->cac_started)
 			started_ifbmp &= ~BIT(iface->iface_id);
@@ -1265,20 +1314,25 @@ int rtw_regd_init(struct wiphy *wiphy)
 #else
 	wiphy->regulatory_flags &= ~REGULATORY_STRICT_REG;
 	wiphy->regulatory_flags &= ~REGULATORY_DISABLE_BEACON_HINTS;
+	wiphy->regulatory_flags &= ~REGULATORY_COUNTRY_IE_IGNORE;
 #endif
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 19, 0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 19, 0)) && (LINUX_VERSION_CODE < KERNEL_VERSION(6, 1, 39))
 	wiphy->regulatory_flags |= REGULATORY_IGNORE_STALE_KICKOFF;
 #endif
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 0, 0))
 	if (rtw_regd_is_wiphy_self_managed(wiphy))
 		wiphy->regulatory_flags |= REGULATORY_WIPHY_SELF_MANAGED;
+	else
+#endif
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0))
+	if (!REGSTY_REGD_SRC_OS_11D(dvobj_to_regsty(wiphy_to_dvobj(wiphy))))
+		wiphy->regulatory_flags |= REGULATORY_COUNTRY_IE_IGNORE;
 #endif
 
 #if defined(CONFIG_DFS_MASTER) && (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0))
 	if (rtw_regd_is_wiphy_self_managed(wiphy)
-		&& rtw_rfctl_radar_detect_supported(dvobj_to_rfctl(wiphy_to_dvobj(wiphy)))
 		&& wiphy->bands[NL80211_BAND_5GHZ])
 		wiphy_ext_feature_set(wiphy, NL80211_EXT_FEATURE_DFS_OFFLOAD);
 #endif

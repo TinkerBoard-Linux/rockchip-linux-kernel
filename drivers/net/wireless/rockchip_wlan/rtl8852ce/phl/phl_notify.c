@@ -123,6 +123,12 @@ void rtw_phl_dev_terminate_ntf(void *phl)
 	struct phl_info_t *phl_info = (struct phl_info_t *)phl;
 
 	SET_STATUS_FLAG(phl_info->phl_com->dev_state, RTW_DEV_SURPRISE_REMOVAL);
-	phl_disp_eng_notify_shall_stop(phl_info);
+	phl_disp_eng_notify_shall_stop(phl_info, true);
 	rtw_hal_notification(phl_info->hal, MSG_EVT_SURPRISE_REMOVE, HW_BAND_MAX);
+}
+
+void rtw_phl_dev_shall_stop_ntf(void *phl)
+{
+	struct phl_info_t *phl_info = (struct phl_info_t *)phl;
+	phl_disp_eng_notify_shall_stop(phl_info, false);
 }

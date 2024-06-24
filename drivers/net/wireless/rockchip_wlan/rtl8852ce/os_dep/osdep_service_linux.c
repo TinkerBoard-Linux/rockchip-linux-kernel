@@ -45,6 +45,22 @@ void _rtw_skb_queue_purge(struct sk_buff_head *list)
 		_rtw_skb_free(skb);
 }
 
+#ifdef CONFIG_RTW_NEON_MODE
+void _rtw_neon_memcpy(volatile void *dst, volatile const void *src, u32 sz)
+{
+    if (sz & 63) {
+        sz = (sz & -64) + 64;
+    }
+    asm volatile (
+        "NEONCopyPLD:                          \n"
+        "    VLDM %[src]!,{d0-d7}                 \n"
+        "    VSTM %[dst]!,{d0-d7}                 \n"
+        "    SUBS %[sz],%[sz],#0x40                 \n"
+        "    BGT NEONCopyPLD                  \n"
+        : [dst]"+r"(dst), [src]"+r"(src), [sz]"+r"(sz) : : "d0", "d1", "d2", "d3", "d4", "d5", "d6", "d7", "cc", "memory");
+}
+#endif
+
 void _rtw_memcpy(void *dst, const void *src, u32 sz)
 {
 	memcpy(dst, src, sz);
@@ -179,6 +195,169 @@ inline bool _rtw_time_after(systime a, systime b)
 inline bool _rtw_time_after_eq(systime a, systime b)
 {
 	return time_after_eq(a, b);
+}
+
+sysptime rtw_sptime_get(void)
+{
+	return ktime_get(); /* CLOCK_MONOTONIC */
+}
+
+sysptime rtw_sptime_get_raw(void)
+{
+	return ktime_get_raw(); /* CLOCK_MONOTONIC_RAW */
+}
+
+sysptime rtw_sptime_set(s64 secs, const u32 nsecs)
+{
+	return ktime_set(secs, nsecs);
+}
+
+sysptime rtw_sptime_zero(void)
+{
+	return ktime_set(0, 0);
+}
+
+/*
+ *   cmp1  < cmp2: return <0
+ *   cmp1 == cmp2: return 0
+ *   cmp1  > cmp2: return >0
+ */
+int rtw_sptime_cmp(const sysptime cmp1, const sysptime cmp2)
+{
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 8, 0))
+	return ktime_compare(cmp1, cmp2);
+#else
+	if (cmp1.tv64 < cmp2.tv64)
+		return -1;
+	if (cmp1.tv64 > cmp2.tv64)
+		return 1;
+	return 0;
+#endif
+}
+
+bool rtw_sptime_eql(const sysptime cmp1, const sysptime cmp2)
+{
+	return rtw_sptime_cmp(cmp1, cmp2) == 0;
+}
+
+bool rtw_sptime_is_zero(const sysptime sptime)
+{
+	return rtw_sptime_cmp(sptime, rtw_sptime_zero()) == 0;
+}
+
+/*
+ * sub = lhs - rhs, in normalized form
+ */
+sysptime rtw_sptime_sub(const sysptime lhs, const sysptime rhs)
+{
+	return ktime_sub(lhs, rhs);
+}
+
+/*
+ * add = lhs + rhs, in normalized form
+ */
+sysptime rtw_sptime_add(const sysptime lhs, const sysptime rhs)
+{
+	return ktime_add(lhs, rhs);
+}
+
+s64 rtw_sptime_to_ms(const sysptime sptime)
+{
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 35))
+	return ktime_to_ms(sptime);
+#else
+	struct timeval tv = ktime_to_timeval(sptime);
+
+	return (s64) tv.tv_sec * MSEC_PER_SEC + tv.tv_usec / USEC_PER_MSEC;
+#endif
+}
+
+sysptime rtw_ms_to_sptime(u64 ms)
+{
+	return ns_to_ktime(ms * NSEC_PER_MSEC);
+}
+
+s64 rtw_sptime_to_us(const sysptime sptime)
+{
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 22))
+	return ktime_to_us(sptime);
+#else
+	struct timeval tv = ktime_to_timeval(sptime);
+
+	return (s64) tv.tv_sec * USEC_PER_SEC + tv.tv_usec;
+#endif
+}
+
+sysptime rtw_us_to_sptime(u64 us)
+{
+	return ns_to_ktime(us * NSEC_PER_USEC);
+}
+
+s64 rtw_sptime_to_ns(const sysptime sptime)
+{
+	return ktime_to_ns(sptime);
+}
+
+sysptime rtw_ns_to_sptime(u64 ns)
+{
+	return ns_to_ktime(ns);
+}
+
+s64 rtw_sptime_diff_ms(const sysptime start, const sysptime end)
+{
+	sysptime diff;
+
+	diff = rtw_sptime_sub(end, start);
+
+	return rtw_sptime_to_ms(diff);
+}
+
+s64 rtw_sptime_pass_ms(const sysptime start)
+{
+	sysptime cur, diff;
+
+	cur = rtw_sptime_get();
+	diff = rtw_sptime_sub(cur, start);
+
+	return rtw_sptime_to_ms(diff);
+}
+
+s64 rtw_sptime_diff_us(const sysptime start, const sysptime end)
+{
+	sysptime diff;
+
+	diff = rtw_sptime_sub(end, start);
+
+	return rtw_sptime_to_us(diff);
+}
+
+s64 rtw_sptime_pass_us(const sysptime start)
+{
+	sysptime cur, diff;
+
+	cur = rtw_sptime_get();
+	diff = rtw_sptime_sub(cur, start);
+
+	return rtw_sptime_to_us(diff);
+}
+
+s64 rtw_sptime_diff_ns(const sysptime start, const sysptime end)
+{
+	sysptime diff;
+
+	diff = rtw_sptime_sub(end, start);
+
+	return rtw_sptime_to_ns(diff);
+}
+
+s64 rtw_sptime_pass_ns(const sysptime start)
+{
+	sysptime cur, diff;
+
+	cur = rtw_sptime_get();
+	diff = rtw_sptime_sub(cur, start);
+
+	return rtw_sptime_to_ns(diff);
 }
 
 void rtw_sleep_schedulable(int ms)
@@ -383,6 +562,32 @@ inline int rtw_test_and_set_bit(int nr, unsigned long *addr)
 	return test_and_set_bit(nr, addr);
 }
 
+#if defined(CONFIG_RTW_ANDROID_GKI) && !defined(CONFIG_LOAD_FILE_BY_REQ_FW_API)
+#define CONFIG_LOAD_FILE_BY_REQ_FW_API
+#endif
+
+#ifdef CONFIG_LOAD_FILE_BY_REQ_FW_API
+#include <linux/firmware.h>
+
+static const char *get_file_name_from_path(const char *path)
+{
+	char *ret;
+	size_t path_len;
+
+	if (!path)
+		return NULL;
+
+	path_len = strlen(path);
+	if (path_len == 0)
+		return NULL;
+
+	ret = strrchr(path, '/');
+	if (ret && ret - path < path_len)
+		return ret + 1;
+	return NULL;
+}
+#endif /* CONFIG_LOAD_FILE_BY_REQ_FW_API */
+
 #if !defined(CONFIG_RTW_ANDROID_GKI)
 /*
 * Open a file with the specific @param path, @param flag, @param mode
@@ -492,6 +697,7 @@ static int isDirReadable(const char *pathname, u32 *sz)
 
 	return kern_path(pathname, LOOKUP_FOLLOW, &path);
 }
+#endif /* !defined(CONFIG_RTW_ANDROID_GKI)*/
 
 /*
 * Test if the specifi @param path is a file and readable
@@ -501,6 +707,38 @@ static int isDirReadable(const char *pathname, u32 *sz)
 */
 static int isFileReadable(const char *path, u32 *sz)
 {
+#if defined(CONFIG_LOAD_FILE_BY_REQ_FW_API)
+	int ret = -EINVAL;
+	const struct firmware *fw = NULL;
+	const char *name;
+
+	if (path == NULL) {
+		RTW_ERR("%s() NULL pointer\n", __func__);
+		goto exit;
+	}
+
+	name = get_file_name_from_path(path);
+	if (name == NULL) {
+		RTW_ERR("%s() parsing file name fail\n", __func__);
+		goto exit;
+	}
+
+	/* request_firmware() will find file in /vendor/firmware but not in path */
+	ret = request_firmware(&fw, name, NULL);
+	if (ret != 0) {
+		RTW_ERR("%s() request_firmware file : %s, error : %d\n", __func__, name, ret);
+		goto exit;
+	}
+
+	if (sz)
+		*sz = (u32)fw->size;
+
+exit:
+	if (fw)
+		release_firmware(fw);
+
+	return ret;
+#else /* !defined(CONFIG_LOAD_FILE_BY_REQ_FW_API) */
 	struct file *fp;
 	int ret = 0;
 	#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0))
@@ -538,8 +776,8 @@ static int isFileReadable(const char *path, u32 *sz)
 		filp_close(fp, NULL);
 	}
 	return ret;
+#endif /* defined(CONFIG_LOAD_FILE_BY_REQ_FW_API) */
 }
-#endif /* !defined(CONFIG_RTW_ANDROID_GKI)*/
 
 /*
 * Open the file with @param path and retrive the file content into memory starting from @param buf for @param sz at most
@@ -550,33 +788,17 @@ static int isFileReadable(const char *path, u32 *sz)
 */
 static int retriveFromFile(const char *path, u8 *buf, u32 sz)
 {
-#if defined(CONFIG_RTW_ANDROID_GKI)
+#if defined(CONFIG_LOAD_FILE_BY_REQ_FW_API)
 	int ret = -EINVAL;
 	const struct firmware *fw = NULL;
-	char* const delim = "/";
-	char *name, *token, *cur, *path_tmp = NULL;
-
+	const char *name;
 
 	if (path == NULL || buf == NULL) {
 		RTW_ERR("%s() NULL pointer\n", __func__);
 		goto err;
 	}
 
-	path_tmp = kstrdup(path, GFP_KERNEL);
-	if (path_tmp == NULL) {
-		RTW_ERR("%s() cannot copy path for parsing file name\n", __func__);
-		goto err;
-	}
-
-	/* parsing file name from path */
-	cur = path_tmp;
-	token = strsep(&cur, delim);
-	while (token != NULL) {
-		token = strsep(&cur, delim);
-		if(token)
-			name = token;
-	}
-
+	name = get_file_name_from_path(path);
 	if (name == NULL) {
 		RTW_ERR("%s() parsing file name fail\n", __func__);
 		goto err;
@@ -587,7 +809,7 @@ static int retriveFromFile(const char *path, u8 *buf, u32 sz)
 	if (ret == 0) {
 		RTW_INFO("%s() Success. retrieve file : %s, file size : %zu\n", __func__, name, fw->size);
 
-		if ((u32)fw->size < sz) {
+		if ((u32)fw->size <= sz) {
 			_rtw_memcpy(buf, fw->data, (u32)fw->size);
 			ret = (u32)fw->size;
 			goto exit;
@@ -606,12 +828,10 @@ static int retriveFromFile(const char *path, u8 *buf, u32 sz)
 err:
 	RTW_ERR("%s() Fail. retrieve file : %s, error : %d\n", __func__, path, ret);
 exit:
-	if (path_tmp)
-		kfree(path_tmp);
 	if (fw)
 		release_firmware(fw);
 	return ret;
-#else /* !defined(CONFIG_RTW_ANDROID_GKI) */
+#else /* !defined(CONFIG_LOAD_FILE_BY_REQ_FW_API) */
 	int ret = -1;
 	#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0))
 	mm_segment_t oldfs;
@@ -648,7 +868,7 @@ exit:
 		ret =  -EINVAL;
 	}
 	return ret;
-#endif /* defined(CONFIG_RTW_ANDROID_GKI) */
+#endif /* defined(CONFIG_LOAD_FILE_BY_REQ_FW_API) */
 }
 
 #if !defined(CONFIG_RTW_ANDROID_GKI)
@@ -720,15 +940,10 @@ int rtw_is_dir_readable(const char *path)
 */
 int rtw_is_file_readable(const char *path)
 {
-#if !defined(CONFIG_RTW_ANDROID_GKI)
 	if (isFileReadable(path, NULL) == 0)
 		return _TRUE;
 	else
 		return _FALSE;
-#else
-	RTW_INFO("%s() Android GKI prohibbit kernel_read, return _TRUE\n", __func__);
-	return  _TRUE;
-#endif /* !defined(CONFIG_RTW_ANDROID_GKI) */
 }
 
 /*
@@ -739,18 +954,11 @@ int rtw_is_file_readable(const char *path)
 */
 int rtw_is_file_readable_with_size(const char *path, u32 *sz)
 {
-#if !defined(CONFIG_RTW_ANDROID_GKI)
 	if (isFileReadable(path, sz) == 0)
 		return _TRUE;
 	else
 		return _FALSE;
-#else
-	RTW_INFO("%s() Android GKI prohibbit kernel_read, return _TRUE\n", __func__);
-	*sz = 0;
-	return  _TRUE;
-#endif /* !defined(CONFIG_RTW_ANDROID_GKI) */
 }
-
 
 /*
 * Open the file with @param path and retrive the file content into memory starting from @param buf for @param sz at most
@@ -846,66 +1054,6 @@ RETURN:
 	return;
 }
 
-int rtw_change_ifname(_adapter *padapter, const char *ifname)
-{
-	struct dvobj_priv *dvobj;
-	struct net_device *pnetdev;
-	struct net_device *cur_pnetdev;
-	struct rereg_nd_name_data *rereg_priv;
-	int ret;
-	u8 rtnl_lock_needed;
-
-	if (!padapter)
-		goto error;
-
-	dvobj = adapter_to_dvobj(padapter);
-	cur_pnetdev = padapter->pnetdev;
-	rereg_priv = &padapter->rereg_nd_name_priv;
-
-	/* free the old_pnetdev */
-	if (rereg_priv->old_pnetdev) {
-		free_netdev(rereg_priv->old_pnetdev);
-		rereg_priv->old_pnetdev = NULL;
-	}
-
-	rtnl_lock_needed = rtw_rtnl_lock_needed(dvobj);
-
-	if (rtnl_lock_needed)
-		unregister_netdev(cur_pnetdev);
-	else
-		unregister_netdevice(cur_pnetdev);
-
-	rereg_priv->old_pnetdev = cur_pnetdev;
-
-	pnetdev = rtw_init_netdev(padapter);
-	if (!pnetdev)  {
-		ret = -1;
-		goto error;
-	}
-
-	SET_NETDEV_DEV(pnetdev, dvobj_to_dev(adapter_to_dvobj(padapter)));
-
-	rtw_init_netdev_name(pnetdev, ifname);
-
-	dev_addr_mod(pnetdev, 0, adapter_mac_addr(padapter), ETH_ALEN);
-
-	if (rtnl_lock_needed)
-		ret = register_netdev(pnetdev);
-	else
-		ret = register_netdevice(pnetdev);
-
-	if (ret != 0) {
-		goto error;
-	}
-
-	return 0;
-
-error:
-
-	return -1;
-
-}
-
 #ifdef CONFIG_PLATFORM_SPRD
 #ifdef do_div
 	#undef do_div
@@ -926,7 +1074,9 @@ u64 rtw_division64(u64 x, u64 y)
 
 inline u32 rtw_random32(void)
 {
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 8, 0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0))
+	return get_random_u32();
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 8, 0))
 	return prandom_u32();
 #elif (LINUX_VERSION_CODE <= KERNEL_VERSION(2, 6, 18))
 	u32 random_int;
@@ -936,3 +1086,10 @@ inline u32 rtw_random32(void)
 	return random32();
 #endif
 }
+void rtw_wiphy_rfkill_set_hw_state(struct wiphy *wiphy, bool blocked)
+{
+	wiphy_rfkill_set_hw_state(wiphy, blocked);
+}
+
+u16 rtw_warn_on_cnt;
+

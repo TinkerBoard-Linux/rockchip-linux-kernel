@@ -78,17 +78,20 @@ enum phl_mdl_status {
 
 enum dispatcher_status {
 	DISPR_INIT = BIT0,
-	DISPR_STARTED = BIT1,
-	DISPR_SHALL_STOP = BIT2,
-	DISPR_MSGQ_INIT = BIT3,
-	DISPR_REQ_INIT = BIT4,
-	DISPR_NOTIFY_IDLE = BIT5,
-	DISPR_CLR_PEND_MSG = BIT6,
-	DISPR_CTRL_PRESENT = BIT7,
-	DISPR_WAIT_ABORT_MSG_DONE = BIT8,
-	DISPR_CANNOT_IO = BIT9,
-	DISPR_CLEARANCE = BIT10,
-	DISPR_EXCLUSIVE_USE = BIT11,
+	DISPR_MSGQ_INIT = BIT1,
+	DISPR_REQ_INIT = BIT2,
+	DISPR_STARTED = BIT3,
+	DISPR_REQ_ENABLED = BIT4,
+	DISPR_CTRL_PRESENT = BIT5,
+	DISPR_SHALL_STOP = BIT6,
+	DISPR_CANNOT_IO = BIT7,
+
+	/* flow control */
+	DISPR_NOTIFY_IDLE = BIT8,
+	DISPR_CLR_PEND_MSG = BIT9,
+	DISPR_WAIT_ABORT_MSG_DONE = BIT10,
+	DISPR_CLEARANCE = BIT11,
+	DISPR_EXCLUSIVE_USE = BIT12,
 };
 
 enum token_op_type {
@@ -228,6 +231,8 @@ enum rtw_phl_status send_dev_io_status_change(struct cmd_dispatcher *obj, u8 all
 void _notify_dispr_controller(struct cmd_dispatcher *obj, struct phl_dispr_msg_ex *ex);
 static u8 dispr_enqueue_token_op_info(struct cmd_dispatcher *obj, struct phl_token_op_info *op_info,
 			    	enum token_op_type type, u8 data);
+static u8 pop_specific_token_op_info(struct cmd_dispatcher *obj,
+                                     u8 req_ex_idx);
 
 #ifdef CONFIG_CMD_DISP_SUPPORT_CUSTOM_SEQ
 static void free_dispr_attr(void *d, struct dispr_msg_attr **dispr_attr);
@@ -791,6 +796,7 @@ u8 register_cur_cmd_req(struct cmd_dispatcher *obj,
 	PHL_TRACE(COMP_PHL_CMDDISP, _PHL_INFO_, "%s[%d], ret(%d)\n", __func__, obj->idx, ret);
 
 	if (ret == MDL_RET_FAIL) {
+		pop_specific_token_op_info(obj, req->idx);
 		deregister_cur_cmd_req(obj, false);
 		return false;
 	}
@@ -837,6 +843,9 @@ void init_cmd_req_pool(struct cmd_dispatcher *obj)
 void deinit_cmd_req_pool(struct cmd_dispatcher *obj)
 {
 	void *d = phl_to_drvpriv(obj->phl_info);
+
+	if (!TEST_STATUS_FLAG(obj->status, DISPR_REQ_INIT))
+		return;
 
 	CLEAR_STATUS_FLAG(obj->status, DISPR_REQ_INIT);
 
@@ -887,9 +896,9 @@ static u8 pop_front_token_op_info(struct cmd_dispatcher *obj,
 }
 
 static u8 push_back_token_op_info(struct cmd_dispatcher *obj,
-				  struct phl_token_op_info *op_info,
-				  enum token_op_type type,
-			    	  u8 data)
+                                  struct phl_token_op_info *op_info,
+                                  enum token_op_type type,
+                                  u8 data)
 {
 	void *d = phl_to_drvpriv(obj->phl_info);
 	_os_spinlockfg sp_flags;
@@ -906,6 +915,40 @@ static u8 push_back_token_op_info(struct cmd_dispatcher *obj,
 	pq_push(d, &(obj->token_op_q), &(op_info->list), _tail, _bh);
 	notify_dispr_thread(obj);
 	return true;
+}
+
+u8 search_op_owner(void *d, void *token_op, void *priv)
+{
+	u8 idx = *(u8 *)priv;
+	struct phl_token_op_info *op_info = NULL;
+
+	op_info = (struct phl_token_op_info *)token_op;
+	if (op_info->data == idx) {
+		PHL_TRACE(COMP_PHL_CMDDISP, _PHL_DEBUG_, "%s:: idx %d\n",
+			  __func__, idx);
+		return true;
+	} else
+		return false;
+}
+
+static u8 pop_specific_token_op_info(struct cmd_dispatcher *obj, u8 req_ex_idx)
+{
+	void *d = phl_to_drvpriv(obj->phl_info);
+	struct phl_token_op_info *op_info = NULL;
+	_os_spinlockfg sp_flags;
+	_os_list *node = NULL;
+	u8 is_found = false;
+
+	while (pq_search_node(d, &obj->token_op_q, &node, _bh, true,
+			      &req_ex_idx, search_op_owner)) {
+		op_info = (struct phl_token_op_info *)node;
+		_os_spinlock(d, &obj->token_op_q_lock, _bh, &sp_flags);
+		op_info->used = false;
+		_os_spinunlock(d, &obj->token_op_q_lock, _bh, &sp_flags);
+		is_found = true;
+	}
+
+	return is_found;
 }
 
 void _handle_token_op_info(struct cmd_dispatcher *obj, struct phl_token_op_info *op_info)
@@ -956,6 +999,7 @@ void token_op_hanler(struct cmd_dispatcher *obj)
 	struct phl_token_op_info *info = NULL;
 	void *d = phl_to_drvpriv(obj->phl_info);
 	u8 ntfyidx = HW_BAND_0;
+	_os_spinlockfg sp_flags;
 
 	/* dispr1 might have no token cmd. */
 	if (TEST_STATUS_FLAG(obj->status, DISPR_CLEARANCE)) {
@@ -970,7 +1014,9 @@ void token_op_hanler(struct cmd_dispatcher *obj)
 
 	while (pop_front_token_op_info(obj, &info)) {
 		_handle_token_op_info(obj, info);
+		_os_spinlock(d, &obj->token_op_q_lock, _bh, &sp_flags);
 		info->used = false;
+		_os_spinunlock(d, &obj->token_op_q_lock, _bh, &sp_flags);
 	}
 }
 static u8
@@ -1121,11 +1167,6 @@ void msg_pre_phase_hdl(struct cmd_dispatcher *obj, struct phl_dispr_msg_ex *ex)
 	_os_list *node = NULL;
 	struct phl_queue *q = NULL;
 	enum phl_mdl_ret_code ret = MDL_RET_FAIL;
-	u8 owner_id = (ex->module)?(ex->module->id):(PHL_MDL_ID_MAX);
-	enum phl_bk_module_priority priority = PHL_MDL_PRI_MAX;
-
-	if (owner_id < PHL_BK_MDL_END)
-		priority = _get_mdl_priority(owner_id);
 
 	for (i = PHL_MDL_PRI_MAX - 1 ; i >= PHL_MDL_PRI_ROLE ; i--) {
 #ifdef CONFIG_CMD_DISP_SUPPORT_CUSTOM_SEQ
@@ -1133,11 +1174,6 @@ void msg_pre_phase_hdl(struct cmd_dispatcher *obj, struct phl_dispr_msg_ex *ex)
 		if (STOP_DISPATCH_MSG(ret))
 			return;
 #endif
-		if (priority == i && _chk_bitmap_bit(ex->premap, MODL_MASK_LEN, owner_id)) {
-			ret = feed_mdl_msg(obj, ex->module, ex);
-			if (STOP_DISPATCH_MSG(ret))
-				return;
-		}
 		q = &(obj->module_q[(u8)i]);
 
 		if (pq_get_front(d, q, &node, _bh) == false)
@@ -1163,11 +1199,6 @@ void msg_post_phase_hdl(struct cmd_dispatcher *obj, struct phl_dispr_msg_ex *ex)
 	_os_list *node = NULL;
 	struct phl_queue *q = NULL;
 	enum phl_mdl_ret_code ret = MDL_RET_FAIL;
-	u8 owner_id = (ex->module)?(ex->module->id):(PHL_MDL_ID_MAX);
-	enum phl_bk_module_priority priority = PHL_MDL_PRI_MAX;
-
-	if (owner_id < PHL_BK_MDL_END)
-		priority = _get_mdl_priority(owner_id);
 
 	for (i = PHL_MDL_PRI_ROLE ; i < PHL_MDL_PRI_MAX ; i++) {
 #ifdef CONFIG_CMD_DISP_SUPPORT_CUSTOM_SEQ
@@ -1175,11 +1206,6 @@ void msg_post_phase_hdl(struct cmd_dispatcher *obj, struct phl_dispr_msg_ex *ex)
 		if (STOP_DISPATCH_MSG(ret))
 			return;
 #endif
-		if (priority == i && _chk_bitmap_bit(ex->postmap, MODL_MASK_LEN, owner_id)) {
-			ret = feed_mdl_msg(obj, ex->module, ex);
-			if (STOP_DISPATCH_MSG(ret))
-				return;
-		}
 		q = &(obj->module_q[(u8)i]);
 		if (pq_get_tail(d, q, &node, _bh) == false)
 			continue;
@@ -1284,6 +1310,9 @@ recycle:
 void dispr_thread_loop_hdl(struct cmd_dispatcher *obj)
 {
 	struct phl_dispr_msg_ex *ex = NULL;
+
+	if (!TEST_STATUS_FLAG(obj->status, DISPR_STARTED))
+		return;
 
 	/* check pending msg need in advance.
 	* if pending msg is not empty before while loop breaks,
@@ -1471,9 +1500,19 @@ void _notify_dispr_controller(struct cmd_dispatcher *obj, struct phl_dispr_msg_e
 
 }
 
+void dispr_clr_ctrl_state(struct cmd_dispatcher *obj)
+{
+	/* clear dispr flow state */
+	obj->status &= 0xFF;
+}
+
 void dispr_thread_stop_prior_hdl(struct cmd_dispatcher *obj)
 {
+	if (!TEST_STATUS_FLAG(obj->status, DISPR_STARTED))
+		return;
+
 	CLEAR_STATUS_FLAG(obj->status, DISPR_STARTED);
+	CLEAR_STATUS_FLAG(obj->status, DISPR_REQ_ENABLED);
 	_stop_dispr_controller(obj);
 	cancel_all_cmd_req(obj);
 	cancel_running_msg(obj);
@@ -1486,6 +1525,7 @@ void dispr_thread_stop_post_hdl(struct cmd_dispatcher *obj)
 	/* have to wait for bk thread ends before deinit msg & req*/
 	deinit_dispr_msg_pool(obj);
 	deinit_cmd_req_pool(obj);
+	dispr_clr_ctrl_state(obj);
 	_os_atomic_set(d, &(obj->token_cnt), 0);
 	#ifdef CONFIG_CMD_DISP_SOLO_MODE
 	_os_sema_free(d, &(obj->msg_q_sema));
@@ -1502,7 +1542,7 @@ enum rtw_phl_status dispr_init(struct phl_info_t *phl_info, void **dispr, u8 idx
 
 	obj = (struct cmd_dispatcher *)_os_mem_alloc(d, sizeof(struct cmd_dispatcher));
 	if (obj == NULL) {
-		PHL_TRACE(COMP_PHL_CMDDISP, _PHL_ERR_, "%s[%d], alloc fail\n", __func__, obj->idx);
+		PHL_TRACE(COMP_PHL_CMDDISP, _PHL_ERR_, "%s, alloc fail\n", __func__);
 		return RTW_PHL_STATUS_RESOURCE;
 	}
 
@@ -1515,7 +1555,6 @@ enum rtw_phl_status dispr_init(struct phl_info_t *phl_info, void **dispr, u8 idx
 	(*dispr) = (void*)obj;
 	_os_spinlock_init(d, &(obj->token_op_q_lock));
 	SET_STATUS_FLAG(obj->status, DISPR_INIT);
-	SET_STATUS_FLAG(obj->status, DISPR_NOTIFY_IDLE);
 	_register_dispr_controller(obj);
 	PHL_TRACE(COMP_PHL_CMDDISP, _PHL_INFO_, "%s[%d], size dispr(%d), msg_ex(%d), req_ex(%d) \n",
 		 __func__, obj->idx, (int)sizeof(struct cmd_dispatcher),
@@ -1537,8 +1576,10 @@ enum rtw_phl_status dispr_deinit(struct phl_info_t *phl, void *dispr)
 	for (i = 0 ; i < PHL_MDL_PRI_MAX; i++)
 		pq_deinit(d, &(obj->module_q[i]));
 	_os_spinlock_free(d, &(obj->token_op_q_lock));
-	_os_mem_free(d, obj, sizeof(struct cmd_dispatcher));
+
 	PHL_TRACE(COMP_PHL_CMDDISP, _PHL_INFO_, "%s[%d]\n", __func__, obj->idx);
+
+	_os_mem_free(d, obj, sizeof(struct cmd_dispatcher));
 	return RTW_PHL_STATUS_SUCCESS;
 }
 
@@ -1559,12 +1600,17 @@ enum rtw_phl_status dispr_start(void *dispr)
 	#ifdef CONFIG_CMD_DISP_SOLO_MODE
 	_os_sema_init(d, &(obj->msg_q_sema), 0);
 	if (disp_eng_is_solo_thread_mode(obj->phl_info)) {
-		_os_thread_init(d, &(obj->bk_thread), background_thread_hdl, obj,
-				"dispr_solo_thread");
+		if (RTW_PHL_STATUS_SUCCESS !=_os_thread_init(d, &(obj->bk_thread), background_thread_hdl, obj,
+				"dispr_solo_thread")) {
+			PHL_ERR("[TM]: thread init dispr_solo_thread fail.\n");
+			return RTW_PHL_STATUS_FAILURE;
+		}
 		_os_thread_schedule(d, &(obj->bk_thread));
 	}
 	#endif
 	SET_STATUS_FLAG(obj->status, DISPR_STARTED);
+	SET_STATUS_FLAG(obj->status, DISPR_NOTIFY_IDLE);
+	SET_STATUS_FLAG(obj->status, DISPR_REQ_ENABLED);
 	_start_dispr_controller(obj);
 
 	PHL_TRACE(COMP_PHL_CMDDISP, _PHL_INFO_, "%s[%d]\n", __func__, obj->idx);
@@ -2028,6 +2074,12 @@ dispr_send_msg(void *dispr,
 		goto err;
 	}
 
+	if (cur_req_id == module_id && !TEST_STATUS_FLAG(obj->status, DISPR_REQ_ENABLED)) {
+		PHL_TRACE(COMP_PHL_CMDDISP, _PHL_INFO_,"%s[%d]: dispr reject fg msg\n", __func__, obj->idx);
+		sts = RTW_PHL_STATUS_UNEXPECTED_ERROR;
+		goto err;
+	}
+
 	if (!pop_front_idle_msg(obj, &msg_ex)) {
 		PHL_TRACE(COMP_PHL_CMDDISP, _PHL_ERR_, "%s[%d] idle msg empty\n", __func__, obj->idx);
 		sts = RTW_PHL_STATUS_RESOURCE;
@@ -2075,6 +2127,7 @@ dispr_send_msg(void *dispr,
 		PHL_TRACE(COMP_PHL_CMDDISP, _PHL_ERR_,
 			"%s[%d] msg not allow since cur req is going to unload\n", __func__, obj->idx);
 		SET_MSG_INDC_FIELD(msg_ex->msg.msg_id, MSG_INDC_FAIL);
+		CLEAR_STATUS_FLAG(msg_ex->status, MSG_STATUS_NOTIFY_COMPLETE);
 		push_back_idle_msg(obj, msg_ex);
 		sts = RTW_PHL_STATUS_FAILURE;
 		goto exit;
@@ -2161,8 +2214,8 @@ dispr_add_token_req(void *dispr,
 	    chk_cmd_req_ops(req) == false)
 		return RTW_PHL_STATUS_UNEXPECTED_ERROR;
 
-	if (TEST_STATUS_FLAG(obj->status, DISPR_SHALL_STOP)){
-		PHL_TRACE(COMP_PHL_CMDDISP, _PHL_INFO_,"%s[%d]: dispr shall stop\n", __func__, obj->idx);
+	if (!TEST_STATUS_FLAG(obj->status, DISPR_REQ_ENABLED)){
+		PHL_TRACE(COMP_PHL_CMDDISP, _PHL_INFO_,"%s[%d]: dispr reject token req\n", __func__, obj->idx);
 		return RTW_PHL_STATUS_UNEXPECTED_ERROR;
 	}
 
@@ -2302,11 +2355,13 @@ enum rtw_phl_status dispr_notify_dev_io_status(void *dispr, enum phl_module_id m
 	return status;
 }
 
-void dispr_notify_shall_stop(void *dispr)
+void dispr_notify_shall_stop(void *dispr, bool surprise)
 {
 	struct cmd_dispatcher *obj = (struct cmd_dispatcher *)dispr;
 
-	if (!TEST_STATUS_FLAG(obj->status, DISPR_SHALL_STOP)) {
+	CLEAR_STATUS_FLAG(obj->status, DISPR_REQ_ENABLED);
+
+	if (surprise && !TEST_STATUS_FLAG(obj->status, DISPR_SHALL_STOP)) {
 		SET_STATUS_FLAG(obj->status, DISPR_SHALL_STOP);
 		dispr_clr_pending_msg(dispr);
 		PHL_TRACE(COMP_PHL_CMDDISP, _PHL_INFO_,
@@ -2355,9 +2410,9 @@ enum rtw_phl_status dispr_process_token_req(struct cmd_dispatcher *obj)
 		if (!TEST_STATUS_FLAG(obj->status, DISPR_STARTED))
 			return RTW_PHL_STATUS_UNEXPECTED_ERROR;
 
-		if (TEST_STATUS_FLAG(obj->status, DISPR_SHALL_STOP)) {
+		if (!TEST_STATUS_FLAG(obj->status, DISPR_REQ_ENABLED)) {
 			PHL_TRACE(COMP_PHL_CMDDISP, _PHL_INFO_,
-			          "%s[%d]: dispr shall stop\n", __func__, obj->idx);
+			          "%s[%d]: dispr reject token req\n", __func__, obj->idx);
 
 			return RTW_PHL_STATUS_FAILURE;
 		}

@@ -128,8 +128,7 @@ void phl_ps_cmd_parser(struct phl_info_t *phl_info, char input[][MAX_ARGV],
 	default:
 		PS_CNSL(out_len, used, output + used, out_len - used,
 			 "command not supported !!\n");
-
-		/* fall through */
+		fallthrough;
 	case PHL_PS_HELP:
 		PS_CNSL(out_len, used, output + used, out_len - used,
 			 "PS cmd ==>\n");
@@ -208,23 +207,25 @@ void phl_ps_dbg_dump(struct phl_info_t *phl_info, u32 *used,
 
 	PS_CNSL(out_len, *used, output + *used, out_len - *used,
 		"init_rf_state: %s, init_rt_stop_rson: 0x%x, leave_fail_act: 0x%x\
-		\nlps: %s, lps_cap: %s, lps_pause_tx: %d\
+		\nlps: %s, lps_cap: %s, ps_pause_tx: %d\
 		\nawake_interval: %d, listen_bcn_mode: %d, smart_ps_mode: %d, bcnnohit: %d\
 		\nrssi_enter_threshold: %d, rssi_leave_threshold: %d, rssi_diff_threshold: %d\
 		\ndefer_rson: 0x%x, lps_ping_defer_time: %d(ms), lps_dhcp_defer_time: %d(ms)\
 		\nlps_adv_cap: pvb_wait_rx (%s)\
 		\nips: %s, ips_cap: %s\
 		\nwowlan lps: %s, wowlan lps_cap: %s\
-		\nwowlan lps awake_interval: %d, wowlan lps listen_bcn_mode: %d, wowlan lps smart_ps_mode: %d\n",
+		\nwowlan lps awake_interval: %d, wowlan lps listen_bcn_mode: %d, wowlan lps smart_ps_mode: %d\
+		\nwowlan ips: %s, wowlan ips_cap: %s\n",
 		(ps_cap->init_rf_state ? "off" : "on"), ps_cap->init_rt_stop_rson, ps_cap->leave_fail_act,
-		phl_ps_op_mode_to_str(ps_cap->lps_en), phl_ps_pwr_lvl_to_str(phl_ps_judge_pwr_lvl(ps_cap->lps_cap, PS_MODE_LPS, true)), ps_cap->lps_pause_tx,
+		phl_ps_op_mode_to_str(ps_cap->lps_en), phl_ps_pwr_lvl_to_str(phl_ps_judge_pwr_lvl(ps_cap->lps_cap, PS_MODE_LPS, true)), ps_cap->ps_pause_tx,
 		ps_cap->lps_awake_interval, ps_cap->lps_listen_bcn_mode, ps_cap->lps_smart_ps_mode, ps_cap->lps_bcnnohit_en,
 		ps_cap->lps_rssi_enter_threshold, ps_cap->lps_rssi_leave_threshold, ps_cap->lps_rssi_diff_threshold,
 		ps_cap->defer_para.defer_rson, (int)ps_cap->defer_para.lps_ping_defer_time, (int)ps_cap->defer_para.lps_dhcp_defer_time,
 	        ((ps_cap->lps_adv_cap & RTW_LPS_ADV_PVB_W_RX) ? "on" : "off"),
 		phl_ps_op_mode_to_str(ps_cap->ips_en), phl_ps_pwr_lvl_to_str(phl_ps_judge_pwr_lvl(ps_cap->ips_cap, PS_MODE_IPS, true)),
 		phl_ps_op_mode_to_str(ps_cap->lps_wow_en), phl_ps_pwr_lvl_to_str(phl_ps_judge_pwr_lvl(ps_cap->lps_wow_cap, PS_MODE_LPS, true)),
-		ps_cap->lps_wow_awake_interval, ps_cap->lps_wow_listen_bcn_mode, ps_cap->lps_wow_smart_ps_mode);
+		ps_cap->lps_wow_awake_interval, ps_cap->lps_wow_listen_bcn_mode, ps_cap->lps_wow_smart_ps_mode,
+		phl_ps_op_mode_to_str(ps_cap->ips_wow_en), phl_ps_pwr_lvl_to_str(phl_ps_judge_pwr_lvl(ps_cap->ips_wow_cap, PS_MODE_IPS, true)));
 
 #else
 	PS_CNSL(out_len, *used, output + *used, out_len - *used,

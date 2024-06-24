@@ -26,10 +26,10 @@
 #define __HALRF_DPK_8852CH__
 #ifdef RF_8852C_SUPPORT
 /*--------------------------Define Parameters-------------------------------*/
-#define DPK_VER_8852C 0x10
+#define DPK_VER_8852C 0x1c
 #define DPK_RF_PATH_MAX_8852C 2
-#define DPK_KIP_REG_NUM_8852C 5
-#define DPK_BB_REG_NUM_8852C 3
+#define DPK_KIP_REG_NUM_8852C 7
+#define DPK_BB_REG_NUM_8852C 2
 #define DPK_RF_REG_NUM_8852C 7
 #define DPK_PATH_A_8852C 1
 #define DPK_PATH_B_8852C 1

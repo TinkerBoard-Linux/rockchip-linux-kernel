@@ -27,6 +27,11 @@ enum lock_type {
 	_irq
 };
 
+enum cache_addr_type {
+	NONCACHE_ADDR, /* coherent 4K block addr */
+	CACHE_ADDR,
+};
+
 #ifndef PHL_PLATFORM_LINUX
 	#ifndef inline
 	#define inline __inline
@@ -75,8 +80,17 @@ enum lock_type {
 	#define _os_list struct list_head
 
 	#define _os_atomic volatile long
+#ifdef _KERNEL_MODE
 	#define _os_dbgdump DbgPrint
-	#define _os_dbgdump_c DbgPrint
+#else
+	char phl_msgbuf[MAX_MSG_LEN];
+	#define _os_dbgdump(fmt, ...) do {\
+		snprintf(phl_msgbuf, MAX_MSG_LEN, fmt, ##__VA_ARGS__);\
+		OutputDebugStringA(phl_msgbuf);\
+	}while(0);
+#endif /* _KERNEL_MODE */
+
+	#define _os_dbgdump_c _os_dbgdump
 	#define _os_dbgdump_lmt DbgPrint
 	#define _os_dbgdump_c_lmt DbgPrint
 	#define _os_assert ASSERT
@@ -87,6 +101,7 @@ enum lock_type {
 	#define _os_thread RT_THREAD
 	#define _os_spinlockfg unsigned int
 	#define _os_workitem RT_WORK_ITEM
+	#define _os_va_list va_list
 
 	#define _os_path_sep "\\"
 	#define HAL_FILE_CONFIG_PATH ""
@@ -102,6 +117,17 @@ enum lock_type {
 		struct tasklet_struct tasklet;
 		void (*func)(void *);
 		void *data;
+	};
+
+	/* workitemw is wrapper for callback function prototype is void (*func)(void *) */
+	typedef struct rtw_workitemw _workitemw;
+	struct rtw_workitemw {
+#ifdef CONFIG_CPU_BALANCE
+		_workitem_cpu work;
+#else
+		_workitem work;
+#endif
+		void (*func)(void *);
 	};
 
 	#define _os_lock _lock
@@ -136,8 +162,9 @@ enum lock_type {
 
 	#define _os_tasklet _taskletw
 	#define _os_thread struct thread_hdl
-	#define _os_workitem _workitem
+	#define _os_workitem _workitemw
 	#define _os_spinlockfg unsigned long
+	#define _os_va_list va_list
 
 	#define	_os_path_sep "/"
 
@@ -155,6 +182,39 @@ enum lock_type {
 	#else
 	#define PLATFOM_IS_LITTLE_ENDIAN 0
 	#endif
+
+#elif defined(PHL_PLATFORM_UEFI)
+
+	#define MAC_ALEN 6
+	#define _dma unsigned int
+	#define _os_timer RT_TIMER
+	#define _os_lock RT_SPIN_LOCK
+	#define _os_mutex PlatformMutex
+	#define _os_sema PlatformSemaphore
+	#define _os_event PlatformEvent
+	#define _os_list struct list_head
+
+	#define _os_atomic volatile long
+
+	#define _os_dbgdump DbgPrint
+	#define _os_dbgdump_c DbgPrint
+	#define _os_dbgdump_lmt DbgPrint
+
+	#define KERN_CONT
+	#define _os_assert
+	#define _os_warn_on
+
+		/*#define _os_completion unsigned long*/
+	#define _os_tasklet struct uefi_tasklet
+	#define _os_thread RT_THREAD
+	#define _os_spinlockfg unsigned int
+	#define _os_workitem RT_WORK_ITEM
+	#define _os_va_list unsigned int
+
+	#define _os_path_sep "\\"
+	#define HAL_FILE_CONFIG_PATH ""
+	#define FW_FILE_CONFIG_PATH ""
+	#define PLATFOM_IS_LITTLE_ENDIAN 1
 
 #else
 
@@ -207,6 +267,7 @@ enum lock_type {
 	#define _os_tasklet unsigned long
 	#define _os_thread unsigned long
 	#define _os_workitem unsigned long
+	#define _os_va_list unsigned long
 
 	#define	_os_path_sep "/"
 	#define HAL_FILE_CONFIG_PATH	""

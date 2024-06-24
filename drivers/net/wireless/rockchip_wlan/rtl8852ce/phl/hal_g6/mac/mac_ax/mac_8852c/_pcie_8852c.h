@@ -23,13 +23,9 @@
 
 #define LTR_EN_BITS (B_AX_LTR_HW_DEC_EN | B_AX_LTR_FW_DEC_EN | B_AX_LTR_DRV_DEC_EN)
 
-enum pcie_ltr_idx {
-	PCIE_LTR_IDX_ACT = 0,
-	PCIE_LTR_IDX_1,
-	PCIE_LTR_IDX_2,
-	PCIE_LTR_IDX_IDLE,
-	PCIE_LTR_IDX_MAX
-};
+#define PCIE_LTR_IDX_DISABLE 0
+#define PCIE_LTR_IDX_ACT 1
+#define PCIE_LTR_IDX_IDLE 3
 
 /**
  * @addtogroup HCI
@@ -322,6 +318,29 @@ u32 pcie_ltr_read_8852c(struct mac_ax_adapter *adapter,
  */
 u32 ltr_sw_trigger_8852c(struct mac_ax_adapter *adapter,
 			 enum mac_ax_pcie_ltr_sw_ctrl ctrl);
+/**
+ * @}
+ * @}
+ */
+
+/**
+ * @addtogroup HCI
+ * @{
+ * @addtogroup PCIE
+ * @{
+ */
+
+/**
+ * @brief ltr_dyn_ctrl_8852c
+ *
+ * @param *adapter
+ * @param type
+ * @param *param
+ * @return Please Place Description here.
+ * @retval u32
+ */
+u32 ltr_dyn_ctrl_8852c(struct mac_ax_adapter *adapter, enum mac_ax_ltr_dyn_ctrl_tp type,
+		       void *param);
 /**
  * @}
  * @}
@@ -746,6 +765,34 @@ u32 get_pcie_speed_8852c(struct mac_ax_adapter *adapter,
  * @addtogroup PCIE
  * @{
  */
+
+/**
+ * @brief get_pcie_sup_speed_8852c
+ *
+ * @param *adapter
+ * @return Please Place Description here.
+ * @retval u32
+ */
+u32 get_pcie_sup_speed_8852c(struct mac_ax_adapter *adapter);
+/**
+ * @}
+ * @}
+ */
+
+/**
+ * @addtogroup HCI
+ * @{
+ * @addtogroup PCIE
+ * @{
+ */
+u32 get_pcie_support_width_8852c(struct mac_ax_adapter *adapter, u16 *width);
+
+u32 get_pcie_link_width_8852c(struct mac_ax_adapter *adapter, u16 *width);
+
+u32 set_pcie_link_width_8852c(struct mac_ax_adapter *adapter,
+			      enum mac_ax_pcie_link_width set_width);
+
+u32 pcie_aspm_frontdoor_set_8852c(struct mac_ax_adapter *adapter);
 
 #endif /* #if MAC_AX_8852C_SUPPORT */
 #endif

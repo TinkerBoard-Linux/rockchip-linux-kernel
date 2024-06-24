@@ -6,7 +6,7 @@
 #ifdef CONFIG_CORE_TXSC
 /* TX shorcut amsdu */
 #ifdef CONFIG_TX_AMSDU
-//#define CONFIG_TXSC_AMSDU
+#define CONFIG_TXSC_AMSDU
 #endif
 /* PHL TX path shortcut */
 #define CONFIG_PHL_TXSC

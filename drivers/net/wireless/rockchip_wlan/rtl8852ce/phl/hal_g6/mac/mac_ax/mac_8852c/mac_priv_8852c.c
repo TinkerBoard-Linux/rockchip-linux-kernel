@@ -14,6 +14,7 @@
  ******************************************************************************/
 
 #include "../mac_priv.h"
+#include "../../include/mac_top.h"
 #include "dbgpkg_8852c.h"
 #include "init_8852c.h"
 #include "pwr_seq_func_8852c.h"
@@ -29,6 +30,10 @@
 #include "efuse_8852c.h"
 #include "hci_fc_8852c.h"
 #include "dle_8852c.h"
+#include "wowlan_8852c.h"
+#include "dbg_cmd_8852c.h"
+#include "../err_flag.h"
+
 #if MAC_AX_PCIE_SUPPORT
 #include "_pcie_8852c.h"
 #endif
@@ -102,6 +107,12 @@ static struct mac_ax_priv_ops mac8852c_priv_ops = {
 	dbg_port_sel_rst_8852c, /* dbg_port_sel_rst */
 	dle_dfi_sel_8852c, /* dle_dfi_sel */
 	mac_bacam_init, /* bacam init */
+	/* ERROR FLAG CHECKER */
+	err_flag_cmac_8852c,
+	err_flag_dmac_8852c,
+	err_flag_rst_cmac_8852c,
+	err_flag_rst_dmac_8852c,
+	err_flag_chk,
 #if MAC_AX_PCIE_SUPPORT
 	get_pcie_info_def_8852c, /* get_pcie_info_def */
 	get_bdram_tbl_pcie_8852c, /* get_bdram_tbl_pcie */
@@ -112,6 +123,7 @@ static struct mac_ax_priv_ops mac8852c_priv_ops = {
 	get_rxbd_reg_pcie_8852c, /* get_rxbd_reg_pcie */
 	set_rxbd_reg_pcie_8852c, /* set_rxbd_reg_pcie */
 	ltr_sw_trigger_8852c, /* ltr_sw_trigger */
+	ltr_dyn_ctrl_8852c, /* ltr_dyn_ctrl */
 	pcie_cfgspc_write_8852c, /* pcie_cfgspc_write */
 	pcie_cfgspc_read_8852c, /* pcie_cfgspc_read */
 	pcie_ltr_write_8852c, /* pcie_ltr_write */
@@ -127,10 +139,15 @@ static struct mac_ax_priv_ops mac8852c_priv_ops = {
 	mode_op_pcie_8852c, /* mode_op_pcie */
 	get_err_flag_pcie_8852c, /* get_err_flag_pcie */
 	mac_auto_refclk_cal_pcie_8852c, /* mac_auto_refclk_cal_pcie */
+	sync_trx_bd_idx_pcie, /* sync_trx_bd_idx */
+	mac_read_pcie_cfg_spc, /* read_pcie_cfg_spc */
+	pcie_aspm_frontdoor_set_8852c, /* pcie_aspm_frontdoor_set */
 #ifdef RTW_WKARD_GET_PROCESSOR_ID
 	chk_proc_long_ldy, /* chk_proc_long_ldy_pcie */
 #endif
-	sync_trx_bd_idx_pcie, /* sync_trx_bd_idx */
+	get_pcie_support_width_8852c, /* get_pcie_support_width */
+	get_pcie_link_width_8852c, /* get_pcie_link_width */
+	set_pcie_link_width_8852c, /* set_pcie_link_width */
 #endif
 #if MAC_AX_SDIO_SUPPORT
 	r_indir_cmd52_sdio_8852c, /* r_indir_cmd52_sdio */
@@ -152,10 +169,19 @@ static struct mac_ax_priv_ops mac8852c_priv_ops = {
 	rx_agg_cfg_sdio_8852c, /* rx_agg_cfg_sdio */
 	aval_page_cfg_sdio_8852c, /* aval_page_cfg_sdio */
 	get_sdio_rx_req_len_8852c, /* get_sdio_rx_req_len */
+	read_sdio_cccr_8852c, /* read_sdio_cccr */
 #endif
 #if MAC_AX_USB_SUPPORT
 	usb_ep_cfg_8852c, /* USB endpoint pause release */
+	read_usb2phy_para_8852c, /* read_usb2phy_para */
+	write_usb2phy_para_8852c, /* write_usb2phy_para */
+	read_usb3phy_para_8852c, /* read_usb3phy_para */
+	write_usb3phy_para_8852c, /* write_usb3phy_para */
 #endif
+	/* QC */
+	get_check_reg_8852c, /* get_check_reg */
+	/* WOWLAN */
+	get_wake_reason_8852c, /* get_wake_reason */
 };
 
 struct mac_ax_priv_ops *get_mac_8852c_priv_ops(enum mac_ax_intf intf)

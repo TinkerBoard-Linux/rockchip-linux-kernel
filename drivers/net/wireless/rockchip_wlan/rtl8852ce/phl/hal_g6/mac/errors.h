@@ -151,6 +151,9 @@
 #define MACARDYDONE	131 /* The flow is already done */
 #define MACPSSTATPWRBITFAIL	132 /* protocol power state check pwr bit fail */
 #define MACIOERRINSEC	133 /* Security ic not allow indirect access */
+#define MACIOTESTERR	140 /* general io test error */
+#define MACFWNOSUPPORT	145 /* FW no support */
+#define MACMEMLEAK	146 /* Memory Leak */
 
 /*MAC DBG Status Indication*/
 #define MACSCH_NONEMPTY	1 /* MAC Scheduler non empty */
@@ -193,78 +196,57 @@
 #define SS_STAT_ULRU		BIT(12)
 #define SS_STAT_DLTX		BIT(13)
 
-#ifdef CONFIG_NEW_HALMAC_INTERFACE
-#define PLTFM_MSG_ALWAYS(...)                                                  \
-	_os_dbgdump("[MAC][ERR] " fmt, ##__VA_ARGS__)
-#else
 #define PLTFM_MSG_ALWAYS(...)                                                  \
 	adapter->pltfm_cb->msg_print(adapter->drv_adapter, _PHL_ALWAYS_,  __VA_ARGS__)
-#endif
 
 #if MAC_AX_DBG_MSG_EN
 
-#ifdef CONFIG_NEW_HALMAC_INTERFACE
+#undef PLTFM_MSG_ALWAYS
+
+void mac_console_log(void *vadapter, s8 *prefix, s8 *fmt, ...);
 
 	#if (MAC_AX_MSG_LEVEL >= MAC_AX_MSG_LEVEL_ALWAYS)
-	#define PLTFM_MSG_ALWAYS(...)                                         \
-		_os_dbgdump("[MAC][LOG] " fmt, ##__VA_ARGS__)
+	#define PLTFM_MSG_ALWAYS(...)   do {\
+		if (adapter->fw_dbgcmd.dbg_bg_log_on)			\
+			adapter->pltfm_cb->msg_print(adapter->drv_adapter, _PHL_ALWAYS_,\
+						     __VA_ARGS__);\
+		mac_console_log(adapter, "[MAC][LOG] ", __VA_ARGS__);\
+	} while (0)
 	#else
 	#define PLTFM_MSG_ALWAYS(...)	do {} while (0)
 	#endif
 
 	/* Enable debug msg depends on  HALMAC_MSG_LEVEL */
 	#if (MAC_AX_MSG_LEVEL >= MAC_AX_MSG_LEVEL_ERR)
-	#define PLTFM_MSG_ERR(...)                                           \
-		_os_dbgdump("[MAC][ERR] " fmt, ##__VA_ARGS__)
+	#define PLTFM_MSG_ERR(...)      do {\
+		if (adapter->fw_dbgcmd.dbg_bg_log_on)			\
+			adapter->pltfm_cb->msg_print(adapter->drv_adapter, _PHL_ERR_,\
+						     __VA_ARGS__);\
+		mac_console_log(adapter, "[MAC][ERR] ", __VA_ARGS__);\
+	} while (0)
 	#else
 	#define PLTFM_MSG_ERR(...)	do {} while (0)
 	#endif
 
 	#if (MAC_AX_MSG_LEVEL >= MAC_AX_MSG_LEVEL_WARNING)
-	#define PLTFM_MSG_WARN(...)                                          \
-		_os_dbgdump("[MAC][WARN] " fmt, ##__VA_ARGS__)
+	#define PLTFM_MSG_WARN(...)     do {\
+		adapter->pltfm_cb->msg_print(adapter->drv_adapter, _PHL_WARNING_,\
+					     __VA_ARGS__);\
+		mac_console_log(adapter, "[MAC][WARN] ", __VA_ARGS__);\
+	} while (0)
 	#else
 	#define PLTFM_MSG_WARN(...)	do {} while (0)
 	#endif
 
 	#if (MAC_AX_MSG_LEVEL >= MAC_AX_MSG_LEVEL_TRACE)
-	#define PLTFM_MSG_TRACE(...)                                         \
-		_os_dbgdump("[MAC][TRACE] " fmt, ##__VA_ARGS__)
+	#define PLTFM_MSG_TRACE(...)    do {\
+		adapter->pltfm_cb->msg_print(adapter->drv_adapter, _PHL_DEBUG_,\
+					     __VA_ARGS__);\
+		mac_console_log(adapter, "[MAC][TRACE] ", __VA_ARGS__);\
+	} while (0)
 	#else
 	#define PLTFM_MSG_TRACE(...)	do {} while (0)
 	#endif
-
-#else
-
-	#if (MAC_AX_MSG_LEVEL >= MAC_AX_MSG_LEVEL_ALWAYS)
-	#define PLTFM_MSG_ALWAYS(...)                                         \
-		adapter->pltfm_cb->msg_print(adapter->drv_adapter, _PHL_ALWAYS_, __VA_ARGS__)
-	#else
-	#define PLTFM_MSG_ALWAYS(...)	do {} while (0)
-	#endif
-
-	/* Enable debug msg depends on  HALMAC_MSG_LEVEL */
-	#if (MAC_AX_MSG_LEVEL >= MAC_AX_MSG_LEVEL_ERR)
-	#define PLTFM_MSG_ERR(...)                                           \
-		adapter->pltfm_cb->msg_print(adapter->drv_adapter, _PHL_ERR_, __VA_ARGS__)
-	#else
-	#define PLTFM_MSG_ERR(...)	do {} while (0)
-	#endif
-
-	#if (MAC_AX_MSG_LEVEL >= MAC_AX_MSG_LEVEL_WARNING)
-	#define PLTFM_MSG_WARN(...)                                          \
-		adapter->pltfm_cb->msg_print(adapter->drv_adapter, _PHL_WARNING_, __VA_ARGS__)
-	#else
-	#define PLTFM_MSG_WARN(...)	do {} while (0)
-	#endif
-
-	#if (MAC_AX_MSG_LEVEL >= MAC_AX_MSG_LEVEL_TRACE)
-	#define PLTFM_MSG_TRACE(...)                                         \
-		adapter->pltfm_cb->msg_print(adapter->drv_adapter, _PHL_DEBUG_, __VA_ARGS__)
-	#else
-	#define PLTFM_MSG_TRACE(...)	do {} while (0)
-	#endif
-#endif /*CONFIG_NEW_HALMAC_INTERFACE*/
 
 #else
 

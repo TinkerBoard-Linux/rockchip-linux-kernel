@@ -109,14 +109,13 @@ const struct ieee80211_channel rtw_6ghz_channels[MAX_CHANNEL_NUM_6G] = {
 const enum nl80211_band _rtw_band_to_nl80211_band[] = {
 	[BAND_ON_24G]	= NL80211_BAND_2GHZ,
 	[BAND_ON_5G]	= NL80211_BAND_5GHZ,
-#if CONFIG_IEEE80211_BAND_6GHZ
 	#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
 	[BAND_ON_6G]	= NL80211_BAND_6GHZ,
 	#else
 	[BAND_ON_6G]	= NUM_NL80211_BANDS,
 	#endif
-#endif
 };
+static_assert(ARRAY_SIZE(_rtw_band_to_nl80211_band) >= BAND_MAX);
 
 const enum band_type _nl80211_band_to_rtw_band[] = {
 	[NL80211_BAND_2GHZ]	= BAND_ON_24G,
@@ -131,7 +130,14 @@ const enum band_type _nl80211_band_to_rtw_band[] = {
 	[NL80211_BAND_6GHZ]	= BAND_MAX,
 	#endif
 #endif
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 9, 0))
+	[NL80211_BAND_S1GHZ]	= BAND_MAX,	/* around 900MHz, supported by S1G PHYs */
+#endif
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 16, 0)) || (defined(__ANDROID_COMMON_KERNEL__) && LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
+	[NL80211_BAND_LC]	= BAND_MAX,	/* light communication band (placeholder) */
+#endif
 };
+static_assert(ARRAY_SIZE(_nl80211_band_to_rtw_band) >= NUM_NL80211_BANDS);
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 8, 0))
 const char *nl80211_chan_width_str(enum nl80211_chan_width cwidth)

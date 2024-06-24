@@ -354,7 +354,6 @@ static struct mac_ax_dbg_port_info dbg_port_txtf_infoh_c1 = {
 	B_AX_RX_TB_CTRL_H4B_MSK
 };
 
-#if 0
 static struct mac_ax_dbg_port_info dbg_port_cmac_dma0_c0 = {
 	R_AX_RXDMA_CTRL_0,
 	MAC_AX_BYTE_SEL_4,
@@ -410,7 +409,6 @@ static struct mac_ax_dbg_port_info dbg_port_cmac_dma1_c1 = {
 	B_AX_DEBUG_ST_SH,
 	B_AX_DEBUG_ST_MSK
 };
-#endif
 
 static struct mac_ax_dbg_port_info dbg_port_wde_bufmgn_ctl = {
 	R_AX_WDE_DBG_CTL,
@@ -2211,7 +2209,7 @@ u32 tx_dbg_dump_8852c(struct mac_ax_adapter *adapter)
 
 	for (i = 0; i < TRX_CNT_REPT_CNT; i++) {
 #if MAC_AX_PCIE_SUPPORT
-		if (adapter->hw_info->intf == MAC_AX_INTF_PCIE) {
+		if (adapter->env_info.intf == MAC_AX_INTF_PCIE) {
 			PLTFM_MSG_ALWAYS("R_AX_PCIE_MIO_INTF=0x%x\n",
 					 MAC_REG_R32(R_AX_PCIE_MIO_INTF));
 
@@ -2307,6 +2305,7 @@ u32 tx_dbg_dump_8852c(struct mac_ax_adapter *adapter)
 u32 crit_dbg_dump_8852c(struct mac_ax_adapter *adapter)
 {
 	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
+	u32 ret;
 
 	PLTFM_MSG_ALWAYS("R_AX_SYS_ISO_CTRL=0x%x\n",
 			 MAC_REG_R16(R_AX_SYS_ISO_CTRL));
@@ -2392,7 +2391,7 @@ u32 crit_dbg_dump_8852c(struct mac_ax_adapter *adapter)
 	PLTFM_MSG_ALWAYS("R_AX_FW_DEBUG_USE_ONLY_3=0x%x\n",
 			 MAC_REG_R32(R_AX_FW_DEBUG_USE_ONLY_3));
 
-	if (adapter->hw_info->intf == MAC_AX_INTF_PCIE) {
+	if (adapter->env_info.intf == MAC_AX_INTF_PCIE) {
 		PLTFM_MSG_ALWAYS("R_AX_PCIE_MIO_INTF=0x%x\n",
 				 MAC_REG_R32(R_AX_PCIE_MIO_INTF));
 
@@ -2416,7 +2415,15 @@ u32 crit_dbg_dump_8852c(struct mac_ax_adapter *adapter)
 
 		PLTFM_MSG_ALWAYS("R_AX_PCIE_PADDR_E0=0x%x\n",
 				 MAC_REG_R32(R_AX_PCIE_PADDR_E0));
-	}
+
+		ret = mac_pcie_status_dump(adapter);
+		if (ret != MACSUCCESS) {
+			PLTFM_MSG_ERR("pcie_status_dump fail %d\n", ret);
+			return ret;
+		}
+	} else if (adapter->env_info.intf == MAC_AX_INTF_USB)
+		PLTFM_MSG_ALWAYS("R_AX_USB_DEBUG_1_V1=0x%x\n",
+				 MAC_REG_R32(R_AX_USB_DEBUG_1_V1));
 
 	return MACSUCCESS;
 }
@@ -2781,7 +2788,7 @@ u32 dmac_dbg_dump_8852c(struct mac_ax_adapter *adapter)
 	/* HAXIDMA */
 	PLTFM_MSG_ALWAYS("R_AX_HAXI_INIT_CFG1=0x%x\n",
 			 MAC_REG_R32(R_AX_HAXI_INIT_CFG1));
-	if (adapter->hw_info->intf == MAC_AX_INTF_PCIE) {
+	if (adapter->env_info.intf == MAC_AX_INTF_PCIE) {
 		PLTFM_MSG_ALWAYS("R_AX_HAXI_DMA_STOP1=0x%x\n",
 				 MAC_REG_R32(R_AX_HAXI_DMA_STOP1));
 		PLTFM_MSG_ALWAYS("R_AX_HAXI_DMA_BUSY1=0x%x\n",
@@ -2883,11 +2890,11 @@ u32 tx_flow_ptcl_dbg_port_8852c(struct mac_ax_adapter *adapter, u8 band)
 		return ret;
 	}
 	info = band == MAC_AX_BAND_1 ? dbg_port_ptcl_c1 : dbg_port_ptcl_c0;
-	PLTFM_MUTEX_LOCK(&adapter->hw_info->dbg_port_lock);
-	adapter->hw_info->dbg_port_cnt++;
-	if (adapter->hw_info->dbg_port_cnt != 1) {
+	PLTFM_MUTEX_LOCK(&adapter->lock_info.dbg_port_lock);
+	adapter->dbg_info.dbg_port_cnt++;
+	if (adapter->dbg_info.dbg_port_cnt != 1) {
 		PLTFM_MSG_ERR("[ERR]dbg port sel %x lock cnt %d\n",
-			      info.sel_addr, adapter->hw_info->dbg_port_cnt);
+			      info.sel_addr, adapter->dbg_info.dbg_port_cnt);
 		ret = MACCMP;
 		goto err;
 	}
@@ -2909,8 +2916,8 @@ u32 tx_flow_ptcl_dbg_port_8852c(struct mac_ax_adapter *adapter, u8 band)
 		print_dbg_port(adapter, &info);
 
 err:
-	adapter->hw_info->dbg_port_cnt--;
-	PLTFM_MUTEX_UNLOCK(&adapter->hw_info->dbg_port_lock);
+	adapter->dbg_info.dbg_port_cnt--;
+	PLTFM_MUTEX_UNLOCK(&adapter->lock_info.dbg_port_lock);
 	return ret;
 }
 
@@ -2928,11 +2935,11 @@ u32 tx_flow_sch_dbg_port_8852c(struct mac_ax_adapter *adapter, u8 band)
 	}
 
 	info = band == MAC_AX_BAND_1 ? dbg_port_sch_c1 : dbg_port_sch_c0;
-	PLTFM_MUTEX_LOCK(&adapter->hw_info->dbg_port_lock);
-	adapter->hw_info->dbg_port_cnt++;
-	if (adapter->hw_info->dbg_port_cnt != 1) {
+	PLTFM_MUTEX_LOCK(&adapter->lock_info.dbg_port_lock);
+	adapter->dbg_info.dbg_port_cnt++;
+	if (adapter->dbg_info.dbg_port_cnt != 1) {
 		PLTFM_MSG_ERR("[ERR]dbg port sel %x lock cnt %d\n",
-			      info.sel_addr, adapter->hw_info->dbg_port_cnt);
+			      info.sel_addr, adapter->dbg_info.dbg_port_cnt);
 		ret = MACCMP;
 		goto err;
 	}
@@ -2951,8 +2958,8 @@ u32 tx_flow_sch_dbg_port_8852c(struct mac_ax_adapter *adapter, u8 band)
 		print_dbg_port(adapter, &info);
 
 err:
-	adapter->hw_info->dbg_port_cnt--;
-	PLTFM_MUTEX_UNLOCK(&adapter->hw_info->dbg_port_lock);
+	adapter->dbg_info.dbg_port_cnt--;
+	PLTFM_MUTEX_UNLOCK(&adapter->lock_info.dbg_port_lock);
 	return ret;
 }
 
@@ -2965,12 +2972,12 @@ u32 dbg_port_sel_8852c(struct mac_ax_adapter *adapter,
 	u8 val8, index;
 	u32 ret = MACSUCCESS;
 
-	PLTFM_MUTEX_LOCK(&adapter->hw_info->dbg_port_lock);
-	adapter->hw_info->dbg_port_cnt++;
+	PLTFM_MUTEX_LOCK(&adapter->lock_info.dbg_port_lock);
+	adapter->dbg_info.dbg_port_cnt++;
 
-	if (adapter->hw_info->dbg_port_cnt != 1) {
+	if (adapter->dbg_info.dbg_port_cnt != 1) {
 		PLTFM_MSG_ERR("[ERR]dbg port sel %d lock cnt %d\n", sel,
-			      adapter->hw_info->dbg_port_cnt);
+			      adapter->dbg_info.dbg_port_cnt);
 		ret = MACCMP;
 		goto err;
 	}
@@ -3178,7 +3185,7 @@ u32 dbg_port_sel_8852c(struct mac_ax_adapter *adapter,
 		MAC_REG_W32(R_AX_TCR1_C1, val32);
 		PLTFM_MSG_ALWAYS("Enable tx tf infoh dump.\n");
 		break;
-#if 0
+#//if 1
 	case MAC_AX_DBG_PORT_SEL_CMAC_DMA0_C0:
 		*info = &dbg_port_cmac_dma0_c0;
 
@@ -3257,7 +3264,7 @@ u32 dbg_port_sel_8852c(struct mac_ax_adapter *adapter,
 
 		PLTFM_MSG_ALWAYS("Enable cmac1 dma1 dump.\n");
 		break;
-#endif
+//#endif
 
 	case MAC_AX_DBG_PORT_SEL_WDE_BUFMGN_CTL:
 		*info = &dbg_port_wde_bufmgn_ctl;
@@ -3985,8 +3992,8 @@ u32 dbg_port_sel_8852c(struct mac_ax_adapter *adapter,
 		val32 = SET_CLR_WORD(val32, PAXIDMA_DBG_SEL, B_AX_DBG_SEL1);
 		MAC_REG_W32(R_AX_DBG_CTRL, val32);
 		PLTFM_MSG_WARN("%s ind access sel %d start\n", __func__, sel);
-		PLTFM_MUTEX_LOCK(&adapter->hw_info->ind_access_lock);
-		adapter->hw_info->ind_aces_cnt++;
+		PLTFM_MUTEX_LOCK(&adapter->lock_info.ind_access_lock);
+		adapter->dbg_info.ind_aces_cnt++;
 		MAC_REG_W32(R_AX_FILTER_MODEL_ADDR, AXIDMA_BASE_ADDR);
 		PLTFM_MSG_ALWAYS("Enable PAXIDMA TXDMA dump\n");
 		break;
@@ -4000,8 +4007,8 @@ u32 dbg_port_sel_8852c(struct mac_ax_adapter *adapter,
 		val32 = SET_CLR_WORD(val32, PAXIDMA_DBG_SEL, B_AX_DBG_SEL1);
 		MAC_REG_W32(R_AX_DBG_CTRL, val32);
 		PLTFM_MSG_WARN("%s ind access sel %d start\n", __func__, sel);
-		PLTFM_MUTEX_LOCK(&adapter->hw_info->ind_access_lock);
-		adapter->hw_info->ind_aces_cnt++;
+		PLTFM_MUTEX_LOCK(&adapter->lock_info.ind_access_lock);
+		adapter->dbg_info.ind_aces_cnt++;
 		MAC_REG_W32(R_AX_FILTER_MODEL_ADDR, AXIDMA_BASE_ADDR);
 		PLTFM_MSG_ALWAYS("Enable PAXIDMA RXDMA dump\n");
 		break;
@@ -4015,8 +4022,8 @@ u32 dbg_port_sel_8852c(struct mac_ax_adapter *adapter,
 		val32 = SET_CLR_WORD(val32, PAXIDMA_DBG_SEL, B_AX_DBG_SEL1);
 		MAC_REG_W32(R_AX_DBG_CTRL, val32);
 		PLTFM_MSG_WARN("%s ind access sel %d start\n", __func__, sel);
-		PLTFM_MUTEX_LOCK(&adapter->hw_info->ind_access_lock);
-		adapter->hw_info->ind_aces_cnt++;
+		PLTFM_MUTEX_LOCK(&adapter->lock_info.ind_access_lock);
+		adapter->dbg_info.ind_aces_cnt++;
 		MAC_REG_W32(R_AX_FILTER_MODEL_ADDR, AXIDMA_BASE_ADDR);
 		PLTFM_MSG_ALWAYS("Enable PAXIDMA MST dump\n");
 		break;
@@ -4030,8 +4037,8 @@ u32 dbg_port_sel_8852c(struct mac_ax_adapter *adapter,
 		val32 = SET_CLR_WORD(val32, PAXIDMA_DBG_SEL, B_AX_DBG_SEL1);
 		MAC_REG_W32(R_AX_DBG_CTRL, val32);
 		PLTFM_MSG_WARN("%s ind access sel %d start\n", __func__, sel);
-		PLTFM_MUTEX_LOCK(&adapter->hw_info->ind_access_lock);
-		adapter->hw_info->ind_aces_cnt++;
+		PLTFM_MUTEX_LOCK(&adapter->lock_info.ind_access_lock);
+		adapter->dbg_info.ind_aces_cnt++;
 		MAC_REG_W32(R_AX_FILTER_MODEL_ADDR, AXIDMA_BASE_ADDR);
 		PLTFM_MSG_ALWAYS("Enable PAXIDMA INT dump\n");
 		break;
@@ -4128,8 +4135,8 @@ err:
 		PLTFM_MSG_ERR("[ERR]dbg port sel has no err code\n");
 		ret = MACPROCERR;
 	}
-	adapter->hw_info->dbg_port_cnt--;
-	PLTFM_MUTEX_UNLOCK(&adapter->hw_info->dbg_port_lock);
+	adapter->dbg_info.dbg_port_cnt--;
+	PLTFM_MUTEX_UNLOCK(&adapter->lock_info.dbg_port_lock);
 	return ret;
 }
 
@@ -4159,8 +4166,8 @@ u32 dbg_port_sel_rst_8852c(struct mac_ax_adapter *adapter, u32 sel)
 	case MAC_AX_DBG_PORT_SEL_PAXI_RXDMA:
 	case MAC_AX_DBG_PORT_SEL_PAXI_MST:
 	case MAC_AX_DBG_PORT_SEL_PAXI_INT:
-		adapter->hw_info->ind_aces_cnt--;
-		PLTFM_MUTEX_UNLOCK(&adapter->hw_info->ind_access_lock);
+		adapter->dbg_info.ind_aces_cnt--;
+		PLTFM_MUTEX_UNLOCK(&adapter->lock_info.ind_access_lock);
 		PLTFM_MSG_WARN("%s ind access sel %d end\n", __func__, sel);
 		break;
 	default:
@@ -4172,11 +4179,11 @@ u32 dbg_port_sel_rst_8852c(struct mac_ax_adapter *adapter, u32 sel)
 
 u8 is_dbg_port_not_valid_8852c(struct mac_ax_adapter *adapter, u32 dbg_sel)
 {
-	if (adapter->hw_info->intf != MAC_AX_INTF_PCIE &&
+	if (adapter->env_info.intf != MAC_AX_INTF_PCIE &&
 	    dbg_sel >= MAC_AX_DBG_PORT_SEL_PCIE_TXDMA &&
 	    dbg_sel <= MAC_AX_DBG_PORT_SEL_PCIE_EMAC18)
 		return 1;
-	if (adapter->hw_info->intf != MAC_AX_INTF_USB &&
+	if (adapter->env_info.intf != MAC_AX_INTF_USB &&
 	    dbg_sel >= MAC_AX_DBG_PORT_SEL_USB2_PHY &&
 	    dbg_sel <= MAC_AX_DBG_PORT_SEL_USB2_BT)
 		return 1;

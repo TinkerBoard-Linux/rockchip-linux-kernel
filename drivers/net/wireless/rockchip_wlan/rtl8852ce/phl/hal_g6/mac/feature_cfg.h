@@ -33,20 +33,11 @@
 /* Temp code for FPGA verification*/
 #define MAC_AX_FPGA_TEST	0
 
-/* Temp code for lack of BTC driver*/
-#define MAC_AX_ASIC_TEMP	1
-
 /* temp for h2c alloc move to phl layer*/
 #define MAC_AX_PHL_H2C		1
 
-/* Debug command */
-#define MAC_AX_FEATURE_DBGCMD		1
-
-/* Debug Log Decode */
-#define MAC_AX_FEATURE_DBGDEC		1
-
 /* For USB IO Offload Accelerate enable*/
-#if defined(CONFIG_FW_DBCC_OFLD_SUPPORT) || defined(CONFIG_FW_IO_OFLD_SUPPORT)
+#if defined(CONFIG_FW_DBCC_OFLD_SUPPORT) || defined(CONFIG_PHL_IO_OFLD)
 #define MAC_USB_IO_ACC_ON	1
 #else
 #define MAC_USB_IO_ACC_ON	0
@@ -61,7 +52,12 @@
 #endif
 
 /* For USB IO Offload Accelerate*/
-#define MAC_USB_IO_ACC 		0
+#define MAC_USB_IO_ACC		0
+
+#define MAC_SELF_DIAG_INFO	1
+
+/* Enable FWDL Time Profiling feature during FWDL */
+#define MAC_FWDL_TIME_PROFILING 0
 
 #else /* for WD1 test program */
 
@@ -78,8 +74,6 @@
 
 #define MAC_AX_FPGA_TEST	1
 
-#define MAC_AX_ASIC_TEMP	1
-
 /* temp for h2c alloc move to phl layer */
 #define MAC_AX_PHL_H2C		0
 
@@ -88,20 +82,19 @@
 
 #define MAC_AX_COEX_INIT_EN	1
 
-/* Debug command */
-#define MAC_AX_FEATURE_DBGCMD	1
-
-/* Debug Log Decode */
-#define MAC_AX_FEATURE_DBGDEC	1
-
 /* For workaround temp usage */
 #define MAC_AX_RTK_WARD		0
 
 /* For USB IO Offload Accelerate*/
-#define MAC_USB_IO_ACC 		0
+#define MAC_USB_IO_ACC		0
 
 /* For USB IO Offload Accelerate enable*/
 #define MAC_USB_IO_ACC_ON	1
+
+#define MAC_SELF_DIAG_INFO	1
+
+/* Enable FWDL Time Profiling feature during FWDL */
+#define MAC_FWDL_TIME_PROFILING 1
 
 #endif // #else /* for WD1 test program */
 

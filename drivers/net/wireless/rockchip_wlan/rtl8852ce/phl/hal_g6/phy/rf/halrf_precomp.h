@@ -25,6 +25,8 @@
 #ifndef __HALRF_PRECOMP_H__
 #define __HALRF_PRECOMP_H__
 
+/*---[Define in upper layer] ----------------------------------------------------------*/
+#include "../../hal_headers_le.h"
 /*@--------------------------[Define] ---------------------------------------*/
 
 #ifdef CONFIG_RTL8852A
@@ -35,8 +37,31 @@
     #define RF_8852B_SUPPORT
 #endif
 
+#ifdef CONFIG_RTL8852BT
+    #define RF_8852BT_SUPPORT
+#endif
+
+#ifdef CONFIG_RTL8852BPT
+    #define RF_8852BPT_SUPPORT
+#endif
+
 #ifdef CONFIG_RTL8852C
-    #define RF_8852C_SUPPORT
+	#define RF_8852C_SUPPORT
+#endif
+
+#ifdef CONFIG_RTL8842A
+	#define RF_8852C_SUPPORT
+	#define RF_8842A_SUPPORT
+#endif
+
+
+#ifdef CONFIG_RTL8852D
+//	#ifdef PHL_PLATFORM_AP
+//    #define RF_8832D_SUPPORT
+//	#else
+	#define RF_8852D_SUPPORT
+	#define RF_8832D_SUPPORT
+//	#endif
 #endif
 
 #ifdef CONFIG_RTL8832BR
@@ -78,7 +103,7 @@
 
 
 /*---[Define Only] ----------------------------------------------------------*/
-#include "../../hal_headers_le.h"
+//#include "../../hal_headers_le.h"
 #include "halrf_ic_hw_info.h"
 #include "halrf_ic_sw_info.h"
 
@@ -88,6 +113,7 @@
 
 /*---[Include structure & prototype] ----------------------------------------*/
 
+#include "halrf_outsrc_def.h"
 #include "halrf_hw_cfg.h"
 #include "halrf_hw_cfg_ex.h"
 #include "halrf_interface.h"
@@ -120,10 +146,40 @@
 #include "halrf_8852b/halrf_kfree_8852b.h"
 #endif
 
+#ifdef RF_8852BT_SUPPORT
+#include "halrf_8852bt/halrf_dack_8852bt.h"
+#include "halrf_8852bt/halrf_hwimg_8852bt.h"
+#include "halrf_8852bt/halrf_kfree_8852bt.h"
+#endif
+
+#ifdef RF_8852BPT_SUPPORT
+#include "halrf_8852bpt/halrf_dack_8852bpt.h"
+#include "halrf_8852bpt/halrf_hwimg_8852bpt.h"
+#include "halrf_8852bpt/halrf_kfree_8852bpt.h"
+#endif
+
 #ifdef RF_8852C_SUPPORT
 #include "halrf_8852c/halrf_dack_8852c.h"
 #include "halrf_8852c/halrf_hwimg_8852c.h"
 #include "halrf_8852c/halrf_kfree_8852c.h"
+#endif
+
+#ifdef RF_8842A_SUPPORT
+#include "halrf_8842a/halrf_dack_8842a.h"
+#include "halrf_8842a/halrf_hwimg_8842a.h"
+#include "halrf_8842a/halrf_kfree_8842a.h"
+#endif
+
+#ifdef RF_8852D_SUPPORT
+#include "halrf_8852d/halrf_dack_8852d.h"
+#include "halrf_8852d/halrf_hwimg_8852d.h"
+#include "halrf_8852d/halrf_kfree_8852d.h"
+#endif
+
+#ifdef RF_8832D_SUPPORT
+#include "halrf_8832d/halrf_dack_8832d.h"
+#include "halrf_8832d/halrf_hwimg_8832d.h"
+#include "halrf_8832d/halrf_kfree_8832d.h"
 #endif
 
 #ifdef RF_8832BR_SUPPORT
@@ -172,6 +228,7 @@
 	#include "halrf_8852a/halrf_set_pwr_table_8852a.h"
 	#include "halrf_8852a/halrf_tssi_8852a.h"
 	#include "halrf_8852a/halrf_psd_8852a.h"
+	#include "halrf_8852a/halrf_ops_rtl8852a.h"
 #endif
 
 #ifdef RF_8852B_SUPPORT
@@ -187,6 +244,39 @@
 	#include "halrf_8852b/halrf_set_pwr_table_8852b.h"
 	#include "halrf_8852b/halrf_tssi_8852b.h"
 	#include "halrf_8852b/halrf_psd_8852b.h"
+	#include "halrf_8852b/halrf_ops_rtl8852b.h"
+#endif
+
+#ifdef RF_8852BT_SUPPORT
+	#include "halrf_8852bt/halrf_efuse_8852bt.h"
+	#include "halrf_8852bt/halrf_reg_cfg_8852bt.h"
+	#include "halrf_8852bt/halrf_8852bt.h"
+	#include "halrf_8852bt/halrf_8852bt_api.h"
+	#include "halrf_8852bt/halrf_8852bt_api_ex.h"
+	#include "halrf_8852bt/halrf_iqk_8852bt.h"
+	#include "halrf_8852bt/halrf_dpk_8852bt.h"
+	#include "halrf_8852bt/halrf_txgapk_8852bt.h"
+	#include "halrf_8852bt/halrf_version_rtl8852bt.h"
+	#include "halrf_8852bt/halrf_set_pwr_table_8852bt.h"
+	#include "halrf_8852bt/halrf_tssi_8852bt.h"
+	#include "halrf_8852bt/halrf_psd_8852bt.h"
+	#include "halrf_8852bt/halrf_ops_rtl8852bt.h"
+#endif
+
+#ifdef RF_8852BPT_SUPPORT
+	#include "halrf_8852bpt/halrf_efuse_8852bpt.h"
+	#include "halrf_8852bpt/halrf_reg_cfg_8852bpt.h"
+	#include "halrf_8852bpt/halrf_8852bpt.h"
+	#include "halrf_8852bpt/halrf_8852bpt_api.h"
+	#include "halrf_8852bpt/halrf_8852bpt_api_ex.h"
+	#include "halrf_8852bpt/halrf_iqk_8852bpt.h"
+	#include "halrf_8852bpt/halrf_dpk_8852bpt.h"
+	#include "halrf_8852bpt/halrf_txgapk_8852bpt.h"
+	#include "halrf_8852bpt/halrf_version_rtl8852bpt.h"
+	#include "halrf_8852bpt/halrf_set_pwr_table_8852bpt.h"
+	#include "halrf_8852bpt/halrf_tssi_8852bpt.h"
+	#include "halrf_8852bpt/halrf_psd_8852bpt.h"
+	#include "halrf_8852bpt/halrf_ops_rtl8852bpt.h"
 #endif
 
 #ifdef RF_8852C_SUPPORT
@@ -202,7 +292,57 @@
 	#include "halrf_8852c/halrf_set_pwr_table_8852c.h"
 	#include "halrf_8852c/halrf_tssi_8852c.h"
 	#include "halrf_8852c/halrf_psd_8852c.h"
+	#include "halrf_8852c/halrf_ops_rtl8852c.h"
 #endif
+
+#ifdef RF_8842A_SUPPORT
+	#include "halrf_8842a/halrf_efuse_8842a.h"
+	#include "halrf_8842a/halrf_reg_cfg_8842a.h"
+	#include "halrf_8842a/halrf_8842a.h"
+	#include "halrf_8842a/halrf_8842a_api.h"
+//	#include "halrf_8842a/halrf_8842a_api_ex.h"
+	#include "halrf_8842a/halrf_iqk_8842a.h"
+	#include "halrf_8842a/halrf_dpk_8842a.h"
+	#include "halrf_8842a/halrf_txgapk_8842a.h"
+	#include "halrf_8842a/halrf_version_rtl8842a.h"
+	#include "halrf_8842a/halrf_set_pwr_table_8842a.h"
+	#include "halrf_8842a/halrf_tssi_8842a.h"
+	#include "halrf_8842a/halrf_psd_8842a.h"
+	#include "halrf_8842a/halrf_ops_rtl8842a.h"
+#endif
+
+#ifdef RF_8852D_SUPPORT
+	#include "halrf_8852d/halrf_efuse_8852d.h"
+	#include "halrf_8852d/halrf_reg_cfg_8852d.h"
+	#include "halrf_8852d/halrf_8852d.h"
+	#include "halrf_8852d/halrf_8852d_api.h"
+//	#include "halrf_8852d/halrf_8852d_api_ex.h"
+	#include "halrf_8852d/halrf_iqk_8852d.h"
+	#include "halrf_8852d/halrf_dpk_8852d.h"
+	#include "halrf_8852d/halrf_txgapk_8852d.h"
+	#include "halrf_8852d/halrf_version_rtl8852d.h"
+	#include "halrf_8852d/halrf_set_pwr_table_8852d.h"
+	#include "halrf_8852d/halrf_tssi_8852d.h"
+	#include "halrf_8852d/halrf_psd_8852d.h"
+	#include "halrf_8852d/halrf_ops_rtl8852d.h"
+#endif
+
+#ifdef RF_8832D_SUPPORT
+	#include "halrf_8832d/halrf_efuse_8832d.h"
+	#include "halrf_8832d/halrf_reg_cfg_8832d.h"
+	#include "halrf_8832d/halrf_8832d.h"
+	#include "halrf_8832d/halrf_8832d_api.h"
+//	#include "halrf_8832d/halrf_8832d_api_ex.h"
+	#include "halrf_8832d/halrf_iqk_8832d.h"
+	#include "halrf_8832d/halrf_dpk_8832d.h"
+	#include "halrf_8832d/halrf_txgapk_8832d.h"
+	#include "halrf_8832d/halrf_version_rtl8832d.h"
+	#include "halrf_8832d/halrf_set_pwr_table_8832d.h"
+	#include "halrf_8832d/halrf_tssi_8832d.h"
+	#include "halrf_8832d/halrf_psd_8832d.h"
+	#include "halrf_8832d/halrf_ops_rtl8832d.h"
+#endif
+
 
 #ifdef RF_8832BR_SUPPORT
 	#include "halrf_8832br/halrf_efuse_8832br.h"
@@ -217,6 +357,7 @@
 	#include "halrf_8832br/halrf_set_pwr_table_8832br.h"
 	#include "halrf_8832br/halrf_tssi_8832br.h"
 	#include "halrf_8832br/halrf_psd_8832br.h"
+	#include "halrf_8832br/halrf_ops_rtl8832br.h"
 #endif
 
 #ifdef RF_8192XB_SUPPORT
@@ -232,6 +373,7 @@
 	#include "halrf_8192xb/halrf_set_pwr_table_8192xb.h"
 	#include "halrf_8192xb/halrf_tssi_8192xb.h"
 	#include "halrf_8192xb/halrf_psd_8192xb.h"
+	#include "halrf_8192xb/halrf_ops_rtl8192xb.h"
 #endif
 
 #ifdef RF_8852BP_SUPPORT
@@ -247,6 +389,7 @@
 	#include "halrf_8852bp/halrf_set_pwr_table_8852bp.h"
 	#include "halrf_8852bp/halrf_tssi_8852bp.h"
 	#include "halrf_8852bp/halrf_psd_8852bp.h"
+	#include "halrf_8852bp/halrf_ops_rtl8852bp.h"
 #endif
 #ifdef RF_8730A_SUPPORT
 	#include "halrf_8730a/halrf_efuse_8730a.h"
@@ -276,6 +419,7 @@
 	#include "halrf_8851b/halrf_set_pwr_table_8851b.h"
 	#include "halrf_8851b/halrf_tssi_8851b.h"
 	#include "halrf_8851b/halrf_psd_8851b.h"
+	#include "halrf_8851b/halrf_ops_rtl8851b.h"
 #endif
 
 #endif

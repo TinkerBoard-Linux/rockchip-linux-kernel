@@ -15,6 +15,15 @@
 #ifndef _RTW_TRX_PCI_H_
 #define _RTW_TRX_PCI_H_
 
+#ifdef CONFIG_64BIT_DMA
+/*
+ * 64bit DMA constraint:
+ * - 8852ce and later: 36bit in WP
+ * - 8852be and before: 40bit in WP
+ */
+#define CONFIG_64BIT_DMA_BIT_MASK 36
+#endif
+
 extern struct rtw_intf_ops pci_ops;
 
 static inline u8 is_pci_support_dma64(struct dvobj_priv *dvobj)

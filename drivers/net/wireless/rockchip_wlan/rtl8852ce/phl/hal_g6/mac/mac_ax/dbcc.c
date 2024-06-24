@@ -453,6 +453,40 @@ u32 mac_dbcc_trx_ctrl(struct mac_ax_adapter *adapter,
 	return ret;
 }
 
+u32 mac_notify_fw_dbcc(struct mac_ax_adapter *adapter, u8 en)
+{
+	u32 ret;
+	struct fwcmd_notify_dbcc *dbcc;
+	struct h2c_info h2c_info = {0};
+
+	if (adapter->sm.fwdl != MAC_AX_FWDL_INIT_RDY) {
+		PLTFM_MSG_WARN("%s fw not ready\n", __func__);
+		return MACFWNONRDY;
+	}
+
+	h2c_info.agg_en = 0;
+	h2c_info.content_len = sizeof(struct fwcmd_notify_dbcc);
+	h2c_info.h2c_cat = FWCMD_H2C_CAT_MAC;
+	h2c_info.h2c_class = FWCMD_H2C_CL_MEDIA_RPT;
+	h2c_info.h2c_func = FWCMD_H2C_FUNC_NOTIFY_DBCC;
+	h2c_info.rec_ack = 0;
+	h2c_info.done_ack = 1;
+
+	dbcc = (struct fwcmd_notify_dbcc *)PLTFM_MALLOC(h2c_info.content_len);
+	if (!dbcc) {
+		PLTFM_MSG_ERR("%s: h2c MALLOC fail\n", __func__);
+		return MACNPTR;
+	}
+
+	dbcc->dword0 = en ? FWCMD_H2C_NOTIFY_DBCC_EN : 0;
+
+	ret = mac_h2c_common(adapter, &h2c_info, (u32 *)dbcc);
+
+	PLTFM_FREE(dbcc, h2c_info.content_len);
+
+	return ret;
+}
+
 u32 mac_dbcc_enable(struct mac_ax_adapter *adapter,
 		    struct mac_ax_trx_info *info, u8 dbcc_en)
 {

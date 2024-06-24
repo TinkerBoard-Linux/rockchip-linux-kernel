@@ -25,11 +25,14 @@
 #define IEEE80211_CHAN_IR_CONCURRENT IEEE80211_CHAN_GO_CONCURRENT
 #endif
 
+#if !RTW_PER_ADAPTER_WIPHY
 void rtw_chset_hook_os_channels(struct rtw_chset *chset, void *os_ref);
+#endif
 void rtw_regd_change_complete_sync(struct wiphy *wiphy, struct get_chplan_resp *chplan, bool rtnl_lock_needed);
 int rtw_regd_change_complete_async(struct wiphy *wiphy, struct get_chplan_resp *chplan);
 #ifdef CONFIG_REGD_SRC_FROM_OS
 void rtw_chset_apply_from_os(struct rtw_chset *chset, u8 d_flags);
+enum country_ie_slave_en_mode rtw_os_get_cis_en_mode(_adapter *adapter);
 s16 rtw_os_get_total_txpwr_regd_lmt_mbm(_adapter *adapter, enum band_type band, u8 cch, enum channel_width bw);
 #endif
 

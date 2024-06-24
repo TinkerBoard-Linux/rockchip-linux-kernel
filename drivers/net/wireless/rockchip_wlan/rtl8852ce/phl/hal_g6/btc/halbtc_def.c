@@ -70,6 +70,12 @@
 	case BTC_FDDT_TYPE_##src: return #src
 #define case_fddt_norun(src) \
 	case BTC_NFRSN_##src: return #src
+#define case_fddt_tstate(src) \
+	case CX_FDDT_STATE_##src: return #src
+#define case_fddt_tphase(src) \
+	case CX_FDDT_PHASE_##src: return #src
+#define case_fddt_chkmap(src) \
+	case CX_FDDT_CHKMAP_##src: return #src
 #define case_dmerr(src) \
 	case BTC_DMERR_##src: return #src
 #define case_fwerr(src) \
@@ -78,6 +84,8 @@
 	case BTC_RPT_TYPE_##src: return #src
 #define case_h2cerr(src) \
 	case SET_##src: return #src
+#define case_vendorid(src) \
+	case BTC_VID_##src: return #src
 
 const char *id_to_str(u8 type, u32 id)
 {
@@ -159,10 +167,16 @@ const char *id_to_str(u8 type, u32 id)
 		break;
 	case BTC_STR_BRANCH:
 		switch (id) {
-		case_branch(MAIN);
+		case_branch(FORMAL);
+		case_branch(UPSTREAM);
 		case_branch(HP);
 		case_branch(LENOVO);
-		case_branch(HUAWEI);
+		case_branch(XBOX);
+		case_branch(HW);
+		case_branch(ROKU);
+		case_branch(LG);
+		case_branch(SAMSUNG);
+		case_branch(AMAZON);
 		}
 		break;
 	case BTC_STR_RXFLCTRL:
@@ -201,6 +215,7 @@ const char *id_to_str(u8 type, u32 id)
 		case_antpath(FREERUN);
 		case_antpath(FDDTRAIN);
 		case_antpath(WRFK);
+		case_antpath(WRFK2);
 		case_antpath(BRFK);
 		}
 		break;
@@ -218,8 +233,8 @@ const char *id_to_str(u8 type, u32 id)
 		case_gdbg(BT_RELINK);
 		case_gdbg(SLOT_WL);
 		case_gdbg(SLOT_BT);
-		case_gdbg(WL_RFK);
-		case_gdbg(BT_RFK);
+		case_gdbg(WL_ERR);
+		case_gdbg(WL_OK);
 		case_gdbg(SLOT_B2W);
 		case_gdbg(SLOT_W1);
 		case_gdbg(SLOT_W2);
@@ -232,11 +247,12 @@ const char *id_to_str(u8 type, u32 id)
 		case_gdbg(SLOT_E2G);
 		case_gdbg(SLOT_E5G);
 		case_gdbg(SLOT_EBT);
-		case_gdbg(SLOT_ENULL);
 		case_gdbg(SLOT_WLK);
-		case_gdbg(SLOT_W1FDD);
 		case_gdbg(SLOT_B1FDD);
 		case_gdbg(BT_CHANGE);
+		case_gdbg(WL_CCA);
+		case_gdbg(BT_LEAUDIO);
+		case_gdbg(USER_DEF);
 		}
 		break;
 	case BTC_STR_CHIPID:
@@ -244,11 +260,17 @@ const char *id_to_str(u8 type, u32 id)
 		case_chip(WIFI6_8852A);
 		case_chip(WIFI6_8852B);
 		case_chip(WIFI6_8852C);
-#ifdef BTC_8852BP_SUPPORT
-		case_chip(WIFI6_8852BP);
+		case_chip(WIFI6_8842A);
+#ifdef BTC_8852D_SUPPORT
+		case_chip(WIFI6_8852D);
 #endif
-#ifdef BTC_8851B_SUPPORT
+		case_chip(WIFI6_8852BP);
 		case_chip(WIFI6_8851B);
+#ifdef BTC_8852BT_SUPPORT
+		case_chip(WIFI6_8852BT);
+#endif
+#ifdef BTC_8852BT_SUPPORT
+		case_chip(WIFI6_8852BPT);
 #endif
 		}
 		break;
@@ -290,6 +312,9 @@ const char *id_to_str(u8 type, u32 id)
 		case_event(EBT_EXTEND);
 		case_event(E2G_NULL1);
 		case_event(B1FDD_TMR);
+#ifdef BTC_LE_INIT_TO_WL_SLOT
+		case_event(LE_INIT_END);
+#endif
 		}
 		break;
 	case BTC_STR_WLMODE:
@@ -348,10 +373,13 @@ const char *id_to_str(u8 type, u32 id)
 		case_cxp(OFF_EQ1);
 		case_cxp(OFF_EQ2);
 		case_cxp(OFF_EQ3);
+		case_cxp(OFF_EQ4);
+		case_cxp(OFF_EQ5);
 		case_cxp(OFF_BWB0);
 		case_cxp(OFF_BWB1);
 		case_cxp(OFF_BWB2);
 		case_cxp(OFF_BWB3);
+		case_cxp(OFF_WL2);
 		case_cxp(OFFB_BWB0);
 		case_cxp(OFFE_2GBWISOB);
 		case_cxp(OFFE_2GISOB);
@@ -381,6 +409,7 @@ const char *id_to_str(u8 type, u32 id)
 		case_cxp(AUTO_TD60B1);
 		case_cxp(AUTO_TD20B1);
 		case_cxp(AUTO_TDW1B1);
+		case_cxp(AUTO_TDW1B1_CXTPS);
 		case_cxp(PAUTO_TD50B1);
 		case_cxp(PAUTO_TD60B1);
 		case_cxp(PAUTO_TD20B1);
@@ -598,6 +627,41 @@ const char *id_to_str(u8 type, u32 id)
 		case_fddt_norun(RETRY_PERIOD);
 		}
 		break;
+	case BTC_STR_FDDT_TSTATE:
+		switch(id) {
+		case_fddt_tstate(STOP);
+		case_fddt_tstate(RUN);
+		case_fddt_tstate(OK);
+		case_fddt_tstate(FAIL);
+		case_fddt_tstate(NA);
+		case_fddt_tstate(DEBUG);
+		case_fddt_tstate(MAX);
+		}
+		break;
+	case BTC_STR_FDDT_TPHASE:
+		switch(id) {
+		case_fddt_tphase(STOP);
+		case_fddt_tphase(DEBUG);
+		case_fddt_tphase(TDD);
+		case_fddt_tphase(FDD_A);
+		case_fddt_tphase(FDD_B);
+		case_fddt_tphase(TDD_STAY);
+		case_fddt_tphase(FDD_STAY);
+		case_fddt_tphase(TDD_FAIL);
+		case_fddt_tphase(MAX);
+		}
+		break;
+	case BTC_STR_FDDT_CHKMAP:
+		switch(id) {
+		case_fddt_chkmap(NOEMPTY);
+		case_fddt_chkmap(TPRATIO);
+		case_fddt_chkmap(TPLOW);
+		case_fddt_chkmap(CN);
+		case_fddt_chkmap(CELLCHG);
+		case_fddt_chkmap(NHM);
+		case_fddt_chkmap(MAX);
+		}
+		break;
 	case BTC_STR_DMERROR:
 		switch(id) {
 		case_dmerr(INIT);
@@ -617,6 +681,17 @@ const char *id_to_str(u8 type, u32 id)
 		case_dmerr(AFH_CONFLICT);
 		case_dmerr(AFH_LE_CONFLICT);
 		case_dmerr(BT_SLOT_FLOOD);
+		case_dmerr(E2G_HANG);
+		case_dmerr(WL_VER_MISMATCH);
+		case_dmerr(BT_VER_MISMATCH);
+		case_dmerr(RFE_TYPE0);
+		case_dmerr(H2C_BUF_OVER);
+		case_dmerr(BTTX_HANG);
+		case_dmerr(WL_NO_STA_NTFY);
+		case_dmerr(H2C_BMAP_MISMATCH);
+		case_dmerr(C2H_BMAP_MISMATCH);
+		case_dmerr(H2C_STRUCT_INVALID);
+		case_dmerr(C2H_STRUCT_INVALID);
 		}
 		break;
 	case BTC_STR_FWERROR:
@@ -628,9 +703,9 @@ const char *id_to_str(u8 type, u32 id)
 		case_fwerr(B2_EXCEPTION);
 		case_fwerr(B3_EXCEPTION);
 		case_fwerr(B4_EXCEPTION);
-		case_fwerr(AUTO_EXCEPTION);
+		case_fwerr(LPS_TIMER_START);
 		case_fwerr(EXAUTO_EXCEPTION);
-		case_fwerr(EXAUTO_EXCEPTION2);
+		case_fwerr(BUF_OVERFLOW);
 		case_fwerr(BRLY_EXCEPTION);
 		case_fwerr(SM);
 		case_fwerr(B2_AFTER);
@@ -675,9 +750,21 @@ const char *id_to_str(u8 type, u32 id)
 		case_h2cerr(BT_LNA_CONSTRAIN);
 		case_h2cerr(BT_QUERY_DEV_LIST);
 		case_h2cerr(BT_QUERY_DEV_INFO);
-		case_h2cerr(BT_GOLDEN_RX_RANGE);
 		case_h2cerr(BT_PSD_REPORT);
 		case_h2cerr(H2C_TEST);
+		}
+		break;
+	case BTC_STR_VENDORID:
+		switch(id) {
+		case_vendorid(NONE);
+		case_vendorid(HP);
+		case_vendorid(ASUS);
+		case_vendorid(ACER);
+		case_vendorid(LNV);
+		case_vendorid(NEC);
+		case_vendorid(AMD);
+		case_vendorid(FUJITSU);
+		case_vendorid(DELL);
 		}
 		break;
 	}

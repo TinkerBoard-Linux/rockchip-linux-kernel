@@ -17,6 +17,8 @@
 
 #ifdef CONFIG_CORE_TXSC
 
+//#define USE_ONE_WLHDR /* do not use one hdr when use sw amsdu in txsc */ /* TBD, open this when hw_hde_conv ready */
+
 #ifndef USE_ONE_WLHDR
 #define USE_PREV_WLHDR_BUF
 #endif
@@ -31,7 +33,6 @@ enum txsc_action_type {
 	TXSC_ADD,
 	TXSC_APPLY,
 	TXSC_AMSDU_APPLY,
-	TXSC_DEBUG,
 };
 
 enum full_cnt_type {
@@ -40,6 +41,31 @@ enum full_cnt_type {
 	PHL_WD_RECYCLE_NOTHING,
 	PHL_WD_RECYCLE_OK,
 };
+
+#ifdef CONFIG_TXSC_AMSDU
+
+#define MAX_AMSDU_ENQ_NUM 256
+
+enum txsc_amsdu_timer_type {
+	TXSC_AMSDU_TIMER_UNSET,
+	TXSC_AMSDU_TIMER_SETTING,
+	TXSC_AMSDU_TIMER_TIMEOUT,
+};
+
+enum txsc_amsdu_enq_type {
+	TXSC_AMSDU_NEED_DEQ,
+	TXSC_AMSDU_ENQ_ABORT,
+	TXSC_AMSDU_ENQ_SUCCESS,
+};
+
+struct txsc_amsdu_swq {
+	_lock	txsc_amsdu_lock;
+	struct sk_buff *skb_q[MAX_AMSDU_ENQ_NUM];
+	u32 wptr;
+	u32 rptr;
+	u32 cnt;
+};
+#endif
 
 struct txsc_pkt_entry {
 	enum txsc_action_type step;
@@ -51,6 +77,12 @@ struct txsc_pkt_entry {
 
 	struct sk_buff *xmit_skb[MAX_TXSC_SKB_NUM];
 	u8 skb_cnt;
+	bool is_sta_sleep;
+#ifdef CONFIG_TXSC_AMSDU
+	u8 ac;
+	bool amsdu;
+	bool is_amsdu_timeout;
+#endif
 };
 
 struct txsc_entry {
@@ -69,16 +101,17 @@ struct txsc_entry {
 
 	struct rtw_t_meta_data	txsc_mdata;
 	u32	txsc_frag_len;/* for pkt frag check */
-
-	u8	txsc_phl_id; /* CONFIG_PHL_TXSC */
+	u8 txsc_phl_id; /* CONFIG_PHL_TXSC */
+#ifdef CONFIG_TXSC_AMSDU
+	bool txsc_amsdu;
+#endif
 	u32	txsc_cache_hit;
 };
 
-void _print_txreq_mdata(struct rtw_t_meta_data *mdata, const char *func);
 void _print_txreq_pklist(struct xmit_frame *pxframe, struct rtw_xmit_req *ptxsc_txreq, struct sk_buff *pskb, const char *func);
 void txsc_init(_adapter *padapter);
 void txsc_clear(_adapter *padapter);
-void txsc_dump(_adapter *padapter);
+void txsc_dump(_adapter *padapter, void *m);
 void txsc_dump_data(u8 *buf, u16 buf_len, const char *prefix);
 u8 txsc_get_sc_cached_entry(_adapter *padapter, struct sk_buff *pskb, struct txsc_pkt_entry *txsc_pkt);
 void txsc_add_sc_cache_entry(_adapter *padapter, struct xmit_frame *pxframe, struct txsc_pkt_entry *txsc_pkt);
@@ -90,6 +123,15 @@ void txsc_recycle_txreq_phyaddr(_adapter *padapter, struct rtw_xmit_req *txreq);
 void txsc_free_txreq(_adapter *padapter, struct rtw_xmit_req *txreq);
 void txsc_debug_sc_entry(_adapter *padapter, struct xmit_frame *pxframe, struct txsc_pkt_entry *txsc_pkt);
 void txsc_issue_addbareq_cmd(_adapter *padapter, u8 priority, struct sta_info *psta, u8 issue_when_busy);
+#ifdef CONFIG_TXSC_AMSDU
+void txsc_amsdu_queue_free(_adapter *padapter, struct sta_info *psta);
+void txsc_amsdu_queue_init(_adapter *padapter, struct sta_info *psta);
+u8 txsc_amsdu_enqueue(_adapter *padapter, struct txsc_pkt_entry *txsc_pkt, u8 *status);
+s32 txsc_amsdu_timeout_tx(struct sta_info *psta, u8 ac);
+void txsc_amsdu_sta_init(_adapter *padapter, struct sta_info* psta);
+void txsc_amsdu_clear(_adapter *padapter);
+void txsc_amsdu_dump(_adapter *padapter, void *m);
+#endif /* CONFIG_TXSC_AMSDU */
 #endif /* CONFIG_CORE_TXSC */
 #endif /* _RTW_XMIT_SHORTCUT_H_ */
 

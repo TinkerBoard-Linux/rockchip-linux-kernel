@@ -36,7 +36,6 @@
 #define DFS_PPB_PRCNT 4
 #define DFS_PPB_IDLE_PRCNT 5
 
-#define DFS_CHIRP_TH 3
 #define DFS_FCC_LP_LNGTH 12	/*Real Waveform length of FCC-LP is 12 secs*/
 #define DFS_MAX_SEQ_NUM 127
 
@@ -46,7 +45,41 @@
 
 #define DFS_Normal_State 0
 #define DFS_Adaptive_State 1
+
+#ifdef HALBB_DFS_GEN2_SERIES
+#define REF_TYPE_PRI 111                /* 1428us / 12.8(unit) */
+#define SRRC_RFE_TYPE_PRI 78      /* 1000us / 12.8(unit) */
+#define W56_Type1_PRI 108            /* 1388us / 12.8(unit) */
+#endif
+
+#ifdef HALBB_DBG_TRACE_SUPPORT
+#ifdef HALBB_DBCC_SUPPORT
+#define BB_DFS_DBG(bb, case, fmt, ...)\
+	do {\
+		if((bb->dbg_component & BB_DFS) && (bb->bb_dfs_i.dbg_print_component & case)) {\
+			_os_dbgdump("[BB][%d]" fmt, bb->bb_phy_idx, ##__VA_ARGS__);\
+		}\
+	} while (0)
+#else
+#define BB_DFS_DBG(bb, case, fmt, ...)\
+	do {\
+		if((bb->dbg_component & BB_DFS) && (bb->bb_dfs_i.dbg_print_component & case)) {\
+			_os_dbgdump("[BB]" fmt, ##__VA_ARGS__);\
+		}\
+	} while (0)
+#endif
+#else
+#define BB_DFS_DBG(bb, case, fmt, ...)
+#endif
+
 /*@--------------------------[Enum]------------------------------------------*/
+enum dfs_dbg_print_case {
+	HWDET_PRINT		= BIT(1),
+	SWDET_PRINT		= BIT(2),
+	BRK_PRINT		= BIT(3),
+	DYN_PRINT		= BIT(4),
+	TRIVIL_PRINT		= BIT(5)
+};
 /*@--------------------------[Structure]-------------------------------------*/
 struct bb_dfs_cr_info {
 	u32 dfs_en;
@@ -60,13 +93,12 @@ struct bb_dfs_cr_info {
 };
 
 struct bb_dfs_info {
-	struct bb_dfs_cr_info	bb_dfs_cr_i;
-
 //============= Used by TW DFS ==============//
 	bool is_tw_en;
 	bool bypass_seg0;
 //===========================================//
 
+	u8 dbg_print_component;
 	u8 dfs_rgn_domain;
 	u8 ppb_prcnt;
 	u16 pw_rpt[DFS_MAX_SEQ_NUM];
@@ -74,6 +106,51 @@ struct bb_dfs_info {
 	u8 seq_num_rpt[DFS_MAX_SEQ_NUM];
 	u8 seq_num_rpt_all[DFS_MAX_SEQ_NUM];
 	bool chrp_rpt[DFS_MAX_SEQ_NUM];
+
+#ifdef HALBB_DFS_GEN2_SERIES
+	bool dfs_more[DFS_MAX_SEQ_NUM];
+	bool dfs_phy_def[DFS_MAX_SEQ_NUM];
+	u8 format[DFS_MAX_SEQ_NUM];
+	u8 bbid[DFS_MAX_SEQ_NUM];
+	u16 seq_num[DFS_MAX_SEQ_NUM];
+	u16 RSVD[DFS_MAX_SEQ_NUM];
+	u16 sub20_1_pw[DFS_MAX_SEQ_NUM];
+	u16 sub20_1_pri[DFS_MAX_SEQ_NUM];
+	bool sub20_1_chirp_flag[DFS_MAX_SEQ_NUM];
+	bool sub20_1_pres[DFS_MAX_SEQ_NUM];
+	u16 sub20_0_pw[DFS_MAX_SEQ_NUM];
+	u16 sub20_0_pri[DFS_MAX_SEQ_NUM];
+	bool sub20_0_chirp_flag[DFS_MAX_SEQ_NUM];
+	bool sub20_0_pres[DFS_MAX_SEQ_NUM];
+
+	u8 sub20_0_srt_rdr_cnt[DFS_RDR_TYP_NUM];
+	u8 sub20_1_srt_rdr_cnt[DFS_RDR_TYP_NUM];
+	u8 sub20_2_srt_rdr_cnt[DFS_RDR_TYP_NUM];
+	u8 sub20_3_srt_rdr_cnt[DFS_RDR_TYP_NUM];
+	u8 sub20_4_srt_rdr_cnt[DFS_RDR_TYP_NUM];
+	u8 sub20_5_srt_rdr_cnt[DFS_RDR_TYP_NUM];
+	u8 sub20_6_srt_rdr_cnt[DFS_RDR_TYP_NUM];
+	u8 sub20_7_srt_rdr_cnt[DFS_RDR_TYP_NUM];
+	u8 sub20_0_lng_rdr_cnt;
+	u8 sub20_1_lng_rdr_cnt;
+	u8 sub20_2_lng_rdr_cnt;
+	u8 sub20_3_lng_rdr_cnt;
+	u8 sub20_4_lng_rdr_cnt;
+	u8 sub20_5_lng_rdr_cnt;
+	u8 sub20_6_lng_rdr_cnt;
+	u8 sub20_7_lng_rdr_cnt;
+
+	u8 adv_pri_cnt[DFS_RDR_TYP_NUM];
+	bool sub20_detect_en;
+#endif
+	u16 pw_ofst;
+	u16 pri_ofst;
+	u16 adv_pri_ofst;
+	u32 l2h_init_val;
+	u32 l2h_val;  /* for FCC detection BW */
+
+//===========================================//
+//===========================================//
 //============= Used by TW DFS ==============//
 	bool seg_rpt[DFS_MAX_SEQ_NUM];
 	bool seg_rpt_all[DFS_MAX_SEQ_NUM];
@@ -81,7 +158,6 @@ struct bb_dfs_info {
 	//u8 chrp_cnt;
 	//u8 chrp_th;
 	u32 chrp_srt_t;
-	u8 n_cnfd_lvl;
 	u8 lng_rdr_cnt;
 	u8 chrp_rdr_cnt;
 	u8 lng_rdr_cnt_pre;
@@ -95,15 +171,16 @@ struct bb_dfs_info {
 //===========================================//
 
 	u8 srt_rdr_cnt[DFS_RDR_TYP_NUM];
-	u8 pw_lbd[DFS_RDR_TYP_NUM];
+	u16 pw_lbd[DFS_RDR_TYP_NUM];
 	u16 pw_ubd[DFS_RDR_TYP_NUM];
-	u8 pri_lbd[DFS_RDR_TYP_NUM];
-	u8 pri_ubd[DFS_RDR_TYP_NUM];
-	u8 pw_min_tab[DFS_RDR_TYP_NUM];
+	u16 pri_lbd[DFS_RDR_TYP_NUM];
+	u16 pri_ubd[DFS_RDR_TYP_NUM];
+	u16 pw_min_tab[DFS_RDR_TYP_NUM];
 	u16 pw_max_tab[DFS_RDR_TYP_NUM];
-	u8 pri_min_tab[DFS_RDR_TYP_NUM];
-	u8 pri_max_tab[DFS_RDR_TYP_NUM];
+	u16 pri_min_tab[DFS_RDR_TYP_NUM];
+	u16 pri_max_tab[DFS_RDR_TYP_NUM];
 	u8 ppb_tab[DFS_RDR_TYP_NUM];
+	u8 ppb_tp_tab[DFS_RDR_TYP_NUM];
 	u8 ppb_typ_th[DFS_RDR_TYP_NUM];
 	u8 lst_seq_num;
 	u8 lst_seg_idx;
@@ -119,7 +196,6 @@ struct bb_dfs_info {
 	bool is_mic_w56;
 	bool l_rdr_exst_flag;
 	bool chrp_obsrv_flag;
-	bool n_cnfd_flag;
 	bool n_seq_flag;
 //============= Used by TW DFS ==============//
 	bool chrp_obsrv_flag_sg1;
@@ -131,20 +207,15 @@ struct bb_dfs_info {
 
 	bool dfs_sw_trgr_mode;
 	bool dfs_dbg_mode;
-	bool dbg_dyn_prnt_en;
-	bool dbg_hwdet_prnt_en;
-	bool dbg_swdet_prnt_en;
-	bool dbg_trivil_prnt_en;
-	bool dbg_brk_prnt_en;
+	bool mask_fake_rpt_en;
+	bool dfs_dyn_setting_en;
+	u16 dfs_fa_th;
 	u8 fk_dfs_num_th;
 	u8 dfs_tp_th;
 	u8 dfs_idle_prd_th;
-
-	u16 dfs_fa_th;
+	u8 dfs_rx_rto_th;
 	u8 dfs_nhm_th;
-	u8 dfs_n_cnfd_lvl_th;
-
-	bool dfs_dyn_setting_en;
+	u8 dfs_rssi_th;
 
 	u8 adap_detect_cnt;
 	u8 adap_detect_cnt_init;
@@ -156,15 +227,7 @@ struct bb_dfs_info {
 
 	u8 pri_mask_th;
 	u8 rpt_rdr_cnt;
-
-	bool dfs_dyn_aci_en;
-	u8 dfs_aci_adaptv_th0;
-	u8 dfs_aci_adaptv_th1;
-	u8 dfs_aci_idx;
-	s8 ACI2SIG_db;
-	bool dfs_aci_is_read;
-	u8 no_aci_rpt_cnt;
-	u8 no_aci_rpt_th;
+	u8 pri_full_cnt;
 
 	bool In_CAC_Flag;
 
@@ -172,7 +235,8 @@ struct bb_dfs_info {
 	u16 pw_lng_chrp_diff_th;
 	u16 pri_diff_th;
 	u16 pw_max_th;
-	u16 invalid_lng_pulse_th;
+	u16 invalid_lng_pulse_h_th;
+	u16 invalid_lng_pulse_l_th;
 
 	u16 min_pw_shrt[DFS_RDR_TYP_NUM];
 	u16 min_pw_lng;
@@ -203,12 +267,6 @@ struct bb_dfs_info {
 	u16 pri_diff_shrt_sg1[DFS_RDR_TYP_NUM];
 //===========================================//
 
-
-//============== MSFT Only ==================//
-	u8 dfs_mask_l2h_val;
-	u8 dfs_backup_l2h_val;
-//===========================================//
-
 };
 
 struct bb_dfs_rpt {
@@ -217,11 +275,73 @@ struct bb_dfs_rpt {
 	u8 phy_idx; /*phy0,phy1*/
 };
 
+#ifdef HALBB_DFS_GEN2_SERIES
+#if (PLATFOM_IS_LITTLE_ENDIAN)
+struct bb_rdr_info_gen2 {
+	u8 dfs_sub20_0_pres : 1;  /*whether rpt is valid*/
+	u8 dfs_sub20_0_chirp_flag : 1;
+	u8 dfs_sub20_0_pri_l : 6;
+
+	u8 dfs_sub20_0_pri_m : 3;
+	u8 dfs_sub20_0_pw_l : 5;
+
+	u8 dfs_sub20_0_pw_m : 4;
+	u8 dfs_sub20_1_pres : 1;
+	u8 dfs_sub20_1_chirp_flag : 1;
+	u8 dfs_sub20_1_pri_l : 2;
+
+	u8 dfs_sub20_1_pri_m : 7;
+	u8 dfs_sub20_1_pw_l : 1;
+
+	u8 dfs_sub20_1_pw_m;
+
+	u8 RSVD_l;
+	
+	u8 RSVD_m : 4;
+	u8 dfs_seq_num_l : 4;
+
+	u8 dfs_seq_num_m : 3;
+	u8 dfs_bbid : 1; /*BB0,BB1*/
+	u8 dfs_format : 2;
+	u8 dfs_phy_def : 1; /*phy0,phy1*/
+	u8 dfs_more : 1;
+};
+#else
+struct bb_rdr_info_gen2 {
+	u8 dfs_sub20_0_pri_l : 6;
+	u8 dfs_sub20_0_chirp_flag : 1;
+	u8 dfs_sub20_0_pres : 1;
+
+	u8 dfs_sub20_0_pw_l : 5;
+	u8 dfs_sub20_0_pri_m : 3;
+
+	u8 dfs_sub20_1_pri_l : 2;
+	u8 dfs_sub20_1_chirp_flag : 1;
+	u8 dfs_sub20_1_pres : 1;
+	u8 dfs_sub20_0_pw_m : 4;
+
+	u8 dfs_sub20_1_pw_l : 1;
+	u8 dfs_sub20_1_pri_m : 7;
+
+	u8 dfs_sub20_1_pw_m;
+
+	u8 RSVD_l;
+	
+	u8 dfs_seq_num_l : 4;
+	u8 RSVD_m : 4;
+
+	u8 dfs_more : 1;
+	u8 dfs_phy_def : 1;
+	u8 dfs_format : 2;
+	u8 dfs_bbid : 1;
+	u8 dfs_seq_num_m : 3;
+};
+#endif
+#endif
 
 #ifdef HALBB_TW_DFS_SERIES
-
 #if (PLATFOM_IS_LITTLE_ENDIAN)
-struct bb_rdr_info {
+struct bb_rdr_info_gen1 {
 	u8 rdr_info_sg1_chirp_flag : 1; /*[18:9],[8:1],[0]*/
 	u8 rdr_info_sg1_pri_l : 7;
 
@@ -248,7 +368,7 @@ struct bb_rdr_info {
 
 };
 #else
-struct bb_rdr_info {
+struct bb_rdr_info_gen1 {
 	u8 rdr_info_sg1_pri_l : 7;
 	u8 rdr_info_sg1_chirp_flag : 1;
 
@@ -274,10 +394,10 @@ struct bb_rdr_info {
 	u8 rdr_info_sg0_seq : 7;
 };
 #endif
+#endif
 
-#else
 #if (PLATFOM_IS_LITTLE_ENDIAN)
-struct bb_rdr_info {
+struct bb_rdr_info_gen0{
 	u8 rdr_info_sg0_chirp_flag:1;	/*[18:9],[8:1],[0]*/
 	u8 rdr_info_sg0_pri_l:7;
 
@@ -304,7 +424,7 @@ struct bb_rdr_info {
 	u8 rdr_info_seq:7;
 };
 #else
-struct bb_rdr_info {
+struct bb_rdr_info_gen0 {
 	u8 rdr_info_sg0_pri_l:7;
 	u8 rdr_info_sg0_chirp_flag:1;
 
@@ -331,7 +451,6 @@ struct bb_rdr_info {
 	u8 rdr_info_zw_pw_h:1;
 };
 #endif
-#endif
 /*@--------------------------[Prptotype]-------------------------------------*/
 struct bb_info;
 struct hal_dfs_rpt;
@@ -347,9 +466,17 @@ void halbb_radar_ptrn_cmprn(struct bb_info *bb, u16 dfs_rpt_idx,
 			    u8 pri, u16 pw, bool chrp_flag, bool is_sg1);
 void halbb_radar_info_processing(struct bb_info *bb,
 				 struct hal_dfs_rpt *dfs_rpt, u16 dfs_rpt_idx);
-void halbb_parsing_aci2sig(struct bb_info* bb, u32 physts_bitmap);
 void halbb_dfs_dyn_setting(struct bb_info *bb);
 void halbb_dfs_debug(struct bb_info *bb, char input[][16], u32 *_used,
 		     char *output, u32 *_out_len);
 void halbb_cr_cfg_dfs_init(struct bb_info *bb);
+#ifdef HALBB_DFS_GEN2_SERIES
+void halbb_radar_info_processing_gen2(struct bb_info *bb, struct hal_dfs_rpt *rpt, u16 dfs_rpt_idx);
+void halbb_radar_cnt_accumulate(struct bb_info *bb, u8 rpt_idx, bool sub20_1, u8 rdr_type_idx, bool is_long);
+void halbb_radar_ptrn_cmprn_gen2(struct bb_info *bb);
+u16 halbb_radar_judge_gen2(struct bb_info *bb);
+u16 halbb_radar_detect_gen2(struct bb_info *bb, struct hal_dfs_rpt *dfs_rpt);
+void halbb_dfs_dyn_setting_gen2(struct bb_info *bb);
+void halbb_radar_show_log(struct bb_info *bb, struct hal_dfs_rpt *dfs_rp, u16 rdr_detected);
+#endif
 #endif

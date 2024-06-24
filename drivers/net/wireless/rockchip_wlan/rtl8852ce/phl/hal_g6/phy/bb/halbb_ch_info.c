@@ -102,7 +102,7 @@ bool halbb_ch_info_valid_chk_8852a(struct bb_info *bb, struct physts_rxd *desc)
 void halbb_ch_info_cr_dump(struct bb_info *bb)
 {
 	struct bb_ch_rpt_info *ch_rpt = &bb->bb_ch_rpt_i;
-	struct bb_ch_info_cr_info *cr = &ch_rpt->bb_ch_info_cr_i;
+	struct bb_ch_info_cr_info *cr = &bb->bb_cmn_hooker->bb_ch_info_cr_i;
 	struct bb_ch_info_cr_cfg_info *cfg = &ch_rpt->bb_ch_info_cr_cfg_i;
 	struct bb_ch_info_cr_cfg_info *cur_cfg = &ch_rpt->bb_ch_info_cur_cr_cfg_i;
 	u32 cr_table[4];
@@ -135,7 +135,8 @@ void halbb_ch_info_physts_get_buf(struct bb_info *bb, u8 *rpt_buf,
 	drv->get_ch_rpt_success = ch_physts->get_ch_rpt_success;
 	drv->seg_idx_curr = 0;
 	drv->raw_data_len = ch_physts->ch_info_len;
-	rpt_buf = (u8*)buf->octet;
+	if (rpt_buf)
+		rpt_buf = (u8*)buf->octet;
 }
 
 void halbb_ch_info_print(struct bb_info *bb, char input[][16], u32 *_used,
@@ -148,8 +149,8 @@ void halbb_ch_info_print(struct bb_info *bb, char input[][16], u32 *_used,
 	struct bb_ch_info_raw_info *buf = &ch_rpt->bb_ch_info_raw_i;
 	u16 *rpt_tmp_16 = NULL;
 	u8 *rpt_tmp_8 = NULL;
-	u16 tone_num = 0;
-	u8 i, j, k;
+	u16 i, tone_num = 0;
+	u8 j, k;
 	u32 rpt_idx = 0;
 	#if defined(BB_8852A_2_SUPPORT)
 	u16 shift_tone = 0;
@@ -448,7 +449,7 @@ void halbb_ch_info_cfg_mu_buff_cr(struct bb_info *bb, bool en)
 	struct bb_ch_rpt_info *ch_rpt = &bb->bb_ch_rpt_i;
 	struct bb_ch_info_cr_cfg_info *cfg = &ch_rpt->bb_ch_info_cr_cfg_i;
 	struct bb_ch_info_cr_cfg_info *cur_cfg = &ch_rpt->bb_ch_info_cur_cr_cfg_i;
-	struct bb_ch_info_cr_info *cr = &ch_rpt->bb_ch_info_cr_i;
+	struct bb_ch_info_cr_info *cr = &bb->bb_cmn_hooker->bb_ch_info_cr_i;
 	u32 val_32 = 0;
 
 	BB_DBG(bb, DBG_CH_INFO, "[%s], en=%d\n", __func__, en);
@@ -480,7 +481,7 @@ bool halbb_cfg_ch_info_cr(struct bb_info *bb, struct bb_ch_info_cr_cfg_info *cfg
 {
 	struct bb_ch_rpt_info *ch_rpt = &bb->bb_ch_rpt_i;
 	struct bb_ch_info_cr_cfg_info *cur_cfg = &ch_rpt->bb_ch_info_cur_cr_cfg_i;
-	struct bb_ch_info_cr_info *cr = &bb->bb_ch_rpt_i.bb_ch_info_cr_i;	
+	struct bb_ch_info_cr_info *cr = &bb->bb_cmn_hooker->bb_ch_info_cr_i;
 	u32 val_32;
 
 	BB_DBG(bb, DBG_CH_INFO, "src=%d, cmprs=%d, grp_num/he=%d/%d\n",
@@ -520,7 +521,8 @@ void halbb_ch_info_physts_en(struct bb_info *bb, bool en,
 			     u16 bitmap, enum phl_phy_idx phy_idx)
 {
 	struct bb_ch_rpt_info *ch_rpt = &bb->bb_ch_rpt_i;
-	struct bb_ch_info_cr_info *cr = &ch_rpt->bb_ch_info_cr_i;
+	struct bb_ch_info_cr_info *cr = &bb->bb_cmn_hooker->bb_ch_info_cr_i;
+	struct bb_ch_info_cr_cfg_info *cur_cfg = &ch_rpt->bb_ch_info_cur_cr_cfg_i;
 	u32 val_32 = 1;
 	u16 i = 0;
 
@@ -547,15 +549,30 @@ void halbb_ch_info_physts_en(struct bb_info *bb, bool en,
 
 	/*Phy-sts IE 8 Enable*/
 	for (i=0; i < PHYSTS_BITMAP_NUM; i++) {
-		if (bitmap & BIT(i))
-			halbb_physts_ie_bitmap_en(bb, i, IE08_FTR_CH, en);
+		if (bitmap & BIT(i)) {
+			if ((i == LEGACY_OFDM_PKT) && (cur_cfg->ch_i_ele_bitmap & 0xfefe)) {
+				BB_DBG(bb, DBG_CH_INFO, "Error for legacy bitmap setting, legacy only have 1 sts\n");
+			} else {
+				halbb_physts_ie_bitmap_en(bb, i, IE08_FTR_CH, en);
+			}
+		}
 	}
+
+	/*=== [fix lightmode IC bug] ==================================================*/
+	if (bb->ic_type & (BB_RTL8852C | BB_RTL8192XB))
+		halbb_ch_info_close_powersaving(bb, en, phy_idx);
+
+	if (bb->ic_type & (BB_RTL8852B | BB_RTL8852C | BB_RTL8192XB | BB_RTL8851B)) {
+		cur_cfg->ch_i_data_src = 1;
+		halbb_set_reg(bb, cr->ch_info_en_0, 0x4, cur_cfg->ch_i_data_src);
+	}
+
 }
 
 void halbb_ch_info_status_en(struct bb_info *bb, bool en, enum phl_phy_idx phy_idx)
 {
 	struct bb_ch_rpt_info *ch_rpt = &bb->bb_ch_rpt_i;
-	struct bb_ch_info_cr_info *cr = &ch_rpt->bb_ch_info_cr_i;
+	struct bb_ch_info_cr_info *cr = &bb->bb_cmn_hooker->bb_ch_info_cr_i;
 	//u32 val_32 = 1;
 
 	BB_DBG(bb, DBG_CH_INFO, "[%s] en=%d\n", __func__, en);
@@ -1302,8 +1319,7 @@ void halbb_ch_info_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 
 void halbb_cr_cfg_ch_info_init(struct bb_info *bb)
 {
-	struct bb_ch_rpt_info *ch_rpt = &bb->bb_ch_rpt_i;
-	struct bb_ch_info_cr_info *cr = &ch_rpt->bb_ch_info_cr_i;
+	struct bb_ch_info_cr_info *cr = &bb->bb_cmn_hooker->bb_ch_info_cr_i;
 	
 	switch (bb->cr_type) {
 
@@ -1357,8 +1373,7 @@ void halbb_cr_cfg_ch_info_init(struct bb_info *bb)
 void halbb_ch_info_close_powersaving(struct bb_info *bb, bool en,
 			 enum phl_phy_idx phy_idx)
 {
-	struct bb_ch_rpt_info *ch_rpt = &bb->bb_ch_rpt_i;
-	struct bb_ch_info_cr_info *cr = &ch_rpt->bb_ch_info_cr_i;
+	struct bb_ch_info_cr_info *cr = &bb->bb_cmn_hooker->bb_ch_info_cr_i;
 	#if (defined(BB_8852C_SUPPORT) || defined(BB_8192XB_SUPPORT))
 	if ((bb->ic_type == BB_RTL8852C) || (bb->ic_type == BB_RTL8192XB)){
 		if (en) {
@@ -1411,6 +1426,104 @@ void halbb_ch_info_modify_ack_rxsc(struct bb_info *bb, struct physts_rxd *desc, 
 		BB_WARNING("error for bwidx\n");
 	}
 	BB_DBG(bb, DBG_CH_INFO, "[%s], modify_rxsc=%d, data_rate=%d\n", __func__, *rxsc, desc->data_rate);
+}
+
+bool halbb_ch_info_calc_pertone_snr(struct bb_info *bb, u8 snrvalue, u16 *addr, u32 len)
+{
+	struct bb_ch_rpt_info *ch_rpt = &bb->bb_ch_rpt_i;
+	struct bb_ch_rpt_size_info *size = &ch_rpt->bb_ch_rpt_size_i;
+	struct bb_ch_info_snr_bin_info *snr = &ch_rpt->bb_ch_info_snr_bin_i;
+	s16 *rpt_tmp_16 = NULL;
+	s8 *rpt_tmp_8 = NULL;
+	u32 i, rpt_idx = 0;
+	u32 calc_tone_num = 0, per_bin_tone_num = 0, bin_num_index = 0;
+	u8 j, k;
+	u16 tmp, re_pwr, im_pwr, re_tmp, im_tmp;
+	u32 csi_percent ,csi_tmp_numerator, csi_tmp_denominator;
+	u64 tmplinear;
+	u32 ch_sum[4] = {0};
+	u32 ch_bin_grp[4][CH_INFO_SNR_BIN_NUM] = {0};
+	u8 ch_bin_snr[4][CH_INFO_SNR_BIN_NUM] = {0};
+	
+	halbb_mem_cpy(bb, snr->ch_info_snr, ch_bin_snr, 4 * CH_INFO_SNR_BIN_NUM * sizeof(u8)); /*reset buffer*/
+	calc_tone_num = HALBB_DIV(len, size->per_tone_ch_rpt_size);
+	per_bin_tone_num = HALBB_CEIL(calc_tone_num, CH_INFO_SNR_BIN_NUM);
+	BB_DBG(bb, DBG_CH_INFO, "[%s], snr=%d, calc_tone_num=%d, per_bin_tone_num=%d\n", __func__, snrvalue, calc_tone_num, per_bin_tone_num);
+	
+	/*Only for legacy tonenum now*/
+	if (!(calc_tone_num == 52 || calc_tone_num == 26)) {
+		BB_WARNING("error, tone_num too small\n");
+		return false;
+	}
+	
+	if (calc_tone_num >= 128) {
+		BB_WARNING("tone_num too large, avoid calc overflow error\n");
+		return false;
+	}
+	
+	if (size->data_byte == 2) {
+		rpt_tmp_16 = (u16*)addr;
+		
+		for (i = 0; i < calc_tone_num; i++) {
+			bin_num_index = HALBB_DIV(i, per_bin_tone_num);
+			for (j = 0; j < size->n_c; j++) {
+				for (k = 0; k < size->n_r; k++) {
+					re_tmp = (ABS_16(rpt_tmp_16[rpt_idx + 1]) >> 8) & MASKBYTE0;
+					im_tmp = (ABS_16(rpt_tmp_16[rpt_idx]) >> 8) & MASKBYTE0;
+					re_pwr = re_tmp*re_tmp;
+					im_pwr = im_tmp*im_tmp;
+					tmp = re_pwr+im_pwr;
+					ch_bin_grp[2*j+k][bin_num_index] += tmp;
+					ch_sum[2*j+k] += tmp;
+					rpt_idx += 2;
+				}
+			}
+		}
+	} else {
+		rpt_tmp_8 = (u8*)addr;
+
+		for (i = 0; i < calc_tone_num; i++) {
+			bin_num_index = HALBB_DIV(i, per_bin_tone_num);
+		
+			for (j = 0; j < size->n_c; j++) {
+				for (k = 0; k < size->n_r; k++) {
+					re_tmp = (u16)ABS_8(rpt_tmp_8[rpt_idx + 1]);
+					im_tmp = (u16)ABS_8(rpt_tmp_8[rpt_idx]);
+					re_pwr = re_tmp*re_tmp;
+					im_pwr = im_tmp*im_tmp;
+					tmp = re_pwr+im_pwr;
+					ch_bin_grp[2*j+k][bin_num_index] += tmp;
+					ch_sum[2*j+k] += tmp;
+					rpt_idx += 2;
+				}
+			}
+		}
+	}
+
+	for (i = 0; i < size->n_c; i++) {
+		for (j = 0; j < size->n_r; j++) {
+			for (k = 0; k < CH_INFO_SNR_BIN_NUM; k++) {
+				if (k == CH_INFO_SNR_BIN_NUM-1) {
+					csi_tmp_numerator = (ch_bin_grp[2*i+j][k]*calc_tone_num) << 6;
+					csi_tmp_denominator = ch_sum[2*i+j]*(calc_tone_num%per_bin_tone_num);
+					csi_percent = HALBB_DIV(csi_tmp_numerator, csi_tmp_denominator);
+				} else {
+					csi_tmp_numerator = (ch_bin_grp[2*i+j][k]*calc_tone_num) << 6;
+					csi_tmp_denominator = ch_sum[2*i+j]*per_bin_tone_num;
+					csi_percent = HALBB_DIV(csi_tmp_numerator, csi_tmp_denominator);
+				}
+				tmplinear = (halbb_db_2_linear((u32)snrvalue)*csi_percent) >> 6;
+				tmplinear = (tmplinear + (1 << (FRAC_BITS - 1))) >> FRAC_BITS;
+				ch_bin_snr[2*i+j][k] = (u8)halbb_convert_to_db(tmplinear);
+				BB_DBG(bb, DBG_CH_INFO,"csi_percent128=%d, ch_bin_grp=%d, ch_sum=%d\n",
+					csi_percent, ch_bin_grp[2*i+j][k], ch_sum[2*i+j]);
+				BB_DBG(bb, DBG_CH_INFO,"snr=%d, ch_bin_snr[%d,%d]=%d\n", snrvalue, 2*i+j, k, ch_bin_snr[2*i+j][k]);
+			}
+		}
+	}
+	halbb_mem_cpy(bb, snr->ch_info_snr, ch_bin_snr, 4 * CH_INFO_SNR_BIN_NUM * sizeof(u8));
+
+	return true;
 }
 
 u8 halbb_ch_info_ack_verify(struct bb_info *bb, u16 *addr, u8 datasize, u16 len)

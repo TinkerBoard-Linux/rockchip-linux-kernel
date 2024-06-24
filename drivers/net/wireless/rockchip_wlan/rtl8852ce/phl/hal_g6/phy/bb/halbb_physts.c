@@ -247,6 +247,37 @@ static const u8 ch_base_table[16] = {1, 0xff,
 				     36, 100, 132, 149, 0xff,
 				     1, 33, 65, 97, 129, 161, 193, 225, 0xff};
 
+#ifdef HALBB_BCNOFLD_SUPPORT
+void halbb_bcn_mode_rssi_info_from_fw(struct bb_info *bb, u16 macid, u8 *addr, u8 bcn_num)
+{
+	struct bcn_rssi_info *rssi_info = NULL;
+	u8 rssi_info_len = sizeof(struct bcn_rssi_info);
+	u8 i = 0;
+
+	BB_DBG(bb, DBG_PHY_STS, "[%s] macid=%d\n", __func__, macid);
+
+	if (bcn_num == 0)
+		return;
+
+	if (macid > PHL_MAX_STA_NUM)
+		return;
+
+	for (i = 0; i < bcn_num; i++) {
+		rssi_info = (struct bcn_rssi_info *)addr;
+		BB_DBG(bb, DBG_PHY_STS, "rssi = %d\n", rssi_info->rssi);
+		addr += rssi_info_len;
+	}
+}
+#endif
+
+void halbb_physts_brk_fail_pkt_rpt_be(struct bb_info *bb, bool enable,
+					   enum phl_phy_idx phy_idx)
+{
+	u32 val32 = (enable) ? 0 : 0x3;
+
+	halbb_set_reg_cmn(bb, 0x0738, 0xC, val32, phy_idx);
+}
+
 u8 halbb_physts_fd_snr_cvrt(struct bb_info *bb, u8 path)
 {
 	struct bb_physts_info	*physts = &bb->bb_physts_i;
@@ -351,13 +382,19 @@ u8 halbb_drv_info_rssi_parsing(struct bb_info *bb, u16 rssi_in,
 			       enum channel_width bw)
 {
 	u8 pw_norm_val = 0;
+	u16 rssi_out = 0;
 
+	rssi_out = rssi_in >> 2;
 	if (bw <= CHANNEL_WIDTH_160)
 		pw_norm_val = 3 * (u8)bw;
 	else if (bw == CHANNEL_WIDTH_80_80)
 		pw_norm_val = 9;
+	rssi_out += pw_norm_val;
 
-	return (u8)(rssi_in >> 2) + pw_norm_val;
+	if (rssi_out > RSSI_MAX)
+		return RSSI_MAX;
+	else
+		return (u8)rssi_out;
 }
 
 void halbb_physts_cvrt_2_mp(struct bb_info *bb)
@@ -397,9 +434,9 @@ void halbb_physts_detail_dump_ie_11(struct bb_info *bb)
 		j = (ie_11->rx_pkt_info_idx + i) % IE11_PKT_INFO_LEN;
 
 		pkt_info = &ie_11->pkt_info_rx_i[j];
-		type = (pkt_info->info_type_4 << 31) | (pkt_info->info_type_3 << 23) |
-			(pkt_info->info_type_2 << 15) |(pkt_info->info_type_1 << 7) |
-			pkt_info->info_type_0;
+		type = ((u32)pkt_info->info_type_4 << 31) | ((u32)pkt_info->info_type_3 << 23) |
+			((u32)pkt_info->info_type_2 << 15) | (u32)(pkt_info->info_type_1 << 7) |
+			(u32)pkt_info->info_type_0;
 
 		if (pkt_info->pkt_format == 1) {
 			type1 = (u32)(type & 0xFFFFFF);
@@ -440,9 +477,9 @@ void halbb_physts_detail_dump_ie_11(struct bb_info *bb)
 	for (i = 0; i < IE11_PKT_INFO_LEN; i++) {
 		j = (ie_11->rx_pkt_info_idx + i) % IE11_PKT_INFO_LEN;
 		pkt_info = &ie_11->pkt_info_tx_i[i];
-		type = (pkt_info->info_type_4 << 31) | (pkt_info->info_type_3 << 23) |
-			(pkt_info->info_type_2 << 15) |(pkt_info->info_type_1 << 7) |
-			pkt_info->info_type_0;
+		type = ((u32)pkt_info->info_type_4 << 31) | ((u32)pkt_info->info_type_3 << 23) |
+			((u32)pkt_info->info_type_2 << 15) |((u32)pkt_info->info_type_1 << 7) |
+			(u32)pkt_info->info_type_0;
 
 		if (pkt_info->pkt_format == 1) {
 			type1 = (u32)(type & 0xFFFFFF);
@@ -568,6 +605,8 @@ void halbb_physts_detail_dump(struct bb_info *bb, u32 bitmap, u32 bitmap_mask)
 		 TRANS_2_RSSI(physts->rpl_path[1]),
 		 TRANS_2_RSSI(physts->rpl_path[2]),
 		 TRANS_2_RSSI(physts->rpl_path[3]));
+	BB_TRACE("[Hdr] bt_rx_during_cca=%d, bt_tx_during_cca=%d\n",
+		 psts_h->bt_rx_during_cca, psts_h->bt_tx_during_cca);
 
 	if (bitmap == 0) {
 		BB_TRACE("Hdr only, empty IE\n");
@@ -860,7 +899,7 @@ void halbb_physts_detail_dump(struct bb_info *bb, u32 bitmap, u32 bitmap_mask)
 void halbb_physts_ie_bitmap_set(struct bb_info *bb, enum bb_physts_bitmap_t ie_page, u32 bitmap)
 {
 	struct bb_physts_info	*physts = &bb->bb_physts_i;
-	struct bb_physts_cr_info *cr = &bb->bb_physts_i.bb_physts_cr_i;
+	struct bb_physts_cr_info *cr = &bb->bb_cmn_hooker->bb_physts_cr_i;
 
 	if (ie_page >= PHYSTS_BITMAP_NUM)
 		return;
@@ -886,7 +925,7 @@ void halbb_physts_ie_bitmap_set(struct bb_info *bb, enum bb_physts_bitmap_t ie_p
 
 u32 halbb_physts_ie_bitmap_get(struct bb_info *bb, enum bb_physts_bitmap_t ie_page)
 {
-	struct bb_physts_cr_info *cr = &bb->bb_physts_i.bb_physts_cr_i;
+	struct bb_physts_cr_info *cr = &bb->bb_cmn_hooker->bb_physts_cr_i;
 
 	if (ie_page >= PHYSTS_BITMAP_NUM)
 		return 0;
@@ -961,6 +1000,12 @@ void halbb_physts_brk_fail_rpt_en(struct bb_info *bb, bool enable,
 	#endif
 
 	default:
+		#ifdef HALBB_COMPILE_BE_SERIES
+		if (bb->bb_80211spec == BB_BE_IC)
+			halbb_physts_brk_fail_pkt_rpt_be(bb, enable, phy_idx);
+		else
+		#endif
+			BB_WARNING("[%s] ic=%d\n", __func__, bb->hal_com->chip_id);
 		break;
 	}
 }
@@ -968,8 +1013,7 @@ void halbb_physts_brk_fail_rpt_en(struct bb_info *bb, bool enable,
 void halbb_physts_td_time_rpt_en(struct bb_info *bb, bool en,
 				 enum phl_phy_idx phy_idx)
 {
-	struct bb_physts_info *physts = &bb->bb_physts_i;
-	struct bb_physts_cr_info *cr = &physts->bb_physts_cr_i;
+	struct bb_physts_cr_info *cr = &bb->bb_cmn_hooker->bb_physts_cr_i;
 
 	halbb_set_reg_cmn(bb, cr->period_cnt_en, BIT0, en, phy_idx); /*enable pwr_2_cca time report*/
 }
@@ -1033,7 +1077,8 @@ u8 halbb_physts_ie_hdr(struct bb_info *bb,
 	psts_h->rssi[2] = physts_hdr->rssi_td[2];
 	psts_h->rssi[3] = physts_hdr->rssi_td[3];
 	psts_h->ie_map_type = (enum bb_physts_bitmap_t)physts_hdr->ie_bitmap_select;
-	
+	psts_h->bt_rx_during_cca = physts_hdr->bt_rx_during_cca;
+	psts_h->bt_tx_during_cca = physts_hdr->bt_tx_during_cca;
 
 	*ie_length_hdr = physts_hdr->physts_total_length;
 
@@ -1092,10 +1137,8 @@ bool halbb_physts_ie_01(struct bb_info *bb,
 
 	/*0~6: 5, 10, 20, 40, 80, 160, 80_80*/
 	
-	if (ie_1->bw_idx == 0)
-		psts_1->bw_idx = CHANNEL_WIDTH_5;
-	else if (ie_1->bw_idx == 1)
-		psts_1->bw_idx = CHANNEL_WIDTH_10;
+	if (ie_1->bw_idx <= 1) //5M & 10M
+		psts_1->bw_idx = bb->hal_com->band[bb->bb_phy_idx].cur_chandef.bw;
 	else if (ie_1->bw_idx == 2)
 		psts_1->bw_idx = CHANNEL_WIDTH_20;
 	else if (ie_1->bw_idx == 3)
@@ -1156,7 +1199,7 @@ bool halbb_physts_ie_02(struct bb_info *bb,
 	u32 lt_cfo_buffer_th = (1<<24);
 	u32 lt_cfo_abs_tmp_i,lt_cfo_abs_tmp_q;
 
-	if (physts->bb_physts_cnt_i.invalid_he_occur)
+	if (physts->invalid_he_occur)
 		return true;
 
 	ie_2 = (struct physts_ie_2_info *)addr;
@@ -1308,7 +1351,7 @@ bool halbb_physts_ie_08(struct bb_info *bb,
 
 	#ifdef BB_8852C_SUPPORT
 	/* Fix bug for 52c physts CSI have 3 rsvd, ch_len-8 and shift 64 bits */
-	if (bb->ic_type == BB_RTL8852C){
+	if (bb->ic_sub_type == BB_IC_SUB_TYPE_8852C_8852C){
 		psts_8->ch_info_len -=8;
 		addr += 8; /* shift 64 bits*/
 	}
@@ -2325,15 +2368,20 @@ void halbb_physts_fd_rpl_2_rssi_cvrt(struct bb_info *bb)
 
 	for (i = 0; i < 4; i++)
 		psts_h->rssi_td[i] = psts_h->rssi[i];
-	
+
 	/*Generate Per path RPL*/
 	for (i = 0; i < 4; i++) {
-		if (psts_h->rssi[i] == 0) {
-			physts->rpl_path[i] = 0;
-			continue;
-		}
+		if (bb->ic_type == BB_RTL8851B) {
+			/*WA for 8851B, rssi=0 when gnt_bt=1 but rpl is normal, WQCPC-7869*/
+			physts->rpl_path[i] = physts->rpl_avg;
+		} else {
+			if (psts_h->rssi[i] == 0) {
+				physts->rpl_path[i] = 0;
+				continue;
+			}
 
-		physts->rpl_path[i] = physts->rpl_avg + psts_h->rssi[i] - psts_h->rssi_avg;
+			physts->rpl_path[i] = physts->rpl_avg + psts_h->rssi[i] - psts_h->rssi_avg;
+		}
 	}
 
 	if (physts->rssi_cvrt_2_rpl_en) {
@@ -2365,6 +2413,8 @@ void halbb_physts_rpt_gen(struct bb_info *bb, u32 physts_bitmap,
 	rpt->rssi[2] = psts_h->rssi[2];
 	rpt->rssi[3] = psts_h->rssi[3];
 	rpt->ie_map_type = psts_h->ie_map_type;
+	rpt->bt_rx_during_cca = psts_h->bt_rx_during_cca;
+	rpt->bt_tx_during_cca = psts_h->bt_tx_during_cca;
 
 	for (i = 0; i < 4; i++) {
 		if (psts_h->rssi[i] == 0)
@@ -2425,7 +2475,7 @@ void halbb_physts_rpt_gen(struct bb_info *bb, u32 physts_bitmap,
 			if (psts_h->rssi[i] == 0)
 				continue;
 
-			rpt->snr_fd[i] = (((rpt->snr_fd_avg << 1) + rpt->rssi_avg - rpt->rssi[i]) >> 1);
+			rpt->snr_fd[i] = (((rpt->snr_fd_avg << 1) - rpt->rssi_avg + rpt->rssi[i]) >> 1);
 		}
 	}
 
@@ -2436,6 +2486,8 @@ void halbb_physts_rpt_gen(struct bb_info *bb, u32 physts_bitmap,
 		rpt->snr_td_avg, rpt->snr_td[0], rpt->snr_td[1], rpt->snr_td[2], rpt->snr_td[3]);
 	BB_DBG(bb, DBG_PHY_STS, "[RPT] snr_fd =(%d){%d,%d,%d,%d}\n",
 		rpt->snr_fd_avg, rpt->snr_fd[0], rpt->snr_fd[1], rpt->snr_fd[2], rpt->snr_fd[3]);
+	BB_DBG(bb, DBG_PHY_STS, "[RPT] bt_rx_during_cca=%d, bt_tx_during_cca=%d\n",
+		rpt->bt_rx_during_cca, rpt->bt_tx_during_cca);
 }
 
 void halbb_physts_print(struct bb_info *bb, struct physts_rxd *desc,
@@ -2457,16 +2509,16 @@ void halbb_physts_print(struct bb_info *bb, struct physts_rxd *desc,
 		return;
 
 	physts->show_phy_sts_cnt++;
-	
+
 	BB_TRACE("[Dump_idx:%04d][%d: %s] len=%04d bitmap=0x%08x\n",
 		 bb->bb_physts_i.physts_dump_idx,
-		 psts_h->ie_map_type, 
+		 psts_h->ie_map_type,
 		 bb_physts_bitmap_type_t[psts_h->ie_map_type],
 		 total_len, physts_bitmap);
 
 	bb->bb_physts_i.physts_dump_idx++;
 
-	if (physts->bb_physts_cnt_i.invalid_he_occur) {
+	if (physts->invalid_he_occur) {
 		BB_TRACE("invalid_he_cnt=%d\n", physts->bb_physts_cnt_i.invalid_he_cnt);
 	}
 
@@ -2498,9 +2550,6 @@ void halbb_physts_print(struct bb_info *bb, struct physts_rxd *desc,
 		BB_TRACE("Rate= %s (0x%x-%x), macid_su=%d\n",
 		         bb->dbg_buf, desc->data_rate, desc->gi_ltf, desc->macid_su);
 
-		if (desc->user_num >= 4)
-			return;
-
 		for (i = 0; i < desc->user_num; i++) {
 			BB_TRACE("[%d]bcn=%d, ctrl=%d, data=%d, mgnt=%d\n", i,
 			         desc->user_i[i].is_bcn, desc->user_i[i].is_ctrl,
@@ -2510,6 +2559,30 @@ void halbb_physts_print(struct bb_info *bb, struct physts_rxd *desc,
 		halbb_physts_detail_dump(bb, physts_bitmap, 0xffffffff);
 	}
 	BB_TRACE("==============================================\n");
+}
+
+bool halbb_physts_bt_polluted(struct bb_info *bb, struct physts_rxd *desc,
+			      bool is_pkt_with_data, bool bt_rx_during_cca,
+			      bool bt_tx_during_cca)
+{
+	struct bb_physts_info *physts = &bb->bb_physts_i;
+	bool is_bt_polluted = false;
+
+	is_bt_polluted = (physts->bypass_bt_rx_during_cca && bt_rx_during_cca) ||
+			 (physts->bypass_bt_tx_during_cca && bt_tx_during_cca);
+
+	if (desc->is_to_self && is_pkt_with_data) {
+		if (bt_rx_during_cca)
+			physts->bb_physts_cnt_i.bt_rx_during_cca_cnt++;
+
+		if (bt_tx_during_cca)
+			physts->bb_physts_cnt_i.bt_tx_during_cca_cnt++;
+
+		if (is_bt_polluted && desc->is_su && desc->user_i[0].is_bcn)
+			physts->bb_physts_cnt_i.bt_polluted_bcn_cnt++;
+	}
+
+	return is_bt_polluted;
 }
 
 bool halbb_6_physts_parsing(struct bb_info *bb_0,
@@ -2537,6 +2610,7 @@ bool halbb_6_physts_parsing(struct bb_info *bb_0,
 	bool is_cck_rate = false;
 	bool is_valid = true;
 	bool is_ie8_valid = false;
+	bool is_bt_polluted = false;
 
 #ifdef HALBB_DBCC_SUPPORT
 	HALBB_GET_PHY_PTR(bb_0, bb, desc->phy_idx);
@@ -2600,10 +2674,10 @@ bool halbb_6_physts_parsing(struct bb_info *bb_0,
 
 	if (physts->bb_physts_rslt_hdr_i.ie_map_type == HE_PKT &&
 	    desc->data_rate <= BB_54M) {
-		physts->bb_physts_cnt_i.invalid_he_occur = true;
+		physts->invalid_he_occur = true;
 		physts->bb_physts_cnt_i.invalid_he_cnt++;
 	} else {
-		physts->bb_physts_cnt_i.invalid_he_occur = false;
+		physts->invalid_he_occur = false;
 	}
 
 	/*---[Physts per IE parsing]------------------------------------------*/
@@ -2735,7 +2809,12 @@ PARSING_END:
 			desc->is_su = 0;
 	}
 
-	if (desc->is_to_self && bb_rpt->is_pkt_with_data) {
+	is_bt_polluted = halbb_physts_bt_polluted(bb, desc,
+						  bb_rpt->is_pkt_with_data,
+						  physts->bb_physts_rslt_hdr_i.bt_rx_during_cca,
+						  physts->bb_physts_rslt_hdr_i.bt_tx_during_cca);
+
+	if (desc->is_to_self && bb_rpt->is_pkt_with_data && !is_bt_polluted) {
 		physts->physts_bitmap_recv = physts_bitmap;
 
 		halbb_cmn_rpt(bb, desc, physts_bitmap);
@@ -2758,10 +2837,6 @@ PARSING_END:
 		#endif
 		BB_DBG(bb, DBG_SNIFFER, "snif_rpt_valid=%d\n", bb_rpt->snif_rpt_valid);
 	}
-
-	#ifdef HALBB_DFS_SUPPORT
-	halbb_parsing_aci2sig(bb, physts_bitmap);
-	#endif
 
 	halbb_physts_print(bb, desc, physts_total_length, addr_in_bkp, physts_bitmap);
 
@@ -2834,11 +2909,20 @@ halbb_phy_sts_manual_trig(struct bb_info *bb, enum bb_mode_type mode, u8 ss)
 	halbb_physts_parsing(bb, (u8 *)phy_sts_dbg, sizeof(phy_sts_dbg), &rxdesc, &bb_rpt);
 }
 
+void halbb_physts_cnt_reset(struct bb_info *bb)
+{
+	struct bb_physts_info *physts = &bb->bb_physts_i;
+
+	halbb_mem_set(bb, &physts->bb_physts_cnt_i, 0, sizeof(struct bb_physts_cnt_info));
+}
+
 void halbb_physts_watchdog(struct bb_info *bb)
 {
 	struct bb_physts_info *physts = &bb->bb_physts_i;
 	struct bb_cmn_rpt_info	*cmn_rpt = &bb->bb_cmn_rpt_i;
-	
+
+	halbb_show_cr_cnt(bb, BB_WD_PHYSTS);
+
 #ifdef HALBB_FW_OFLD_SUPPORT
 	if (bb->bb_cmn_hooker->skip_io_init_en) {
 		if (!physts->init_physts_cr_success) {
@@ -2867,18 +2951,12 @@ void halbb_physts_watchdog(struct bb_info *bb)
 
 	/*[Phy-sts control]*/
 	physts->show_phy_sts_cnt = 0;
-
-	physts->bb_physts_cnt_i.all_cnt = 0;
-	physts->bb_physts_cnt_i.is_2_self_cnt = 0;
-	physts->bb_physts_cnt_i.ok_ie_cnt = 0;
-	physts->bb_physts_cnt_i.err_ie_cnt = 0;
-	physts->bb_physts_cnt_i.err_len_cnt = 0;
 }
 
 void halbb_physts_parsing_init_io_en(struct bb_info *bb)
 {
 	struct bb_physts_info *physts = &bb->bb_physts_i;
-	struct bb_physts_cr_info *cr = &physts->bb_physts_cr_i;
+	struct bb_physts_cr_info *cr = &bb->bb_cmn_hooker->bb_physts_cr_i;
 	u32 u32_tmp = 0;
 	u32 mask_tmp = 0;
 	u8 i = 0;
@@ -2956,34 +3034,6 @@ void halbb_physts_parsing_init_io_en(struct bb_info *bb)
 	/*CCK get ch_idx from IE_1*/
 	halbb_physts_ie_bitmap_en(bb, CCK_PKT, IE01_CMN_OFDM, true);
 
-	/*Enable IE24 for supressing DFS False Detection, Enable BRK & Fail RPT*/
-	if (bb->support_ability & BB_DFS) {
-		for (i = 0; i < PHYSTS_BITMAP_NUM; i++) {
-			/* don't enable IE24 at physts_bitmap 4~7 && 9~11 */
-			if ((i >= CCK_BRK && i <= VHT_MU) || (i >= RSVD_9 && i <= CCK_PKT))
-				continue;
-
-			u32_tmp = halbb_physts_ie_bitmap_get(bb, i);
-
-			#ifdef HALBB_DBCC_SUPPORT
-			if (bb->hal_com->dbcc_en) {
-				mask_tmp = (((u32)valid_path) << IE24_DBG_OFDM_TD_PATH_A);
-				u32_tmp |= mask_tmp;
-			} else
-			#endif
-			{
-				u32_tmp |= BIT(IE24_DBG_OFDM_TD_PATH_A);
-			}
-
-			halbb_physts_ie_bitmap_set(bb, i, u32_tmp);
-			/*u32_tmp = halbb_physts_ie_bitmap_get(bb, i);*/
-
-			physts->bitmap_type[i] = u32_tmp;
-		}
-
-		//halbb_physts_brk_fail_rpt_en(bb, true, bb->bb_phy_idx);
-	}
-
 	physts->show_phy_sts_all_pkt = false;
 	physts->show_phy_sts_max_cnt = 5;
 	physts->show_phy_sts_cnt = 0;
@@ -2992,6 +3042,9 @@ void halbb_physts_parsing_init_io_en(struct bb_info *bb)
 	physts->rssi_cvrt_2_rpl_en = true;
 
 	physts->init_physts_cr_success = true;
+
+	physts->bypass_bt_rx_during_cca = true;
+	physts->bypass_bt_tx_during_cca = false;
 }
 
 void halbb_physts_parsing_init(struct bb_info *bb)
@@ -3002,7 +3055,7 @@ void halbb_physts_parsing_init(struct bb_info *bb)
 	BB_DBG(bb, DBG_PHY_STS, "[%s][phy=%d]skip_io_init_en = %d\n",
 	       __func__, bb->bb_phy_idx, bb->bb_cmn_hooker->skip_io_init_en);
 
-	if (bb->bb_cmn_hooker->skip_io_init_en) {
+	if (bb->bb_cmn_hooker->skip_io_init_en && !phl_is_mp_mode(bb->phl_com)) {
 		physts->init_physts_cr_success = false;
 		return;
 	}
@@ -3044,7 +3097,7 @@ void halbb_physts_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 		  char *output, u32 *_out_len)
 {
 	struct bb_physts_info	*physts = &bb->bb_physts_i;
-	struct bb_physts_cr_info *cr = &physts->bb_physts_cr_i;
+	struct bb_physts_cr_info *cr = &bb->bb_cmn_hooker->bb_physts_cr_i;
 	u32 val[10] = {0};
 	u32 u32_tmp = 0;
 	u8 ie11_ever_used = 0;
@@ -3074,12 +3127,22 @@ void halbb_physts_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 			 "rssi_src {0:td, 1:fd_rpl}\n");
 		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
 			 "dump_by_cr\n");
+		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
+			    "bypass_bt {bypass bt_rx_during_cca} {bypass bt_tx_during_cca}\n");
 		return;
 	}
 
-	if (_os_strcmp(input[1], "dump_by_cr") == 0) {
+	if (_os_strcmp(input[1], "bypass_bt") == 0) {
+		HALBB_SCAN(input[2], DCMD_DECIMAL, &val[0]);
+		HALBB_SCAN(input[3], DCMD_DECIMAL, &val[1]);
+		physts->bypass_bt_rx_during_cca = (bool)(val[0]);
+		physts->bypass_bt_tx_during_cca = (bool)(val[1]);
+		BB_DBG_CNSL(*_out_len, *_used, output + *_used, *_out_len - *_used,
+			    "bypass_bt_rx_during_cca=%d, bypass_bt_tx_during_cca=%d\n",
+			    physts->bypass_bt_rx_during_cca,
+			    physts->bypass_bt_tx_during_cca);
+	} else if (_os_strcmp(input[1], "dump_by_cr") == 0) {
 		halbb_physts_query_from_bbcr(bb);
-	
 	} else if (_os_strcmp(input[1], "frc_mu") == 0) {
 		HALBB_SCAN(input[2], DCMD_HEX, &val[0]);
 		physts->frc_mu = (u8)val[0];
@@ -3192,7 +3255,7 @@ void halbb_physts_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 void halbb_cr_cfg_physts_init(struct bb_info *bb)
 {
 	struct bb_physts_info *physts = &bb->bb_physts_i;
-	struct bb_physts_cr_info *cr = &physts->bb_physts_cr_i;
+	struct bb_physts_cr_info *cr = &bb->bb_cmn_hooker->bb_physts_cr_i;
 	
 	switch (bb->cr_type) {
 
@@ -3234,6 +3297,16 @@ void halbb_cr_cfg_physts_init(struct bb_info *bb)
 		break;
 	#endif
 
+	#ifdef HALBB_COMPILE_BE1_SERIES
+	case BB_BE1:
+		cr->plcp_hist = TOP_CTRL_P0_R_PLCP_HISTOGRAM_EN_BE1;
+		cr->plcp_hist_m = TOP_CTRL_P0_R_PLCP_HISTOGRAM_EN_BE1_M;
+		cr->bitmap_search_fail = TOP_CTRL_P0_R_PHY_STS_BITMAP_SEARCH_FAIL_BE1;
+		cr->bitmap_eht = TOP_CTRL_P0_R_PHY_STS_BITMAP_EHT_BE1;
+		cr->period_cnt_en = TOP_CTRL_P0_R_PERIOD_CNT_EN_BE1;
+		break;
+	#endif
+	
 	default:
 		BB_WARNING("[%s] BBCR Hook FAIL!\n", __func__);
 		if (bb->bb_dbg_i.cr_fake_init_hook_en) {

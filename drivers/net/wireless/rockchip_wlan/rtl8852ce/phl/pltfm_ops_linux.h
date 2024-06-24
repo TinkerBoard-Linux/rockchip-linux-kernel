@@ -15,6 +15,14 @@
 #ifndef _PLTFM_OPS_LINUX_H_
 #define _PLTFM_OPS_LINUX_H_
 #include "drv_types.h"
+#ifdef CONFIG_RTW_DEDICATED_CMA_POOL
+#include <linux/platform_device.h>
+extern struct platform_device *g_pldev;
+#endif
+
+#ifdef CONFIG_PLATFORM_AML_S905_V1
+extern struct device * g_pcie_reserved_mem_dev;
+#endif
 
 static inline char *_os_strpbrk(const char *s, const char *ct)
 {
@@ -68,6 +76,8 @@ static inline char*_os_strchr(const char *s, int c)
 #if 1
 #define _os_snprintf(s, sz, fmt, ...) snprintf(s, sz, fmt, ##__VA_ARGS__)
 #define _os_vsnprintf(str, size, fmt, args) vsnprintf(str, size, fmt, args)
+#define _os_va_start(args, fmt) va_start(args, fmt)
+#define _os_va_end(args) va_end(args)
 #else
 static int _os_snprintf(char *str, size_t size, const char *fmt, ...)
 {
@@ -171,8 +181,27 @@ static inline void _os_cache_wback(void *d, u32 *bus_addr_l, u32 *bus_addr_h,
 	pci_cache_wback(pdev, &bus_addr, buf_sz, direction);
 }
 
+static inline void *_os_dma_pool_create(void *d, char *name, u32 wd_page_sz)
+{
+	struct dvobj_priv *dvobj = (struct dvobj_priv *)d;
+	struct device *dev = NULL;
+#ifdef CONFIG_RTW_DEDICATED_CMA_POOL
+	dev = &g_pldev->dev;
+#else
+	dev = &dvobj->pci_data.ppcidev->dev;
+#endif
+	return dma_pool_create(name, dev, wd_page_sz, 2, 0);
+}
+
+static inline void _os_dma_pool_destory(void *d, void *pool)
+{
+	struct dvobj_priv *dvobj = (struct dvobj_priv *)d;
+
+	dma_pool_destroy((struct dma_pool *)pool);
+}
+
 /* txbd, rxbd, wd */
-static inline void *_os_shmem_alloc(void *d, u32 *bus_addr_l, u32 *bus_addr_h,
+static inline void *_os_shmem_alloc(void *d, void *pool, u32 *bus_addr_l, u32 *bus_addr_h,
                                     u32 buf_sz, u8 cache, u8 direction,
                                     void **os_rsvd)
 {
@@ -180,12 +209,14 @@ static inline void *_os_shmem_alloc(void *d, u32 *bus_addr_l, u32 *bus_addr_h,
 	PPCI_DATA pci_data = dvobj_to_pci(pobj);
 	struct pci_dev *pdev = pci_data->ppcidev;
 	dma_addr_t bus_addr;
-	void *vir_addr;
+	void *vir_addr = NULL;
 
-	if (cache)
-		vir_addr = pci_alloc_cache_mem(pdev, &bus_addr, buf_sz, direction);
-	else
+	if ((cache == NONCACHE_ADDR) && (pool == NULL))
 		vir_addr = pci_alloc_noncache_mem(pdev, &bus_addr, buf_sz);
+	else if ((cache == NONCACHE_ADDR) && pool)
+		vir_addr = dma_pool_zalloc((struct dma_pool *)pool, (in_atomic() ? GFP_ATOMIC : GFP_KERNEL), &bus_addr);
+	else /* CACHE_ADDR */
+		vir_addr = pci_alloc_cache_mem(pdev, &bus_addr, buf_sz, direction);
 
 	if (vir_addr) {
 		#ifdef PHL_DMA_ADDR_64
@@ -199,7 +230,7 @@ static inline void *_os_shmem_alloc(void *d, u32 *bus_addr_l, u32 *bus_addr_h,
 	return vir_addr;
 }
 
-static inline void _os_shmem_free(void *d, u8 *vir_addr, u32 *bus_addr_l,
+static inline void _os_shmem_free(void *d, void *pool, u8 *vir_addr, u32 *bus_addr_l,
 				  u32 *bus_addr_h, u32 buf_sz,
 				  u8 cache, u8 direction, void *os_rsvd)
 {
@@ -212,10 +243,13 @@ static inline void _os_shmem_free(void *d, u8 *vir_addr, u32 *bus_addr_l,
 	bus_addr |= ((dma_addr_t)*bus_addr_h) << 32;
 	#endif
 
-	if (cache)
-		return pci_free_cache_mem(pdev, vir_addr, &bus_addr, buf_sz, direction);
-	else
+	if ((cache == NONCACHE_ADDR) && (pool == NULL))
 		return pci_free_noncache_mem(pdev, vir_addr, &bus_addr, buf_sz);
+	else if ((cache == NONCACHE_ADDR) && pool)
+		return dma_pool_free((struct dma_pool *)pool, vir_addr, bus_addr);
+	else /* CACHE_ADDR */
+		return pci_free_cache_mem(pdev, vir_addr, &bus_addr, buf_sz, direction);
+	return;
 }
 #endif /*CONFIG_PCI_HCI*/
 
@@ -231,6 +265,10 @@ static inline void _os_pkt_buf_unmap_rx_pci(struct dvobj_priv *pobj, u32 bus_add
 	dma_addr |= ((dma_addr_t)bus_addr_h) << 32;
 	#endif
 
+#ifdef CONFIG_PLATFORM_AML_S905_V1
+	if (g_pcie_reserved_mem_dev)
+		pdev->dev.dma_mask = NULL;
+#endif
 	dma_unmap_single(&pdev->dev, dma_addr, buf_sz, DMA_FROM_DEVICE);
 
 #ifdef RTW_CORE_RECORD
@@ -257,13 +295,17 @@ static inline void *_os_pkt_buf_unmap_rx(void *d, u32 bus_addr_l,
 #ifdef CONFIG_PCI_HCI
 static inline void _os_pkt_buf_map_rx_pci(struct dvobj_priv *pobj,
                                           u32 *bus_addr_l, u32 *bus_addr_h,
-                                           u32 buf_sz, void *os_priv)
+                                          u32 buf_sz, void *os_priv)
 {
 	PPCI_DATA pci_data = dvobj_to_pci(pobj);
 	struct pci_dev *pdev = pci_data->ppcidev;
 	struct sk_buff *skb = os_priv;
 	dma_addr_t dma_addr;
 
+#ifdef CONFIG_PLATFORM_AML_S905_V1
+	if (g_pcie_reserved_mem_dev)
+		pdev->dev.dma_mask = NULL;
+#endif
 	dma_addr = dma_map_single(&pdev->dev, skb->data, buf_sz, DMA_FROM_DEVICE);
 	*bus_addr_l = (u32)dma_addr;
 
@@ -277,7 +319,7 @@ static inline void _os_pkt_buf_map_rx_pci(struct dvobj_priv *pobj,
 
 static inline void *_os_pkt_buf_map_rx(void *d, u32 *bus_addr_l,
                                        u32 *bus_addr_h, u32 buf_sz,
-                                       void *os_priv)
+				      void *os_priv)
 {
 #ifdef CONFIG_PCI_HCI
 	struct dvobj_priv *pobj = (struct dvobj_priv *)d;
@@ -291,22 +333,83 @@ static inline void *_os_pkt_buf_map_rx(void *d, u32 *bus_addr_l,
 	return NULL;
 }
 
+#ifdef CONFIG_PCI_HCI
+static inline struct sk_buff *_os_alloc_fake_skb(struct pci_dev *pdev, u32 buf_sz,
+						 enum cache_addr_type cache)
+{
+	struct sk_buff *skb = NULL;
+	unsigned char *data = NULL;
+
+	skb = rtw_zmalloc(sizeof(struct sk_buff));
+	if (!skb)
+		goto out;
+
+	if (cache == NONCACHE_ADDR)
+		data = pci_alloc_noncache_mem(pdev, (dma_addr_t *)&skb->cb, buf_sz);
+	else if (cache == CACHE_ADDR)
+		data = pci_alloc_cache_mem(pdev, (dma_addr_t *)&skb->cb, buf_sz, DMA_FROM_DEVICE);
+	else
+		RTW_ERR("%s-%d: unsupported cache type: %d\n", __func__, __LINE__, cache);
+
+	if (!data)
+		goto nodata;
+
+	skb->head = data;
+	skb->data = data;
+	skb_reset_tail_pointer(skb);
+	skb->end = skb->tail + buf_sz;
+	skb->len = buf_sz;
+out:
+	return skb;
+nodata:
+	_rtw_mfree(skb, sizeof(struct sk_buff));
+	skb = NULL;
+	goto out;
+}
+
+static inline void _os_free_fake_skb(struct pci_dev *pdev,
+	struct sk_buff *skb, u32 buf_sz, enum cache_addr_type cache)
+{
+	/* skb buffer */
+	if (cache == NONCACHE_ADDR)
+		pci_free_noncache_mem(pdev, skb->data, (dma_addr_t *)skb->cb, buf_sz);
+	else if (cache == CACHE_ADDR)
+		pci_free_cache_mem(pdev, skb->data, (dma_addr_t *)skb->cb, buf_sz, DMA_FROM_DEVICE);
+	else
+		RTW_ERR("%s-%d: unsupported cache type: %d\n", __func__, __LINE__, cache);
+
+	/* skb */
+	rtw_mfree(skb, sizeof(struct sk_buff));
+}
+#endif /*CONFIG_PCI_HCI*/
+
 /* rxbuf */
 #define PHL_RX_HEADROOM 0/* 50 */
+
 static inline void *_os_pkt_buf_alloc_rx(void *d, u32 *bus_addr_l,
                                          u32 *bus_addr_h, u32 buf_sz,
-                                         void **os_priv)
+                                         enum cache_addr_type cache,
+					 void **os_priv)
 {
 	struct dvobj_priv *pobj = (struct dvobj_priv *)d;
+	struct sk_buff *skb = NULL;
+	u32 rxbuf_size = buf_sz + PHL_RX_HEADROOM;
 #ifdef CONFIG_PCI_HCI
 	PPCI_DATA pci_data = dvobj_to_pci(pobj);
 	struct pci_dev *pdev = pci_data->ppcidev;
 	dma_addr_t dma_addr;
-#endif /*CONFIG_PCI_HCI*/
-	struct sk_buff *skb = NULL;
-	u32 rxbuf_size = buf_sz + PHL_RX_HEADROOM;
 
-	skb = rtw_skb_alloc(rxbuf_size);
+#ifdef CONFIG_RTW_RXSKB_KMALOC
+	skb = _os_alloc_fake_skb(pdev, buf_sz, cache);
+#else
+	if (cache == NONCACHE_ADDR)
+		skb = _os_alloc_fake_skb(pdev, buf_sz, cache);
+	else
+		skb = rtw_skb_alloc(rxbuf_size);
+#endif
+#else
+		skb = rtw_skb_alloc(rxbuf_size);
+#endif
 
 	if (!skb)
 		return NULL;
@@ -316,8 +419,22 @@ static inline void *_os_pkt_buf_alloc_rx(void *d, u32 *bus_addr_l,
 #endif
 
 #ifdef CONFIG_PCI_HCI
-	dma_addr = dma_map_single(&pdev->dev, skb->data, rxbuf_size, DMA_FROM_DEVICE);
-	*bus_addr_l = (u32)dma_addr;
+#ifdef CONFIG_PLATFORM_AML_S905_V1
+	if (g_pcie_reserved_mem_dev)
+		pdev->dev.dma_mask = NULL;
+#endif
+#ifdef CONFIG_RTW_RXSKB_KMALOC
+	*bus_addr_l = *(dma_addr_t *)skb->cb;
+#else
+	if (cache == NONCACHE_ADDR) {
+		*bus_addr_l = *(dma_addr_t *)skb->cb;
+	}
+	else
+	{
+		dma_addr = dma_map_single(&pdev->dev, skb->data, rxbuf_size, DMA_FROM_DEVICE);
+		*bus_addr_l = (u32)dma_addr;
+	}
+#endif
 	#ifdef PHL_DMA_ADDR_64
 	*bus_addr_h = (u32)(dma_addr >> 32);
 	#else
@@ -330,7 +447,7 @@ static inline void *_os_pkt_buf_alloc_rx(void *d, u32 *bus_addr_l,
 }
 
 static inline void _os_pkt_buf_free_rx(void *d, u8 *vir_addr, u32 bus_addr_l,
-                                       u32 bus_addr_h, u32 buf_sz, void *os_priv)
+                                       u32 bus_addr_h, u32 buf_sz, enum cache_addr_type cache, void *os_priv)
 {
 	struct dvobj_priv *pobj = (struct dvobj_priv *)d;
 #ifdef CONFIG_PCI_HCI
@@ -344,7 +461,22 @@ static inline void _os_pkt_buf_free_rx(void *d, u8 *vir_addr, u32 bus_addr_l,
 	#ifdef PHL_DMA_ADDR_64
 	bus_addr |= ((dma_addr_t)bus_addr_h) << 32;
 	#endif
-	dma_unmap_single(&pdev->dev, bus_addr, buf_sz, DMA_FROM_DEVICE);
+
+#ifdef CONFIG_PLATFORM_AML_S905_V1
+	if (g_pcie_reserved_mem_dev)
+		pdev->dev.dma_mask = NULL;
+#endif
+#ifdef CONFIG_RTW_RXSKB_KMALOC
+	_os_free_fake_skb(pdev, skb, buf_sz, cache);
+	return;
+#else
+	if (cache == NONCACHE_ADDR) {
+		_os_free_fake_skb(pdev, skb, buf_sz, cache);
+		return;
+	} else {
+		dma_unmap_single(&pdev->dev, bus_addr, buf_sz, DMA_FROM_DEVICE);
+	}
+#endif
 #endif /*CONFIG_PCI_HCI*/
 	rtw_skb_free(skb);
 }
@@ -352,13 +484,13 @@ static inline void _os_pkt_buf_free_rx(void *d, u8 *vir_addr, u32 bus_addr_l,
 /* phl pre-alloc network layer buffer */
 static inline void * _os_alloc_netbuf(void *d, u32 buf_sz, void **os_priv)
 {
-	return _os_pkt_buf_alloc_rx(d, NULL, NULL, buf_sz, os_priv);
+	return _os_pkt_buf_alloc_rx(d, NULL, NULL, buf_sz, CACHE_ADDR, os_priv);
 }
 
 /* Free netbuf for error case. (ex. drop rx-reorder packet) */
 static inline void _os_free_netbuf(void *d, u8 *vir_addr, u32 buf_sz, void *os_priv)
 {
-	_os_pkt_buf_free_rx(d, vir_addr, 0,0, buf_sz, os_priv);
+	_os_pkt_buf_free_rx(d, vir_addr, 0,0, buf_sz, CACHE_ADDR, os_priv);
 }
 
 /* Generate an unsigned 32-bit random number */
@@ -556,7 +688,11 @@ static __inline int _os_event_wait(void *h, _os_event *event, u32 m_sec)
 			expire = MAX_SCHEDULE_TIMEOUT;
 	}
 	else {
+		#ifdef RTW_MAX_SCHEDULE_TIMEOUT
+		expire = msecs_to_jiffies(RTW_MAX_SCHEDULE_TIMEOUT);
+		#else
 		expire = MAX_SCHEDULE_TIMEOUT;
+		#endif /*RTW_MAX_SCHEDULE_TIMEOUT*/
 	}
 
 	expire = wait_for_completion_timeout(event, expire);
@@ -674,7 +810,7 @@ static inline bool _os_atomic_inc_unless(void *d, _os_atomic *v, int u)
 }
 */
 
-static inline void rtw_taskletw_hdl(unsigned long data)
+static void rtw_taskletw_hdl(unsigned long data)
 {
 	_taskletw *ptask = (_taskletw *) data;
 
@@ -784,20 +920,85 @@ static inline int _os_thread_should_stop(void)
 }
 #endif
 
+static void rtw_workitemw_hdl(struct work_struct *wk)
+{
+/*
+ * struct rtw_workitemw {
+ * #ifdef CONFIG_CPU_BALANCE
+ * 	_workitem_cpu work {
+ * 		 _workitem wk;
+ * 		char work_name[32];
+ * 		struct workqueue_struct *pwkq;
+ * 		int cpu_id;
+ * 	};
+ * #else
+ * 	_workitem work {
+ * 		 _workitem wk;
+ * 	};
+ * #endif
+ * 	void (*func)(void *);
+ * };
+ *
+ * use 'wk' field to dereference  _workitem_cpu or _workitem first,
+ * then use 'work' field to dereference rtw_workitemw
+ *
+ * PHL callback 'func' will use rtw_workitemw as os_handler (to return PHL handler)
+ */
+#ifdef CONFIG_CPU_BALANCE
+	_workitem_cpu *work = (_workitem_cpu *) wk;
+#else
+	_workitem *work = (_workitem *) wk;
+#endif
+	_workitemw *w = (_workitemw *) work;
+
+	w->func(w);
+}
+
+static inline u8 rtw_workitemw_init(_workitemw *w, void (*func)(void *), void *data)
+{
+	w->func = func;
+#ifdef CONFIG_CPU_BALANCE
+	_init_workitem_cpu(&w->work, rtw_workitemw_hdl, data);
+#else
+	_init_workitem(&w->work, rtw_workitemw_hdl, data);
+#endif
+	return 0;
+}
+
+#ifdef CONFIG_CPU_BALANCE
+static inline u8 _os_workitem_config_cpu(void *drv_priv, _os_workitem *workitem,
+			char *work_name, int cpu_id)
+{
+	_config_workitem_cpu(&workitem->work, work_name, cpu_id);
+	return 0;
+}
+#endif
+
 static inline u8 _os_workitem_init(void *drv_priv, _os_workitem *workitem,
 			void (*call_back_func)(void* context), void *context)
 {
-	_init_workitem(workitem, call_back_func, context);
-	return 0;
+	return rtw_workitemw_init(workitem, call_back_func, context);
 }
+
 static inline u8 _os_workitem_schedule(void *drv_priv, _os_workitem *workitem)
 {
-	_set_workitem(workitem);
+#ifdef CONFIG_CPU_BALANCE
+	_set_workitem_cpu(&workitem->work);
+#elif defined(CONFIG_PHL_HANDLER_WQ_HIGHPRI)
+	_set_workitem_highpri(&workitem->work);
+#else
+	_set_workitem(&workitem->work);
+#endif
 	return 0;
 }
+
 static inline u8 _os_workitem_deinit(void *drv_priv, _os_workitem *workitem)
 {
-	_cancel_workitem_sync(workitem);
+#ifdef CONFIG_CPU_BALANCE
+	_cancel_workitem_sync_cpu(&workitem->work);
+#else
+	_cancel_workitem_sync(&workitem->work);
+#endif
 	return 0;
 }
 
@@ -827,6 +1028,27 @@ static inline u8 _os_deinit_handler_ext(void *drv_priv,
 #endif /* CONFIG_RTW_OS_HANDLER_EXT */
 
 /* File Operation */
+
+/*
+* if _os_file_readable() is supported
+*/
+static inline bool _os_file_readable_supported(void)
+{
+	return true;
+}
+
+/*
+* Test if the specific @param path is a file and readable.
+* If readable, @param sz is set to file size
+* @param path the path of the file to test
+* @param sz the file size if file is readable
+* @return true or false
+*/
+static inline bool _os_file_readable(const char *path, u32 *sz)
+{
+	return (bool)rtw_is_file_readable_with_size(path, sz);
+}
+
 static inline u32 _os_read_file(const char *path, u8 *buf, u32 sz)
 {
 	return (u32)rtw_retrieve_from_file(path, buf, sz);

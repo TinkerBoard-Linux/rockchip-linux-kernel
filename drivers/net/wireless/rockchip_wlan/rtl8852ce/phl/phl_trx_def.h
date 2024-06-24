@@ -51,6 +51,9 @@
 #define H2C_CMD_LEN 64
 #define H2C_DATA_LEN 256
 #define H2C_LONG_DATA_LEN 2048
+#ifdef CONFIG_PHL_H2C_PKT_POOL_STATS_CHECK
+#define H2C_LAST_RETURN_NUM 8
+#endif
 
 #define get_h2c_size_by_range(i) \
 	((i < _H2CB_CMD_QLEN) ? \
@@ -70,6 +73,9 @@ struct rtw_h2c_pkt {
 	u32 id; /* h2c id */
 	u32 buf_len;
 	u32 data_len;
+#ifdef CONFIG_PHL_H2C_PKT_POOL_STATS_CHECK
+	enum rtw_phl_comm_module pkt_src;
+#endif
 
 	u32 phy_addr_l;
 	u32 phy_addr_h;
@@ -77,6 +83,20 @@ struct rtw_h2c_pkt {
 	u16 host_idx;
 	u8 h2c_seq; /* h2c seq */
 };
+
+#ifdef CONFIG_PHL_H2C_PKT_POOL_STATS_CHECK
+struct rtw_h2c_pkt_return {
+	enum rtw_phl_comm_module pkt_src;
+	u32 id;
+	u32 timestamp;
+};
+
+struct rtw_h2c_pkt_return_list {
+	struct rtw_h2c_pkt_return h2c_pkt_return[H2C_LAST_RETURN_NUM];
+	_os_lock lock;
+	int oldest_index;
+};
+#endif
 
 /**
  * the category of phl ring
@@ -132,22 +152,13 @@ enum rtw_packet_type {
 	RTW_PHL_PKT_TYPE_MAX = 0xFF
 };
 
-
-/**
-  * struct rtw_t_mdata_non_dcpu:
-  * this settings are only used in non-dcpu mode.
-  */
-struct rtw_t_mdata_non_dcpu {
-	u8 tbd;
+enum rtw_msdu_type {
+	RTW_PHL_MSDU_TYPE_ETHII = 0,
+	RTW_PHL_MSDU_TYPE_8023SNAP = 1,
+	RTW_PHL_MSDU_TYPE_80211 = 2,
+	RTW_PHL_MSDU_TYPE_MAX = 0xFF
 };
 
-/**
-  * struct rtw_t_mdata_dcpu:
-  * this settings are only used in dcpu mode.
-  */
-struct rtw_t_mdata_dcpu {
-	u8 tbd;
-};
 
 /**
  * tx packet descrption
@@ -180,18 +191,27 @@ struct rtw_t_meta_data {
 	u8 hw_ssn_sel;
 	u16 sw_seq;
 
-	/* hdr conversion & hw amsdu */
-	u8 smh_en;
+	/* hdr conversion & hw amsdu & checksum offload*/
+	u8 hw_hdr_conv;
 	u8 hw_amsdu;
-	u8 hdr_len;
+	u8 chk_en; /*bool*/
+
+	enum rtw_msdu_type msdu_type;
+	u8 mac_hdr_len;
+	u8 a4_hdr;/*bool*/
+	u8 with_vlantag;/*bool*/
+	u8 with_llc;/*bool*/
+	u8 sec_hdr_len;/*iv len*/
+
 	u8 wp_offset;
+
+	/*tx shortcut*/
 	u8 shcut_camid;
-	u8 upd_wlan_hdr;
+
+	u8 msdu_num;
 	u8 reuse_start_num;
 	u8 reuse_size;
-	u8 a4_hdr;
 	u8 hci_seqnum_mode;
-	u8 msdu_num;
 
 	/* dma */
 	u8 dma_ch;
@@ -293,11 +313,6 @@ struct rtw_t_meta_data {
 	u8 sw_tx_ok;
 	/* info section end */
 
-	union {
-		struct rtw_t_mdata_non_dcpu non_dcpu;
-		struct rtw_t_mdata_dcpu dcpu;
-	} u;
-
 	void *mac_priv;
 };
 
@@ -314,6 +329,9 @@ struct rtw_r_meta_data {
 	u8 chksum_status; /*return mac_chk_rx_tcpip_chksum_ofd,0 is ok ,1 is fail*/
 #endif
 	u8 rx_deferred_release;
+#ifdef CONFIG_PHL_TDLS
+	u8 is_tdls_frame;
+#endif
 
 	u16 pktlen;
 	u8 shift;
@@ -507,6 +525,7 @@ struct tx_local_buf {
  * @total_len: the total length of pkt_list
  * @pkt_cnt: the packet number of pkt_list
  * @pkt_list: see structure rtw_pkt_buf_list
+ * @cache: see enum cache_addr_type
  * @txfb: tx feedback context
  * @lat_sen: latency sensitive pkt, in lps, we will extend more awake time to rx rsp pkt.
  * Note, this structure are visible to core, phl and hal layer
@@ -536,6 +555,7 @@ struct rtw_xmit_req {
 #ifdef CONFIG_RTW_TX_HW_HDR_CONV
 	u8 hw_hdr_conv;
 #endif
+	enum cache_addr_type cache;
 };
 
 /**
@@ -716,6 +736,10 @@ enum rtw_rx_fltr_opt_mode {
 	RX_FLTR_OPT_MODE_STA_LINKING,
 	RX_FLTR_OPT_MODE_STA_NORMAL,
 	RX_FLTR_OPT_MODE_AP_NORMAL,
+	RX_FLTR_OPT_MODE_LSN_DISCOV,
+#ifdef CONFIG_PHL_TEST_MP
+	RX_FLTR_OPT_MODE_MP,
+#endif
 	RX_FLTR_OPT_MODE_RESTORE = 0xFF
 };
 

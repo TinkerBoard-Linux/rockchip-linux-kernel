@@ -69,9 +69,11 @@ enum efuse_bit_mask {
 struct halbb_pause_lv {
 	s8			lv_fa_cnt;
 	s8			lv_dig;
+	s8			lv_env_mntr;
 	s8			lv_cfo;
 	s8			lv_edcca;
 	s8			lv_path_div;
+	s8			lv_ant_div;
 };
 
 struct bb_func_hooker_info {
@@ -107,9 +109,11 @@ struct bb_link_info {
 	bool			first_connect;
 	bool			first_disconnect;
 	enum bb_trx_state_t	txrx_state_all;
+	enum bb_bw_type		bb_bw;
 	/*[One Entry TP Info]*/
 	bool			is_one_entry_only;
 	u32			one_entry_macid;
+	u32			first_entry_macid;
 	u32			one_entry_tp;
 	u32			one_entry_tp_pre;
 	u16			tp_active_th;
@@ -123,9 +127,13 @@ struct bb_link_info {
 	/*[TP & Traffic]*/
 	u8			traffic_load;
 	u8			traffic_load_pre;
-	u16			tx_rate;
+	u16			tx_rate;	/*from the first sta*/
 	u16			rx_rate_plurality;
 	u16			rx_rate_plurality_mu;
+	u16			rx_utility;
+	u16			tx_utility;
+	u16			avg_phy_rate;		/*Rx avg phy rate*/
+	u16			tx_avg_phy_rate;	/*Tx avg phy rate*/
 	u32			tx_tp;			/*@Mbps*/
 	u32			rx_tp;			/*@Mbps*/
 	u32			total_tp;		/*@Mbps*/
@@ -212,9 +220,12 @@ struct bb_efuse_info{
 	s8 efuse_ofst_path[HALBB_MAX_PATH]; // 8852C: S(8,4)
 	s8 efuse_ofst_tb[HW_PHY_MAX]; // 8852A:S(7,4) 8852B:S(8,4)
 	s8 efuse_ofst_tb_path[HALBB_MAX_PATH]; // 8852C: S(8,4)
+	s8 rpl_ofst_cck; // 8852D: S(8,0)
 
 	u8 efuse_ft; // 8192XB: U(8,0)
 	u8 efuse_adc_td; // 8192XB: U(2,0)
+
+	s8 cck_rpl_ofst_ref;
 };
 
 struct vht_mu_cr_backup_table {
@@ -234,17 +245,22 @@ struct bb_cmn_dbg_info {
 };
 
 struct bb_cmn_info {
+	enum wlan_mode wlan_mode_max;
 	u8 bb_dm_number;
 	bool cck_blk_en;
 	enum phl_phy_idx cck_phy_map;
 	bool bb_dbcc_en;
 	bool ic_dual_phy_support;
 	bool ic_dbcc_support;
-#ifdef BB_8922A_DVLP_SPF
+	bool watchdog_io_saving_en;
+	enum halbb_drv_type bb_drv_type;
+#ifdef HALBB_COMPILE_IC_DBCC_MLO
 	enum mlo_dbcc_mode_type bb_mlo_dbcc_mode_t;
 #endif
 #ifdef HALBB_RA_SUPPORT
 	struct bb_ra_info	bb_ra_i[PHL_MAX_STA_NUM];
+	struct bb_ra_drv_info	bb_ra_drv_i;
+	struct bb_ra_dbg_info	bb_ra_dbg_i;
 #endif
 #ifdef HALBB_PSD_SUPPORT
 	struct bb_psd_info	bb_psd_i;
@@ -265,15 +281,52 @@ struct bb_cmn_info {
 #ifdef HALBB_FW_OFLD_SUPPORT
 	u8 bbcr_fwofld_state;
 	bool skip_io_init_en;
+	bool is_io_ofld_success;
 #endif
 	bool bb_fwofld_in_progress;
 	u32 bb_fwofld_sup_bitmap; /*enum fw_ofld_type.For HALBB to control DBCC-OFLD manully*/
 	u32 bb_fwofld_start_time;
+	struct bb_dbg_cr_info bb_dbg_cr_i;
+	struct bb_physts_cr_info bb_physts_cr_i;
+#ifdef HALBB_STATISTICS_SUPPORT
+	struct bb_stat_cr_info bb_stat_cr_i;
+#endif
+#ifdef HALBB_DIG_SUPPORT
+	struct bb_dig_cr_info bb_dig_cr_i;
+#endif
+#ifdef HALBB_ENV_MNTR_SUPPORT
+	struct bb_env_mntr_cr_info bb_env_mntr_cr_i;
+#endif
+#ifdef HALBB_EDCCA_SUPPORT
+	struct bb_edcca_cr_info bb_edcca_cr_i;
+#endif
+#ifdef HALBB_DFS_SUPPORT
+	struct bb_dfs_cr_info bb_dfs_cr_i;
+#endif
+#ifdef HALBB_ANT_DIV_SUPPORT
+	struct bb_antdiv_cr_info bb_antdiv_cr_i;
+#endif
+#ifdef HALBB_PMAC_TX_SUPPORT
+	struct bb_plcp_cr_info bb_plcp_cr_i;
+#endif
+	struct bb_rpt_info bb_rpt_i;
+#ifdef HALBB_CH_INFO_SUPPORT
+	struct bb_ch_info_cr_info bb_ch_info_cr_i; /*CR callback table*/
+#endif
+#ifdef HALBB_CFO_TRK_SUPPORT
+	struct bb_cfo_trk_cr_info bb_cfo_trk_cr_i;
+#endif
+#ifdef HALBB_UL_TB_CTRL_SUPPORT
+	struct bb_ul_tb_cr_info bb_ul_tb_cr_i;
+#endif
+#ifdef HALBB_SR_SUPPORT
+	struct bb_spatial_reuse_cr_info bb_spatial_reuse_cr_i;
+#endif
+	struct bb_hw_cfg_cr_info bb_hw_cfg_cr_i;
 };
 
-#ifdef HALBB_DIG_MCC_SUPPORT
+#ifdef HALBB_MCC_SUPPORT
 #define PD_IDX_MIN	0
-#define NUM_MAX_IGI_CNT	7
 #define INVALID_INIT_VAL 0xff
 
 /*For 2G/5G/6G*/
@@ -283,28 +336,56 @@ enum mcc_band {
 	MCC_BAND_NUM
 };
 
+enum mr_band {
+	MR_BAND_1 = 0,
+	MR_BAND_2 = 1,
+	MR_BAND_3 = 2,
+	MR_BAND_NUM
+};
+
+enum bb_mcc_t {
+	BB_MCC_DISABLE = 0,
+	BB_MCC_ENABLE = 1,
+	BB_MCC_INVALID
+};
+
+enum halbb_mcc_reg {
+	SEG0R_PD_LOWER_BOUND = 0,
+	NUM_MAX_REG_CNT
+};
+
+enum halbb_mr_err_code{
+	BB_MRDM_DISABLE = 0,
+	BB_MRDM_REG_OVERFLOW = 1,
+	BB_MRDM_CLR_CH = 2,
+	BB_MRDM_SEARCH_CH_FAIL = 3,
+	BB_MRDM_ONE_CH_ONLY = 4,
+	BB_MRDM_SWITCH_CR = 5,
+	BB_MRDM_START = 6,
+	BB_MRDM_ERR_MAX
+};
+
 struct halbb_mcc_dm {
-	bool		mcc_pre_status_en;
-	u8		mcc_reg_id[NUM_MAX_IGI_CNT];
-	u8		sta_cnt[MCC_BAND_NUM];
-	u16		mcc_dm_reg[NUM_MAX_IGI_CNT];
-	u16		mcc_dm_mask[NUM_MAX_IGI_CNT];
-	u16		mcc_dm_val[NUM_MAX_IGI_CNT][MCC_BAND_NUM];
+	enum bb_mcc_t	mcc_pre_status_en;
+	u8		mcc_reg_id[NUM_MAX_REG_CNT];
+	u8		sta_cnt[MR_BAND_NUM];
+	u16		mcc_dm_reg[NUM_MAX_REG_CNT];
+	u16		mcc_dm_mask[NUM_MAX_REG_CNT];
+	u16		mcc_dm_val[NUM_MAX_REG_CNT][MR_BAND_NUM];
 	/*mcc DIG*/
-	u8		rssi_min[MCC_BAND_NUM];
-
+	u8		rssi_min[MR_BAND_NUM];
 	/* need to be config by driver*/
-	bool		mcc_status_en;
+	enum bb_mcc_t	mcc_status_en;
+	u8		mr_num;
 	u8		softap_macid;
-	struct rtw_chan_def mcc_rf_ch[MCC_BAND_NUM];
-
+	struct rtw_chan_def mcc_rf_ch[MR_BAND_NUM];
 };
 /**
  * @struct _mcc_h2c_
  * @brief _mcc_h2c_
  *
  */
- struct mcc_h2c_reg_content {
+struct mcc_h2c_reg_content {
 	// MCCDM
 	u8 addr_lsb;
 	u8 addr_msb;
@@ -312,28 +393,50 @@ struct halbb_mcc_dm {
 	u8 bmask_msb;
 	u8 val_lsb;
 	u8 val_msb;
+	u8 rsvd0;
+	u8 rsvd1;
 };
 
+#if PLATFOM_IS_LITTLE_ENDIAN
 struct mcc_h2c {
 	// MCCDM
 	u8 reg_cnt;
+
 	u8 mcc_dm_en: 1;
-	u8 mcc_ch_idx: 1;
+	u8 mcc_idx: 2;
 	u8 mcc_set: 1;
 	u8 phy0_en: 1;
 	u8 phy1_en: 1;
-	u8 rsvd0: 3;
-	u8 ch_lsb;
-	u8 ch_msb;
-	struct mcc_h2c_reg_content mcc_reg_content[NUM_MAX_IGI_CNT];
+	u8 rsvd0: 2;
+
+	u8 center_ch;
+	u8 band_type;
+	struct mcc_h2c_reg_content mcc_reg_content[NUM_MAX_REG_CNT];
 };
+#else
+struct mcc_h2c {
+	// MCCDM
+	u8 reg_cnt;
+
+	u8 rsvd0: 2;
+	u8 phy1_en: 1;
+	u8 phy0_en: 1;
+	u8 mcc_set: 1;
+	u8 mcc_idx: 2;
+	u8 mcc_dm_en: 1;
+
+	u8 center_ch;
+	u8 band_type;
+	struct mcc_h2c_reg_content mcc_reg_content[NUM_MAX_REG_CNT];
+};
+#endif
 #endif
 
 struct bb_info {
 	struct rtw_phl_com_t	*phl_com;
 	struct rtw_hal_com_t	*hal_com;
 	struct rtw_phl_stainfo_t *phl_sta_info[PHL_MAX_STA_NUM];
-	u8			phl2bb_macid_table[PHL_MAX_STA_NUM];
+	u16			phl2bb_macid_table[PHL_MAX_STA_NUM];
 	bool			sta_exist[PHL_MAX_STA_NUM];
 	/*[DBCC]*/
 #ifdef HALBB_DBCC_SUPPORT
@@ -345,13 +448,15 @@ struct bb_info {
 	u32			bb0_cr_offset;
 	u32			bb0_mcu_cr_offset;
 	struct bb_gain_info	bb_gain_i;
+	struct bb_gain_gen2_info bb_gain_gen2_i;
 	struct bb_efuse_info	bb_efuse_i;
 	enum bb_ic_t		ic_type;
 	enum bb_ic_sub_t	ic_sub_type;
 	enum bb_cr_t		cr_type;
 	enum bb_80211spec_t	bb_80211spec;
-	u8			num_rf_path;
-	u8			bb_sta_cnt;
+	u8			num_ss; /*SS*/
+	u8			num_rf_path; /*STS*/
+	u16			bb_sta_cnt;
 	/*[System Info]*/
 	bool			is_mp_mode_pre;
 	enum bb_watchdog_mode_t bb_watchdog_mode;
@@ -396,8 +501,13 @@ struct bb_info {
 	u32			pmac_pwr_ofst;
 	/*[btc]*/
 	bool			bt_en; /*bt_en=1 when is_share_ant=0 and is_2g, backup for ch_bw switch*/
+	/*[Ch_Trk WR]*/
+	bool			pre_ch_trk_state;
+	/*[npath enable]*/
+	bool			npath_en;
 
 	/*@=== [HALBB Structure] ============================================*/
+	struct bb_hw_cfg_info	bb_hw_cfg_i;
 #ifdef BB_8852A_2_SUPPORT
 	struct bb_8852a_2_info	bb_8852a_2_i;
 	struct bb_h2c_fw_cmw	bb_fw_cmw_i;
@@ -454,7 +564,7 @@ struct bb_info {
 	struct bb_h2c_ehtsig_sigb	bb_h2c_ehtsig_sigb_i;
 	struct bb_fw_dbg_cmn_info	bb_fwdbg_i;
 	struct bb_cmn_rpt_info	bb_cmn_rpt_i;
-	struct bb_rpt_info bb_rpt_i;
+	struct bb_ra_tx_hist_c2h_rpt bb_tx_hist_rpt_i;
 	struct rxevm_physts	rxevm;
 	struct bb_cmn_backup_info	bb_cmn_backup_i;
 	struct bb_spur_info 	bb_spur_i;
@@ -473,11 +583,14 @@ struct bb_info {
 #ifdef HALBB_PATH_DIV_SUPPORT
 	struct bb_pathdiv_info bb_path_div_i;
 #endif
+#ifdef HALBB_SR_SUPPORT
+	struct bb_spatial_reuse_info bb_sr_i;
+#endif
 	/*@=== [HALBB Timer] ================================================*/
 #ifdef HALBB_RUA_SUPPORT
 	/*struct rtw_rua_tbl rtw_rua_t;*/
 #endif
-#ifdef HALBB_DIG_MCC_SUPPORT
+#ifdef HALBB_MCC_SUPPORT
 	struct halbb_mcc_dm mcc_dm;
 #endif
 #ifdef HALBB_DYN_1R_CCA_SUPPORT
@@ -489,7 +602,11 @@ struct bb_info {
 #ifdef HALBB_FW_OFLD_SUPPORT
 	enum phl_msg_evt_id bb_phl_evt;
 #endif
-
+#ifdef HALBB_DV_PXP_DBG_SUPPORT
+	struct bb_dv_pxp_dbg_info bb_dv_pxp_dbg_i;
+#endif
+	struct halbb_plcp_info plcp_in;
+	struct halbb_pmac_info pmac_in;
 };
 
 
@@ -500,6 +617,7 @@ void halbb_sta_info_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 			char *output, u32 *_out_len);
 void halbb_supportability_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 			     char *output, u32 *_out_len);
+void halbb_pause_func_init(struct bb_info *bb);
 void halbb_pause_func_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 			  char *output, u32 *_out_len);
 void halbb_store_data(struct bb_info *bb);

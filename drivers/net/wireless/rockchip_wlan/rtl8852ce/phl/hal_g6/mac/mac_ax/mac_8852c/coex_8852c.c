@@ -91,6 +91,7 @@ u32 mac_get_gnt_8852c(struct mac_ax_adapter *adapter,
 {
 	u32 val, status;
 	struct mac_ax_gnt *gnt;
+	struct mac_ax_wl_act *gnt_wl;
 	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
 
 	val = MAC_REG_R32(R_AX_GNT_SW_CTRL);
@@ -107,6 +108,14 @@ u32 mac_get_gnt_8852c(struct mac_ax_adapter *adapter,
 	gnt->gnt_bt = !!(status & B_AX_GNT_BT_RFC_S1);
 	gnt->gnt_wl_sw_en = !!(val & B_AX_GNT_WL_RFC_S1_SWCTRL);
 	gnt->gnt_wl = !!(status & B_AX_GNT_WL_RFC_S1);
+
+	gnt_wl = &gnt_cfg->bt0;
+	gnt_wl->wlan_act_en = !!(val & B_AX_WL_ACT_SWCTRL);
+	gnt_wl->wlan_act = !!(status & B_AX_WL_ACT_VAL);
+
+	gnt_wl = &gnt_cfg->bt1;
+	gnt_wl->wlan_act_en = !!(val & B_AX_WL_ACT2_SWCTRL);
+	gnt_wl->wlan_act = !!(status & B_AX_WL_ACT2_VAL);
 
 	return MACSUCCESS;
 }
@@ -140,7 +149,11 @@ u32 mac_cfg_gnt_8852c(struct mac_ax_adapter *adapter,
 		B_AX_GNT_WL_TX_VAL | B_AX_GNT_WL_BB_VAL) : 0) |
 	      (gnt_cfg->band1.gnt_wl_sw_en ?
 	       (B_AX_GNT_WL_RFC_S1_SWCTRL | B_AX_GNT_WL_RX_SWCTRL |
-		B_AX_GNT_WL_TX_SWCTRL | B_AX_GNT_WL_BB_SWCTRL) : 0);
+		B_AX_GNT_WL_TX_SWCTRL | B_AX_GNT_WL_BB_SWCTRL) : 0) |
+	      (gnt_cfg->bt0.wlan_act_en ? B_AX_WL_ACT_SWCTRL : 0) |
+	      (gnt_cfg->bt0.wlan_act ? B_AX_WL_ACT_VAL : 0) |
+	      (gnt_cfg->bt1.wlan_act_en ? B_AX_WL_ACT2_SWCTRL : 0) |
+	      (gnt_cfg->bt1.wlan_act ? B_AX_WL_ACT2_VAL : 0);
 
 	MAC_REG_W32(R_AX_GNT_SW_CTRL, val);
 
@@ -193,6 +206,11 @@ u32 mac_cfg_ctrl_path_8852c(struct mac_ax_adapter *adapter, u32 wl)
 	gnt_cfg.band1.gnt_bt = 1;
 	gnt_cfg.band1.gnt_wl_sw_en = 1;
 	gnt_cfg.band1.gnt_wl = 0;
+
+	gnt_cfg.bt0.wlan_act = 1;
+	gnt_cfg.bt0.wlan_act_en = 0;
+	gnt_cfg.bt1.wlan_act = 1;
+	gnt_cfg.bt1.wlan_act_en = 0;
 
 	return mac_cfg_gnt_8852c(adapter, &gnt_cfg);
 }

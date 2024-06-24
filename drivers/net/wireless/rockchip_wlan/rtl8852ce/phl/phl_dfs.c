@@ -118,16 +118,16 @@ phl_radar_detect_switch(struct phl_info_t *phl_info, u8 band_idx, bool enable)
 	struct rtw_phl_com_t *phl_com = phl_info->phl_com;
 	struct rtw_dfs_t *dfs_info = &phl_com->dfs_info;
 
-	if (rtw_hal_radar_detect_cfg(phl_info->hal, enable) == RTW_HAL_STATUS_SUCCESS) {
+	if (rtw_hal_radar_detect_cfg(phl_info->hal, band_idx, enable) == RTW_HAL_STATUS_SUCCESS) {
 		dfs_info->radar_detect_enabled = enable;
 		return RTW_PHL_STATUS_SUCCESS;
 	}
 	return RTW_PHL_STATUS_FAILURE;
 }
 
-bool phl_is_radar_detect_enabled(struct phl_info_t *phl_info, u8 band_idx)
+bool rtw_phl_is_radar_detect_enabled(struct rtw_phl_com_t *phl_com, u8 band_idx)
 {
-	return phl_info->phl_com->dfs_info.radar_detect_enabled;
+	return phl_com->dfs_info.radar_detect_enabled;
 }
 
 static void phl_set_under_cac(struct phl_info_t *phl_info, u8 band_idx, bool under)
@@ -138,9 +138,9 @@ static void phl_set_under_cac(struct phl_info_t *phl_info, u8 band_idx, bool und
 		CLEAR_STATUS_FLAG(phl_info->phl_com->dev_state, RTW_DEV_IN_DFS_CAC_PERIOD);
 }
 
-bool phl_is_under_cac(struct phl_info_t *phl_info, u8 band_idx)
+bool rtw_phl_is_under_cac(struct rtw_phl_com_t *phl_com, u8 band_idx)
 {
-	return TEST_STATUS_FLAG(phl_info->phl_com->dev_state, RTW_DEV_IN_DFS_CAC_PERIOD);
+	return TEST_STATUS_FLAG(phl_com->dev_state, RTW_DEV_IN_DFS_CAC_PERIOD);
 }
 
 static enum rtw_phl_status
@@ -164,12 +164,14 @@ bool phl_is_cac_tx_paused(struct phl_info_t *phl_info, u8 band_idx)
 void phl_dfs_rd_setting_before_ch_switch(struct phl_info_t *phl_info, u8 band_idx
 	, enum band_type band, u8 ch, enum channel_width bw, enum chan_offset offset, struct dfs_rd_ch_switch_ctx *ctx)
 {
+	struct rtw_phl_com_t *phl_com = phl_info->phl_com;
+
 	ctx->should_rd_en_on_new_ch = phl_should_radar_detect_enable_by_ch(phl_info
 		, band_idx, band, ch, bw, offset);
-	ctx->under_cac = phl_is_under_cac(phl_info, band_idx);
+	ctx->under_cac = rtw_phl_is_under_cac(phl_com, band_idx);
 	ctx->cac_tx_paused = phl_is_cac_tx_paused(phl_info, band_idx);
 
-	ctx->rd_enabled = phl_is_radar_detect_enabled(phl_info, band_idx);
+	ctx->rd_enabled = rtw_phl_is_radar_detect_enabled(phl_com, band_idx);
 
 	if (!ctx->should_rd_en_on_new_ch && ctx->rd_enabled) {
 		/* turn off radar detect before channel setting (ex: leaving detection range) */
@@ -179,7 +181,7 @@ void phl_dfs_rd_setting_before_ch_switch(struct phl_info_t *phl_info, u8 band_id
 			, "[DFS] new ch=%d,%u,%d,%d disable radar detect%s\n"
 			, band, ch, bw, offset, rst != RTW_PHL_STATUS_SUCCESS ? " failed" : "");
 
-		ctx->rd_enabled = phl_is_radar_detect_enabled(phl_info, band_idx);
+		ctx->rd_enabled = rtw_phl_is_radar_detect_enabled(phl_com, band_idx);
 	}
 
 	if (ctx->should_rd_en_on_new_ch && ctx->under_cac && !ctx->cac_tx_paused) {
@@ -233,7 +235,7 @@ phl_radar_detect_confs_apply(struct phl_info_t *phl_info, u8 band_idx)
 
 	should_rd_enable = phl_should_radar_detect_enable_by_ch(phl_info, band_idx
 		, chdef.band, chdef.chan, chdef.bw, chdef.offset);
-	under_cac = phl_is_under_cac(phl_info, band_idx);
+	under_cac = rtw_phl_is_under_cac(phl_com, band_idx);
 	cac_tx_paused = phl_is_cac_tx_paused(phl_info, band_idx);
 
 	if (!dfs_info->radar_detect_enabled) {
@@ -309,12 +311,12 @@ _phl_dfs_rd_ctl_hdl(void *phl, u8 *param)
 			dfs_info->enable = true;
 		}
 		if (rd_ctl_param->cac == 1) {
-			if (!phl_is_under_cac(phl_info, band_idx)) {
+			if (!rtw_phl_is_under_cac(phl_com, band_idx)) {
 				PHL_INFO("%s under CAC\n", __func__);
 				phl_set_under_cac(phl_info, band_idx, true);
 			}
 		} else if (rd_ctl_param->cac == 0) {
-			if (phl_is_under_cac(phl_info, band_idx)) {
+			if (rtw_phl_is_under_cac(phl_com, band_idx)) {
 				PHL_INFO("%s CAC done\n", __func__);
 				phl_set_under_cac(phl_info, band_idx, false);
 			}

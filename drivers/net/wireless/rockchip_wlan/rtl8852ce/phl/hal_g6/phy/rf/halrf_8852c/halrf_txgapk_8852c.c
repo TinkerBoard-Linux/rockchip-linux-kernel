@@ -67,6 +67,10 @@ void _txgapk_bkup_rf_8852c(
 	u8 i;
 
 	for (i = 0; i < reg_num; i++) {
+		#ifdef PHL_PLATFORM_AP
+		if (rf_reg[i] == 0x5)
+			continue;
+		#endif
 		rf_bkup[path][i] = halrf_rrf(rf, path, rf_reg[i], MASKRF);
 		
 		RF_DBG(rf, DBG_RF_TXGAPK, "[TXGAPK] Backup RF S%d 0x%x = %x\n",
@@ -104,6 +108,11 @@ void _txgapk_reload_rf_8852c(
 	u8 i;
 
 	for (i = 0; i < reg_num; i++) {
+		#ifdef PHL_PLATFORM_AP
+		if (rf_reg[i] == 0x5)
+			continue;
+		#endif
+		
 		halrf_wrf(rf, path, rf_reg[i], MASKRF, rf_bkup[path][i]);
 		
 			RF_DBG(rf, DBG_RF_TXGAPK, "[TXGAPK] Reload RF S%d 0x%x = %x\n",
@@ -129,6 +138,13 @@ void _txgapk_reload_kip_8852c(
 	}
 }
 
+void _txgapk_befr_or_aftr_w0x18_8852c(struct rf_info *rf, enum rf_path path, bool before) {
+
+	if (before)
+		halrf_wrf(rf, path, 0xd3, BIT(8), 0);
+	else //after
+		halrf_wrf(rf, path, 0xd3, BIT(8), 1);
+}
 
 
 void _halrf_txgapk_rxagc_onoff_8852c(
@@ -192,8 +208,8 @@ void _halrf_txgapk_bb_afe_by_mode_8852c(struct rf_info *rf,
 		
 
 			//ADC320M, s0
-			halrf_wreg(rf, 0xc0d4, 0x0c000000, 0x1);
-			halrf_wreg(rf, 0xc0d8, 0x000001e0, 0xb);
+//			halrf_wreg(rf, 0xc0d4, 0x0c000000, 0x1);
+//			halrf_wreg(rf, 0xc0d8, 0x000001e0, 0xb);
 
 			// AFE debug mode
 			halrf_wreg(rf, 0x12b8, 0x40000000, 0x1);
@@ -273,7 +289,11 @@ void _halrf_txgapk_iqk_preset_by_mode_8852c(struct rf_info *rf,
 	if (!is_dbcc) {
 		/* nodbcc */
 		/* A-Die BB_Direct_SEL */
+	#ifdef PHL_PLATFORM_AP
+		halrf_wrf(rf, path, 0x5, MASKRF, 0x0);
+	#else
 		halrf_wrf(rf, path, 0x5, 0x00001, 0x0);
+	#endif
 
 		// [7]cip_power_on
 		halrf_wreg(rf, 0x8008, MASKDWORD, 0x00000080);
@@ -453,23 +473,19 @@ void _halrf_txgapk_track_table_nctl_2g_8852c
 	u32 i;
 	u32 d[17] = {0}; 
 	//u32 ta[17] = {0};
-
-#ifndef HALRF_CONFIG_FW_IO_OFLD_SUPPORT
-	u32 rf_tmp = 0;
-#endif
-
-	u32 calcu_ta[17] = {0};
 	
+//#ifndef HALRF_CONFIG_FW_IO_OFLD_SUPPORT
+	u32 rf_tmp = 0;
+//#endif
+
+	u32 calcu_ta[17] = {0};	
 	u32 itqt[2] = {0x81cc, 0x82cc};
-
-
 	u32 iqk_ctrl_rfc_addr[2] = {0x5670, 0x7670};
-
 	u32 process_id1[2] = {0x00001019, 0x00001029};
 	u32 process_id2[2] = {0x00001519, 0x00001529};
-
 	u32 gapk_on_tbl_setting[2] = {0x8158, 0x8258};
 
+	rf_tmp = 0;
 	
 	RF_DBG(rf, DBG_RF_TXGAPK, "[TXGAPK]======> %s, gain_stage = 0x%x\n", __func__, gain_stage);
 
@@ -536,200 +552,203 @@ void _halrf_txgapk_track_table_nctl_2g_8852c
 #endif	
 
 
-#ifndef HALRF_CONFIG_FW_IO_OFLD_SUPPORT
-
-	//gapk_report
-	halrf_wreg(rf, 0x80d4, MASKDWORD, 0x00130000);
-	
-	halrf_wreg(rf, 0x80e4, 0x00000f00, 0x3);
-#if 0
-	d[0] = halrf_rreg(rf, 0x80fc, 0x0000007f);
-	d[1] = halrf_rreg(rf, 0x80fc, 0x00003f80);
-	d[2] = halrf_rreg(rf, 0x80fc, 0x001fc000);
-	d[3] = halrf_rreg(rf, 0x80fc, 0x0fe00000);
-#else
-	rf_tmp = halrf_rreg(rf, 0x80fc, 0x0fffffff);
-	d[0] = rf_tmp & 0x0000007f;
-	d[1] = rf_tmp & 0x00003f80;
-	d[2] = rf_tmp & 0x001fc000;
-	d[3] = rf_tmp & 0x0fe00000;
-
-	d[1] = d[1] >> 7;
-	d[2] = d[2] >> 14;
-	d[3] = d[3] >> 21;
-#endif
-
-	halrf_wreg(rf, 0x80e4, 0x00000f00, 0x4);
-#if 0
-	d[4] = halrf_rreg(rf, 0x80fc, 0x0000007f);
-	d[5] = halrf_rreg(rf, 0x80fc, 0x00003f80);
-	d[6] = halrf_rreg(rf, 0x80fc, 0x001fc000);
-	d[7] = halrf_rreg(rf, 0x80fc, 0x0fe00000);
-#else
-	rf_tmp = halrf_rreg(rf, 0x80fc, 0x0fffffff);
-	d[4] = rf_tmp & 0x0000007f;
-	d[5] = rf_tmp & 0x00003f80;
-	d[6] = rf_tmp & 0x001fc000;
-	d[7] = rf_tmp & 0x0fe00000;
-
-	d[5] = d[5] >> 7;
-	d[6] = d[6] >> 14;
-	d[7] = d[7] >> 21;
-#endif
-
-	halrf_wreg(rf, 0x80e4, 0x00000f00, 0x5);
-#if 0
-	d[8] = halrf_rreg(rf, 0x80fc, 0x0000007f);
-	d[9] = halrf_rreg(rf, 0x80fc, 0x00003f80);
-	d[10] = halrf_rreg(rf, 0x80fc, 0x001fc000);
-	d[11] = halrf_rreg(rf, 0x80fc, 0x0fe00000);
-#else
-	rf_tmp = halrf_rreg(rf, 0x80fc, 0x0fffffff);
-	d[8] = rf_tmp & 0x0000007f;
-	d[9] = rf_tmp & 0x00003f80;
-	d[10] = rf_tmp & 0x001fc000;
-	d[11] = rf_tmp & 0x0fe00000;
-
-	d[9] = d[9] >> 7;
-	d[10] = d[10] >> 14;
-	d[11] = d[11] >> 21;
-#endif
-
-	halrf_wreg(rf, 0x80e4, 0x00000f00, 0x6);
-#if 0
-	d[12] = halrf_rreg(rf, 0x80fc, 0x0000007f);
-	d[13] = halrf_rreg(rf, 0x80fc, 0x00003f80);
-	d[14] = halrf_rreg(rf, 0x80fc, 0x001fc000);
-	d[15] = halrf_rreg(rf, 0x80fc, 0x0fe00000);
-#else
-	rf_tmp = halrf_rreg(rf, 0x80fc, 0x0fffffff);
-	d[12] = rf_tmp & 0x0000007f;
-	d[13] = rf_tmp & 0x00003f80;
-	d[14] = rf_tmp & 0x001fc000;
-	d[15] = rf_tmp & 0x0fe00000;
-
-	d[13] = d[13] >> 7;
-	d[14] = d[14] >> 14;
-	d[15] = d[15] >> 21;
-#endif
-
-	halrf_wreg(rf, 0x80e4, 0x00000f00, 0x7);
-	d[16] = halrf_rreg(rf, 0x80fc, 0x0000007f);
-
-#if 0
-	halrf_wreg(rf, 0x80e4, 0x00000f00, 0x9);
-	ta[0] = halrf_rreg(rf, 0x80fc, 0x000000ff);
-	ta[1] = halrf_rreg(rf, 0x80fc, 0x0000ff00);
-	ta[2] = halrf_rreg(rf, 0x80fc, 0x00ff0000);
-	ta[3] = halrf_rreg(rf, 0x80fc, 0xff000000);
-
-	
-	halrf_wreg(rf, 0x80e4, 0x00000f00, 0xa);
-	ta[4] = halrf_rreg(rf, 0x80fc, 0x000000ff);
-	ta[5] = halrf_rreg(rf, 0x80fc, 0x0000ff00);
-	ta[6] = halrf_rreg(rf, 0x80fc, 0x00ff0000);
-	ta[7] = halrf_rreg(rf, 0x80fc, 0xff000000);
-
-	
-	halrf_wreg(rf, 0x80e4, 0x00000f00, 0xb);
-	ta[8] = halrf_rreg(rf, 0x80fc, 0x000000ff);
-	ta[9] = halrf_rreg(rf, 0x80fc, 0x0000ff00);
-	ta[10] = halrf_rreg(rf, 0x80fc, 0x00ff0000);
-	ta[11] = halrf_rreg(rf, 0x80fc, 0xff000000);
-
-	
-	halrf_wreg(rf, 0x80e4, 0x00000f00, 0xc);
-	ta[12] = halrf_rreg(rf, 0x80fc, 0x000000ff);
-	ta[13] = halrf_rreg(rf, 0x80fc, 0x0000ff00);
-	ta[14] = halrf_rreg(rf, 0x80fc, 0x00ff0000);
-	ta[15] = halrf_rreg(rf, 0x80fc, 0xff000000);
-
-	
-	halrf_wreg(rf, 0x80e4, 0x00000f00, 0xd);
-	ta[16] = halrf_rreg(rf, 0x80fc, 0x000000ff);
-#endif
-	// Get The Value --> Ta 6bit
-	halrf_wreg(rf, 0x80e4, 0x00000f00, 0x9);
-#if 0
-	calcu_ta[0] = halrf_rreg(rf, 0x80fc, 0x0000007e);
-	calcu_ta[1] = halrf_rreg(rf, 0x80fc, 0x00007e00);
-	calcu_ta[2] = halrf_rreg(rf, 0x80fc, 0x007e0000);
-	calcu_ta[3] = halrf_rreg(rf, 0x80fc, 0x7e000000);
-#else
-	rf_tmp = halrf_rreg(rf, 0x80fc, 0x7e7e7e7f) & 0x7e7e7e7e;
-	calcu_ta[0] = rf_tmp & (0x0000007e);
-	calcu_ta[1] = rf_tmp & (0x00007e00);
-	calcu_ta[2] = rf_tmp & (0x007e0000);
-	calcu_ta[3] = rf_tmp & (0x7e000000);
-
-	
-	calcu_ta[0] = calcu_ta[0] >> 1;
-	calcu_ta[1] = calcu_ta[1] >> 9;
-	calcu_ta[2] = calcu_ta[2] >> 17;
-	calcu_ta[3] = calcu_ta[3] >> 25;
-#endif
-	halrf_wreg(rf, 0x80e4, 0x00000f00, 0xa);
-#if 0
-	calcu_ta[4] = halrf_rreg(rf, 0x80fc, 0x0000007e);
-	calcu_ta[5] = halrf_rreg(rf, 0x80fc, 0x00007e00);
-	calcu_ta[6] = halrf_rreg(rf, 0x80fc, 0x007e0000);
-	calcu_ta[7] = halrf_rreg(rf, 0x80fc, 0x7e000000);
-#else
-	rf_tmp = halrf_rreg(rf, 0x80fc, 0x7e7e7e7f) & 0x7e7e7e7e;
-	calcu_ta[4] = rf_tmp & (0x0000007e);
-	calcu_ta[5] = rf_tmp & (0x00007e00);
-	calcu_ta[6] = rf_tmp & (0x007e0000);
-	calcu_ta[7] = rf_tmp & (0x7e000000);	
-		
-	calcu_ta[4] = calcu_ta[4] >> 1;
-	calcu_ta[5] = calcu_ta[5] >> 9;
-	calcu_ta[6] = calcu_ta[6] >> 17;
-	calcu_ta[7] = calcu_ta[7] >> 25;
+//#ifndef HALRF_CONFIG_FW_IO_OFLD_SUPPORT
+#ifdef HALRF_CONFIG_FW_IO_OFLD_SUPPORT
+	if (!rf->phl_com->dev_cap.io_ofld) 
 #endif		
-	
-	halrf_wreg(rf, 0x80e4, 0x00000f00, 0xb);
-#if 0
-	calcu_ta[8] = halrf_rreg(rf, 0x80fc, 0x0000007e);
-	calcu_ta[9] = halrf_rreg(rf, 0x80fc, 0x00007e00);
-	calcu_ta[10] = halrf_rreg(rf, 0x80fc, 0x007e0000);
-	calcu_ta[11] = halrf_rreg(rf, 0x80fc, 0x7e000000);
-#else
-	rf_tmp = halrf_rreg(rf, 0x80fc, 0x7e7e7e7f) & 0x7e7e7e7e;
-	calcu_ta[8] = rf_tmp & (0x0000007e);
-	calcu_ta[9] = rf_tmp & (0x00007e00);
-	calcu_ta[10] = rf_tmp & (0x007e0000);
-	calcu_ta[11] = rf_tmp & (0x7e000000);
-			
-	calcu_ta[8] = calcu_ta[8] >> 1;
-	calcu_ta[9] = calcu_ta[9] >> 9;
-	calcu_ta[10] = calcu_ta[10] >> 17;
-	calcu_ta[11] = calcu_ta[11] >> 25;
-#endif
-
-	halrf_wreg(rf, 0x80e4, 0x00000f00, 0xc);
-#if 0
-	calcu_ta[12] = halrf_rreg(rf, 0x80fc, 0x0000007e);
-	calcu_ta[13] = halrf_rreg(rf, 0x80fc, 0x00007e00);
-	calcu_ta[14] = halrf_rreg(rf, 0x80fc, 0x007e0000);
-	calcu_ta[15] = halrf_rreg(rf, 0x80fc, 0x7e000000);
-#else
-	rf_tmp = halrf_rreg(rf, 0x80fc, 0x7e7e7e7f) & 0x7e7e7e7e;
-	calcu_ta[12] = rf_tmp & (0x0000007e);
-	calcu_ta[13] = rf_tmp & (0x00007e00);
-	calcu_ta[14] = rf_tmp & (0x007e0000);
-	calcu_ta[15] = rf_tmp & (0x7e000000);
-	
+	{
+		//gapk_report
+		halrf_wreg(rf, 0x80d4, MASKDWORD, 0x00130000);
 		
-	calcu_ta[12] = calcu_ta[12] >> 1;
-	calcu_ta[13] = calcu_ta[13] >> 9;
-	calcu_ta[14] = calcu_ta[14] >> 17;
-	calcu_ta[15] = calcu_ta[15] >> 25;
+		halrf_wreg(rf, 0x80e4, 0x00000f00, 0x3);
+#if 0
+		d[0] = halrf_rreg(rf, 0x80fc, 0x0000007f);
+		d[1] = halrf_rreg(rf, 0x80fc, 0x00003f80);
+		d[2] = halrf_rreg(rf, 0x80fc, 0x001fc000);
+		d[3] = halrf_rreg(rf, 0x80fc, 0x0fe00000);
+#else
+		rf_tmp = halrf_rreg(rf, 0x80fc, 0x0fffffff);
+		d[0] = rf_tmp & 0x0000007f;
+		d[1] = rf_tmp & 0x00003f80;
+		d[2] = rf_tmp & 0x001fc000;
+		d[3] = rf_tmp & 0x0fe00000;
+
+		d[1] = d[1] >> 7;
+		d[2] = d[2] >> 14;
+		d[3] = d[3] >> 21;
 #endif
 
-	halrf_wreg(rf, 0x80e4, 0x00000f00, 0xd);
-	calcu_ta[16] = halrf_rreg(rf, 0x80fc, 0x0000007e);
+		halrf_wreg(rf, 0x80e4, 0x00000f00, 0x4);
+#if 0
+		d[4] = halrf_rreg(rf, 0x80fc, 0x0000007f);
+		d[5] = halrf_rreg(rf, 0x80fc, 0x00003f80);
+		d[6] = halrf_rreg(rf, 0x80fc, 0x001fc000);
+		d[7] = halrf_rreg(rf, 0x80fc, 0x0fe00000);
+#else
+		rf_tmp = halrf_rreg(rf, 0x80fc, 0x0fffffff);
+		d[4] = rf_tmp & 0x0000007f;
+		d[5] = rf_tmp & 0x00003f80;
+		d[6] = rf_tmp & 0x001fc000;
+		d[7] = rf_tmp & 0x0fe00000;
 
+		d[5] = d[5] >> 7;
+		d[6] = d[6] >> 14;
+		d[7] = d[7] >> 21;
 #endif
+
+		halrf_wreg(rf, 0x80e4, 0x00000f00, 0x5);
+#if 0
+		d[8] = halrf_rreg(rf, 0x80fc, 0x0000007f);
+		d[9] = halrf_rreg(rf, 0x80fc, 0x00003f80);
+		d[10] = halrf_rreg(rf, 0x80fc, 0x001fc000);
+		d[11] = halrf_rreg(rf, 0x80fc, 0x0fe00000);
+#else
+		rf_tmp = halrf_rreg(rf, 0x80fc, 0x0fffffff);
+		d[8] = rf_tmp & 0x0000007f;
+		d[9] = rf_tmp & 0x00003f80;
+		d[10] = rf_tmp & 0x001fc000;
+		d[11] = rf_tmp & 0x0fe00000;
+
+		d[9] = d[9] >> 7;
+		d[10] = d[10] >> 14;
+		d[11] = d[11] >> 21;
+#endif
+
+		halrf_wreg(rf, 0x80e4, 0x00000f00, 0x6);
+#if 0
+		d[12] = halrf_rreg(rf, 0x80fc, 0x0000007f);
+		d[13] = halrf_rreg(rf, 0x80fc, 0x00003f80);
+		d[14] = halrf_rreg(rf, 0x80fc, 0x001fc000);
+		d[15] = halrf_rreg(rf, 0x80fc, 0x0fe00000);
+#else
+		rf_tmp = halrf_rreg(rf, 0x80fc, 0x0fffffff);
+		d[12] = rf_tmp & 0x0000007f;
+		d[13] = rf_tmp & 0x00003f80;
+		d[14] = rf_tmp & 0x001fc000;
+		d[15] = rf_tmp & 0x0fe00000;
+
+		d[13] = d[13] >> 7;
+		d[14] = d[14] >> 14;
+		d[15] = d[15] >> 21;
+#endif
+
+		halrf_wreg(rf, 0x80e4, 0x00000f00, 0x7);
+		d[16] = halrf_rreg(rf, 0x80fc, 0x0000007f);
+
+#if 0
+		halrf_wreg(rf, 0x80e4, 0x00000f00, 0x9);
+		ta[0] = halrf_rreg(rf, 0x80fc, 0x000000ff);
+		ta[1] = halrf_rreg(rf, 0x80fc, 0x0000ff00);
+		ta[2] = halrf_rreg(rf, 0x80fc, 0x00ff0000);
+		ta[3] = halrf_rreg(rf, 0x80fc, 0xff000000);
+
+		
+		halrf_wreg(rf, 0x80e4, 0x00000f00, 0xa);
+		ta[4] = halrf_rreg(rf, 0x80fc, 0x000000ff);
+		ta[5] = halrf_rreg(rf, 0x80fc, 0x0000ff00);
+		ta[6] = halrf_rreg(rf, 0x80fc, 0x00ff0000);
+		ta[7] = halrf_rreg(rf, 0x80fc, 0xff000000);
+
+		
+		halrf_wreg(rf, 0x80e4, 0x00000f00, 0xb);
+		ta[8] = halrf_rreg(rf, 0x80fc, 0x000000ff);
+		ta[9] = halrf_rreg(rf, 0x80fc, 0x0000ff00);
+		ta[10] = halrf_rreg(rf, 0x80fc, 0x00ff0000);
+		ta[11] = halrf_rreg(rf, 0x80fc, 0xff000000);
+
+		
+		halrf_wreg(rf, 0x80e4, 0x00000f00, 0xc);
+		ta[12] = halrf_rreg(rf, 0x80fc, 0x000000ff);
+		ta[13] = halrf_rreg(rf, 0x80fc, 0x0000ff00);
+		ta[14] = halrf_rreg(rf, 0x80fc, 0x00ff0000);
+		ta[15] = halrf_rreg(rf, 0x80fc, 0xff000000);
+
+		
+		halrf_wreg(rf, 0x80e4, 0x00000f00, 0xd);
+		ta[16] = halrf_rreg(rf, 0x80fc, 0x000000ff);
+#endif
+		// Get The Value --> Ta 6bit
+		halrf_wreg(rf, 0x80e4, 0x00000f00, 0x9);
+#if 0
+		calcu_ta[0] = halrf_rreg(rf, 0x80fc, 0x0000007e);
+		calcu_ta[1] = halrf_rreg(rf, 0x80fc, 0x00007e00);
+		calcu_ta[2] = halrf_rreg(rf, 0x80fc, 0x007e0000);
+		calcu_ta[3] = halrf_rreg(rf, 0x80fc, 0x7e000000);
+#else
+		rf_tmp = halrf_rreg(rf, 0x80fc, 0x7e7e7e7f) & 0x7e7e7e7e;
+		calcu_ta[0] = rf_tmp & (0x0000007e);
+		calcu_ta[1] = rf_tmp & (0x00007e00);
+		calcu_ta[2] = rf_tmp & (0x007e0000);
+		calcu_ta[3] = rf_tmp & (0x7e000000);
+
+		
+		calcu_ta[0] = calcu_ta[0] >> 1;
+		calcu_ta[1] = calcu_ta[1] >> 9;
+		calcu_ta[2] = calcu_ta[2] >> 17;
+		calcu_ta[3] = calcu_ta[3] >> 25;
+#endif
+		halrf_wreg(rf, 0x80e4, 0x00000f00, 0xa);
+#if 0
+		calcu_ta[4] = halrf_rreg(rf, 0x80fc, 0x0000007e);
+		calcu_ta[5] = halrf_rreg(rf, 0x80fc, 0x00007e00);
+		calcu_ta[6] = halrf_rreg(rf, 0x80fc, 0x007e0000);
+		calcu_ta[7] = halrf_rreg(rf, 0x80fc, 0x7e000000);
+#else
+		rf_tmp = halrf_rreg(rf, 0x80fc, 0x7e7e7e7f) & 0x7e7e7e7e;
+		calcu_ta[4] = rf_tmp & (0x0000007e);
+		calcu_ta[5] = rf_tmp & (0x00007e00);
+		calcu_ta[6] = rf_tmp & (0x007e0000);
+		calcu_ta[7] = rf_tmp & (0x7e000000);	
+			
+		calcu_ta[4] = calcu_ta[4] >> 1;
+		calcu_ta[5] = calcu_ta[5] >> 9;
+		calcu_ta[6] = calcu_ta[6] >> 17;
+		calcu_ta[7] = calcu_ta[7] >> 25;
+#endif		
+		
+		halrf_wreg(rf, 0x80e4, 0x00000f00, 0xb);
+#if 0
+		calcu_ta[8] = halrf_rreg(rf, 0x80fc, 0x0000007e);
+		calcu_ta[9] = halrf_rreg(rf, 0x80fc, 0x00007e00);
+		calcu_ta[10] = halrf_rreg(rf, 0x80fc, 0x007e0000);
+		calcu_ta[11] = halrf_rreg(rf, 0x80fc, 0x7e000000);
+#else
+		rf_tmp = halrf_rreg(rf, 0x80fc, 0x7e7e7e7f) & 0x7e7e7e7e;
+		calcu_ta[8] = rf_tmp & (0x0000007e);
+		calcu_ta[9] = rf_tmp & (0x00007e00);
+		calcu_ta[10] = rf_tmp & (0x007e0000);
+		calcu_ta[11] = rf_tmp & (0x7e000000);
+				
+		calcu_ta[8] = calcu_ta[8] >> 1;
+		calcu_ta[9] = calcu_ta[9] >> 9;
+		calcu_ta[10] = calcu_ta[10] >> 17;
+		calcu_ta[11] = calcu_ta[11] >> 25;
+#endif
+
+		halrf_wreg(rf, 0x80e4, 0x00000f00, 0xc);
+#if 0
+		calcu_ta[12] = halrf_rreg(rf, 0x80fc, 0x0000007e);
+		calcu_ta[13] = halrf_rreg(rf, 0x80fc, 0x00007e00);
+		calcu_ta[14] = halrf_rreg(rf, 0x80fc, 0x007e0000);
+		calcu_ta[15] = halrf_rreg(rf, 0x80fc, 0x7e000000);
+#else
+		rf_tmp = halrf_rreg(rf, 0x80fc, 0x7e7e7e7f) & 0x7e7e7e7e;
+		calcu_ta[12] = rf_tmp & (0x0000007e);
+		calcu_ta[13] = rf_tmp & (0x00007e00);
+		calcu_ta[14] = rf_tmp & (0x007e0000);
+		calcu_ta[15] = rf_tmp & (0x7e000000);
+		
+			
+		calcu_ta[12] = calcu_ta[12] >> 1;
+		calcu_ta[13] = calcu_ta[13] >> 9;
+		calcu_ta[14] = calcu_ta[14] >> 17;
+		calcu_ta[15] = calcu_ta[15] >> 25;
+#endif
+
+		halrf_wreg(rf, 0x80e4, 0x00000f00, 0xd);
+		calcu_ta[16] = halrf_rreg(rf, 0x80fc, 0x0000007e);
+	}
+//#endif
 
 
 
@@ -805,24 +824,23 @@ void _halrf_txgapk_track_table_nctl_5g_8852c
 {
 	struct halrf_gapk_info *txgapk_info = &rf->gapk;
 	u8 rfe_type = rf->phl_com->dev_cap.rfe_type;
+	u32 band = rf->hal_com->band[phy].cur_chandef.band;
 
 	u32 i;
 	u32 d[17] = {0};
 	//u32 ta[17] = {0};
 	u32 calcu_ta[17] = {0};
-#ifndef HALRF_CONFIG_FW_IO_OFLD_SUPPORT
+//#ifndef HALRF_CONFIG_FW_IO_OFLD_SUPPORT
 	u32 rf_tmp = 0;
-#endif
-
+//#endif
 	
-	u32 itqt[2] = {0x81cc, 0x82cc};
-	
-	u32 iqk_ctrl_rfc_addr[2] = {0x5670, 0x7670};
-	
+	u32 itqt[2] = {0x81cc, 0x82cc};	
+	u32 iqk_ctrl_rfc_addr[2] = {0x5670, 0x7670};	
 	u32 process_id1[2] = {0x00001019, 0x00001029};
 	u32 process_id2[2] = {0x00001519, 0x00001529};
-
 	u32 gapk_on_tbl_setting[2] = {0x8158, 0x8258};
+
+	rf_tmp = 0;
 
 	RF_DBG(rf, DBG_RF_TXGAPK, "[TXGAPK]======> %s, gain_stage = 0x%x\n", __func__, gain_stage);
 
@@ -833,11 +851,15 @@ void _halrf_txgapk_track_table_nctl_5g_8852c
 	halrf_wreg(rf, 0x80e0, 0x0000f000, 0x0); //Gmode 11g 
 
 
-	if (rfe_type <= 50) //ifem
+	if (rfe_type <= 50) {	//ifem
 		//halrf_wreg(rf, 0x8038, 0x003f0000, 0x2d); //52B GapK 2nd ItQt
 		halrf_wreg(rf, 0x8038, 0x003f0000, 0x36); //52B GapK 2nd ItQt
-	else //efem
-		halrf_wreg(rf, 0x8038, 0x003f0000, 0x24); //52B GapK 2nd ItQt
+	} else {	//efem
+		if (band == BAND_ON_5G)
+			halrf_wreg(rf, 0x8038, 0x003f0000, 0x24); //52B GapK 2nd ItQt
+		else
+			halrf_wreg(rf, 0x8038, 0x003f0000, 0x36); //52B GapK 2nd ItQt
+	}
 
 	//debug
 	RF_DBG(rf, DBG_RF_TXGAPK, "[TXGAPK]trk 0x8038[21:16] = 0x%x\n", halrf_rreg(rf, 0x8038, 0x003f0000));
@@ -850,13 +872,16 @@ void _halrf_txgapk_track_table_nctl_5g_8852c
 	halrf_wreg(rf, iqk_ctrl_rfc_addr[path], 0x00000002, 0x1); //IQK cotrol RFC
 
 
-	if (rfe_type <= 50) //ifem
+	if (rfe_type <= 50) {	//ifem
 		//	halrf_wreg(rf, itqt[path], 0x0000003f, 0x12); // ItQt
 		halrf_wreg(rf, itqt[path], 0x0000003f, 0x24); // ItQt
-	else //efem
-		halrf_wreg(rf, itqt[path], 0x0000003f, 0x09); // ItQt
+	} else {	 //efem
+		if (band == BAND_ON_5G)
+			halrf_wreg(rf, itqt[path], 0x0000003f, 0x09); // ItQt
+		else
+			halrf_wreg(rf, itqt[path], 0x0000003f, 0x12); // ItQt
+	}
 
-	
 	//debug
 	RF_DBG(rf, DBG_RF_TXGAPK, "[TXGAPK]trk 0x%x[5:0] = 0x%x\n", itqt[path], halrf_rreg(rf, itqt[path], 0x0000003f));
 		
@@ -902,196 +927,199 @@ void _halrf_txgapk_track_table_nctl_5g_8852c
 #endif
 
 
-#ifndef HALRF_CONFIG_FW_IO_OFLD_SUPPORT
-
-	//read report 
-	halrf_wreg(rf, 0x80d4, MASKDWORD, 0x00130000);
-	
-	halrf_wreg(rf, 0x80e4, 0x00000f00, 0x3);
-#if 0
-	d[0] = halrf_rreg(rf, 0x80fc, 0x0000007f);
-	d[1] = halrf_rreg(rf, 0x80fc, 0x00003f80);
-	d[2] = halrf_rreg(rf, 0x80fc, 0x001fc000);
-	d[3] = halrf_rreg(rf, 0x80fc, 0x0fe00000);
-#else
-	rf_tmp = halrf_rreg(rf, 0x80fc, 0x0fffffff);
-	d[0] = rf_tmp & (0x0000007f);
-	d[1] = rf_tmp & (0x00003f80);
-	d[2] = rf_tmp & (0x001fc000);
-	d[3] = rf_tmp & (0x0fe00000);
-
-	d[1] = d[1] >> 7;
-	d[2] = d[2] >> 14;
-	d[3] = d[3] >> 21;
-#endif
-
-	halrf_wreg(rf, 0x80e4, 0x00000f00, 0x4);
-#if 0
-	d[4] = halrf_rreg(rf, 0x80fc, 0x0000007f);
-	d[5] = halrf_rreg(rf, 0x80fc, 0x00003f80);
-	d[6] = halrf_rreg(rf, 0x80fc, 0x001fc000);
-	d[7] = halrf_rreg(rf, 0x80fc, 0x0fe00000);
-#else
-	rf_tmp = halrf_rreg(rf, 0x80fc, 0x0fffffff);
-	d[4] = rf_tmp & (0x0000007f);
-	d[5] = rf_tmp & (0x00003f80);
-	d[6] = rf_tmp & (0x001fc000);
-	d[7] = rf_tmp & (0x0fe00000);
-
-	d[5] = d[5] >> 7;
-	d[6] = d[6] >> 14;
-	d[7] = d[7] >> 21;
-#endif
-
-	halrf_wreg(rf, 0x80e4, 0x00000f00, 0x5);
-#if 0
-	d[8] = halrf_rreg(rf, 0x80fc, 0x0000007f);
-	d[9] = halrf_rreg(rf, 0x80fc, 0x00003f80);
-	d[10] = halrf_rreg(rf, 0x80fc, 0x001fc000);
-	d[11] = halrf_rreg(rf, 0x80fc, 0x0fe00000);
-#else
-	rf_tmp = halrf_rreg(rf, 0x80fc, 0x0fffffff);
-	d[8] = rf_tmp & (0x0000007f);
-	d[9] = rf_tmp & (0x00003f80);
-	d[10] = rf_tmp & (0x001fc000);
-	d[11] = rf_tmp & (0x0fe00000);
-
-	d[9] = d[9] >> 7;
-	d[10] = d[10] >> 14;
-	d[11] = d[11] >> 21;
-#endif
-
-	halrf_wreg(rf, 0x80e4, 0x00000f00, 0x6);
-#if 0
-	d[12] = halrf_rreg(rf, 0x80fc, 0x0000007f);
-	d[13] = halrf_rreg(rf, 0x80fc, 0x00003f80);
-	d[14] = halrf_rreg(rf, 0x80fc, 0x001fc000);
-	d[15] = halrf_rreg(rf, 0x80fc, 0x0fe00000);
-#else
-	rf_tmp = halrf_rreg(rf, 0x80fc, 0x0fffffff);
-	d[12] = rf_tmp & (0x0000007f);
-	d[13] = rf_tmp & (0x00003f80);
-	d[14] = rf_tmp & (0x001fc000);
-	d[15] = rf_tmp & (0x0fe00000);
-
-	d[13] = d[13] >> 7;
-	d[14] = d[14] >> 14;
-	d[15] = d[15] >> 21;
-#endif
-
-	halrf_wreg(rf, 0x80e4, 0x00000f00, 0x7);
-	d[16] = halrf_rreg(rf, 0x80fc, 0x0000007f);
-
-
-#if 0
-	halrf_wreg(rf, 0x80e4, 0x00000f00, 0x9);
-	ta[0] = halrf_rreg(rf, 0x80fc, 0x000000ff);
-	ta[1] = halrf_rreg(rf, 0x80fc, 0x0000ff00);
-	ta[2] = halrf_rreg(rf, 0x80fc, 0x00ff0000);
-	ta[3] = halrf_rreg(rf, 0x80fc, 0xff000000);
-
-	halrf_wreg(rf, 0x80e4, 0x00000f00, 0xa);
-	ta[4] = halrf_rreg(rf, 0x80fc, 0x000000ff);
-	ta[5] = halrf_rreg(rf, 0x80fc, 0x0000ff00);
-	ta[6] = halrf_rreg(rf, 0x80fc, 0x00ff0000);
-	ta[7] = halrf_rreg(rf, 0x80fc, 0xff000000);
-
-	halrf_wreg(rf, 0x80e4, 0x00000f00, 0xb);
-	ta[8] = halrf_rreg(rf, 0x80fc, 0x000000ff);
-	ta[9] = halrf_rreg(rf, 0x80fc, 0x0000ff00);
-	ta[10] = halrf_rreg(rf, 0x80fc, 0x00ff0000);
-	ta[11] = halrf_rreg(rf, 0x80fc, 0xff000000);
-
-	halrf_wreg(rf, 0x80e4, 0x00000f00, 0xc);
-	ta[12] = halrf_rreg(rf, 0x80fc, 0x000000ff);
-	ta[13] = halrf_rreg(rf, 0x80fc, 0x0000ff00);
-	ta[14] = halrf_rreg(rf, 0x80fc, 0x00ff0000);
-	ta[15] = halrf_rreg(rf, 0x80fc, 0xff000000);
-
-	halrf_wreg(rf, 0x80e4, 0x00000f00, 0xd);
-	ta[16] = halrf_rreg(rf, 0x80fc, 0x000000ff);
-#endif
-
-	// Get The Value --> Ta 6bit
-	halrf_wreg(rf, 0x80e4, 0x00000f00, 0x9);
-#if 0
-	calcu_ta[0] = halrf_rreg(rf, 0x80fc, 0x0000007e);
-	calcu_ta[1] = halrf_rreg(rf, 0x80fc, 0x00007e00);
-	calcu_ta[2] = halrf_rreg(rf, 0x80fc, 0x007e0000);
-	calcu_ta[3] = halrf_rreg(rf, 0x80fc, 0x7e000000);
-#else
-	rf_tmp = halrf_rreg(rf, 0x80fc, 0x7e7e7e7f) & 0x7e7e7e7e;
-	calcu_ta[0] = rf_tmp & (0x0000007e);
-	calcu_ta[1] = rf_tmp & (0x00007e00);
-	calcu_ta[2] = rf_tmp & (0x007e0000);
-	calcu_ta[3] = rf_tmp & (0x7e000000);
-
-	
-	calcu_ta[0] = calcu_ta[0] >> 1;
-	calcu_ta[1] = calcu_ta[1] >> 9;
-	calcu_ta[2] = calcu_ta[2] >> 17;
-	calcu_ta[3] = calcu_ta[3] >> 25;
-#endif
-	halrf_wreg(rf, 0x80e4, 0x00000f00, 0xa);	
-#if 0
-	calcu_ta[4] = halrf_rreg(rf, 0x80fc, 0x0000007e);
-	calcu_ta[5] = halrf_rreg(rf, 0x80fc, 0x00007e00);
-	calcu_ta[6] = halrf_rreg(rf, 0x80fc, 0x007e0000);
-	calcu_ta[7] = halrf_rreg(rf, 0x80fc, 0x7e000000);
-#else
-	rf_tmp = halrf_rreg(rf, 0x80fc, 0x7e7e7e7f) & 0x7e7e7e7e;
-	calcu_ta[4] = rf_tmp & (0x0000007e);
-	calcu_ta[5] = rf_tmp & (0x00007e00);
-	calcu_ta[6] = rf_tmp & (0x007e0000);
-	calcu_ta[7] = rf_tmp & (0x7e000000);
-	
-		
-	calcu_ta[4] = calcu_ta[4] >> 1;
-	calcu_ta[5] = calcu_ta[5] >> 9;
-	calcu_ta[6] = calcu_ta[6] >> 17;
-	calcu_ta[7] = calcu_ta[7] >> 25;
-#endif		
-	halrf_wreg(rf, 0x80e4, 0x00000f00, 0xb);
-#if 0
-	calcu_ta[8] = halrf_rreg(rf, 0x80fc, 0x0000007e);
-	calcu_ta[9] = halrf_rreg(rf, 0x80fc, 0x00007e00);
-	calcu_ta[10] = halrf_rreg(rf, 0x80fc, 0x007e0000);
-	calcu_ta[11] = halrf_rreg(rf, 0x80fc, 0x7e000000);
-#else
-	rf_tmp = halrf_rreg(rf, 0x80fc, 0x7e7e7e7f) & 0x7e7e7e7e;
-	calcu_ta[8] = rf_tmp & (0x0000007e);
-	calcu_ta[9] = rf_tmp & (0x00007e00);
-	calcu_ta[10] = rf_tmp & (0x007e0000);
-	calcu_ta[11] = rf_tmp & (0x7e000000);
-			
-	calcu_ta[8] = calcu_ta[8] >> 1;
-	calcu_ta[9] = calcu_ta[9] >> 9;
-	calcu_ta[10] = calcu_ta[10] >> 17;
-	calcu_ta[11] = calcu_ta[11] >> 25;
-#endif
-	
-	halrf_wreg(rf, 0x80e4, 0x00000f00, 0xc);
-#if 0
-	calcu_ta[12] = halrf_rreg(rf, 0x80fc, 0x0000007e);
-	calcu_ta[13] = halrf_rreg(rf, 0x80fc, 0x00007e00);
-	calcu_ta[14] = halrf_rreg(rf, 0x80fc, 0x007e0000);
-	calcu_ta[15] = halrf_rreg(rf, 0x80fc, 0x7e000000);
-#else
-	rf_tmp = halrf_rreg(rf, 0x80fc, 0x7e7e7e7f) & 0x7e7e7e7e;
-	calcu_ta[12] = rf_tmp & (0x0000007e);
-	calcu_ta[13] = rf_tmp & (0x00007e00);
-	calcu_ta[14] = rf_tmp & (0x007e0000);
-	calcu_ta[15] = rf_tmp & (0x7e000000);
-		
-	calcu_ta[12] = calcu_ta[12] >> 1;
-	calcu_ta[13] = calcu_ta[13] >> 9;
-	calcu_ta[14] = calcu_ta[14] >> 17;
-	calcu_ta[15] = calcu_ta[15] >> 25;
+//#ifndef HALRF_CONFIG_FW_IO_OFLD_SUPPORT
+#ifdef HALRF_CONFIG_FW_IO_OFLD_SUPPORT
+	if (!rf->phl_com->dev_cap.io_ofld) 
 #endif	
-	halrf_wreg(rf, 0x80e4, 0x00000f00, 0xd);
-	calcu_ta[16] = halrf_rreg(rf, 0x80fc, 0x0000007e);
+	{
+		//read report 
+		halrf_wreg(rf, 0x80d4, MASKDWORD, 0x00130000);
+		
+		halrf_wreg(rf, 0x80e4, 0x00000f00, 0x3);
+#if 0
+		d[0] = halrf_rreg(rf, 0x80fc, 0x0000007f);
+		d[1] = halrf_rreg(rf, 0x80fc, 0x00003f80);
+		d[2] = halrf_rreg(rf, 0x80fc, 0x001fc000);
+		d[3] = halrf_rreg(rf, 0x80fc, 0x0fe00000);
+#else
+		rf_tmp = halrf_rreg(rf, 0x80fc, 0x0fffffff);
+		d[0] = rf_tmp & (0x0000007f);
+		d[1] = rf_tmp & (0x00003f80);
+		d[2] = rf_tmp & (0x001fc000);
+		d[3] = rf_tmp & (0x0fe00000);
 
+		d[1] = d[1] >> 7;
+		d[2] = d[2] >> 14;
+		d[3] = d[3] >> 21;
 #endif
+
+		halrf_wreg(rf, 0x80e4, 0x00000f00, 0x4);
+#if 0
+		d[4] = halrf_rreg(rf, 0x80fc, 0x0000007f);
+		d[5] = halrf_rreg(rf, 0x80fc, 0x00003f80);
+		d[6] = halrf_rreg(rf, 0x80fc, 0x001fc000);
+		d[7] = halrf_rreg(rf, 0x80fc, 0x0fe00000);
+#else
+		rf_tmp = halrf_rreg(rf, 0x80fc, 0x0fffffff);
+		d[4] = rf_tmp & (0x0000007f);
+		d[5] = rf_tmp & (0x00003f80);
+		d[6] = rf_tmp & (0x001fc000);
+		d[7] = rf_tmp & (0x0fe00000);
+
+		d[5] = d[5] >> 7;
+		d[6] = d[6] >> 14;
+		d[7] = d[7] >> 21;
+#endif
+
+		halrf_wreg(rf, 0x80e4, 0x00000f00, 0x5);
+#if 0
+		d[8] = halrf_rreg(rf, 0x80fc, 0x0000007f);
+		d[9] = halrf_rreg(rf, 0x80fc, 0x00003f80);
+		d[10] = halrf_rreg(rf, 0x80fc, 0x001fc000);
+		d[11] = halrf_rreg(rf, 0x80fc, 0x0fe00000);
+#else
+		rf_tmp = halrf_rreg(rf, 0x80fc, 0x0fffffff);
+		d[8] = rf_tmp & (0x0000007f);
+		d[9] = rf_tmp & (0x00003f80);
+		d[10] = rf_tmp & (0x001fc000);
+		d[11] = rf_tmp & (0x0fe00000);
+
+		d[9] = d[9] >> 7;
+		d[10] = d[10] >> 14;
+		d[11] = d[11] >> 21;
+#endif
+
+		halrf_wreg(rf, 0x80e4, 0x00000f00, 0x6);
+#if 0
+		d[12] = halrf_rreg(rf, 0x80fc, 0x0000007f);
+		d[13] = halrf_rreg(rf, 0x80fc, 0x00003f80);
+		d[14] = halrf_rreg(rf, 0x80fc, 0x001fc000);
+		d[15] = halrf_rreg(rf, 0x80fc, 0x0fe00000);
+#else
+		rf_tmp = halrf_rreg(rf, 0x80fc, 0x0fffffff);
+		d[12] = rf_tmp & (0x0000007f);
+		d[13] = rf_tmp & (0x00003f80);
+		d[14] = rf_tmp & (0x001fc000);
+		d[15] = rf_tmp & (0x0fe00000);
+
+		d[13] = d[13] >> 7;
+		d[14] = d[14] >> 14;
+		d[15] = d[15] >> 21;
+#endif
+
+		halrf_wreg(rf, 0x80e4, 0x00000f00, 0x7);
+		d[16] = halrf_rreg(rf, 0x80fc, 0x0000007f);
+
+
+#if 0
+		halrf_wreg(rf, 0x80e4, 0x00000f00, 0x9);
+		ta[0] = halrf_rreg(rf, 0x80fc, 0x000000ff);
+		ta[1] = halrf_rreg(rf, 0x80fc, 0x0000ff00);
+		ta[2] = halrf_rreg(rf, 0x80fc, 0x00ff0000);
+		ta[3] = halrf_rreg(rf, 0x80fc, 0xff000000);
+
+		halrf_wreg(rf, 0x80e4, 0x00000f00, 0xa);
+		ta[4] = halrf_rreg(rf, 0x80fc, 0x000000ff);
+		ta[5] = halrf_rreg(rf, 0x80fc, 0x0000ff00);
+		ta[6] = halrf_rreg(rf, 0x80fc, 0x00ff0000);
+		ta[7] = halrf_rreg(rf, 0x80fc, 0xff000000);
+
+		halrf_wreg(rf, 0x80e4, 0x00000f00, 0xb);
+		ta[8] = halrf_rreg(rf, 0x80fc, 0x000000ff);
+		ta[9] = halrf_rreg(rf, 0x80fc, 0x0000ff00);
+		ta[10] = halrf_rreg(rf, 0x80fc, 0x00ff0000);
+		ta[11] = halrf_rreg(rf, 0x80fc, 0xff000000);
+
+		halrf_wreg(rf, 0x80e4, 0x00000f00, 0xc);
+		ta[12] = halrf_rreg(rf, 0x80fc, 0x000000ff);
+		ta[13] = halrf_rreg(rf, 0x80fc, 0x0000ff00);
+		ta[14] = halrf_rreg(rf, 0x80fc, 0x00ff0000);
+		ta[15] = halrf_rreg(rf, 0x80fc, 0xff000000);
+
+		halrf_wreg(rf, 0x80e4, 0x00000f00, 0xd);
+		ta[16] = halrf_rreg(rf, 0x80fc, 0x000000ff);
+#endif
+
+		// Get The Value --> Ta 6bit
+		halrf_wreg(rf, 0x80e4, 0x00000f00, 0x9);
+#if 0
+		calcu_ta[0] = halrf_rreg(rf, 0x80fc, 0x0000007e);
+		calcu_ta[1] = halrf_rreg(rf, 0x80fc, 0x00007e00);
+		calcu_ta[2] = halrf_rreg(rf, 0x80fc, 0x007e0000);
+		calcu_ta[3] = halrf_rreg(rf, 0x80fc, 0x7e000000);
+#else
+		rf_tmp = halrf_rreg(rf, 0x80fc, 0x7e7e7e7f) & 0x7e7e7e7e;
+		calcu_ta[0] = rf_tmp & (0x0000007e);
+		calcu_ta[1] = rf_tmp & (0x00007e00);
+		calcu_ta[2] = rf_tmp & (0x007e0000);
+		calcu_ta[3] = rf_tmp & (0x7e000000);
+
+		
+		calcu_ta[0] = calcu_ta[0] >> 1;
+		calcu_ta[1] = calcu_ta[1] >> 9;
+		calcu_ta[2] = calcu_ta[2] >> 17;
+		calcu_ta[3] = calcu_ta[3] >> 25;
+#endif
+		halrf_wreg(rf, 0x80e4, 0x00000f00, 0xa);	
+#if 0
+		calcu_ta[4] = halrf_rreg(rf, 0x80fc, 0x0000007e);
+		calcu_ta[5] = halrf_rreg(rf, 0x80fc, 0x00007e00);
+		calcu_ta[6] = halrf_rreg(rf, 0x80fc, 0x007e0000);
+		calcu_ta[7] = halrf_rreg(rf, 0x80fc, 0x7e000000);
+#else
+		rf_tmp = halrf_rreg(rf, 0x80fc, 0x7e7e7e7f) & 0x7e7e7e7e;
+		calcu_ta[4] = rf_tmp & (0x0000007e);
+		calcu_ta[5] = rf_tmp & (0x00007e00);
+		calcu_ta[6] = rf_tmp & (0x007e0000);
+		calcu_ta[7] = rf_tmp & (0x7e000000);
+		
+			
+		calcu_ta[4] = calcu_ta[4] >> 1;
+		calcu_ta[5] = calcu_ta[5] >> 9;
+		calcu_ta[6] = calcu_ta[6] >> 17;
+		calcu_ta[7] = calcu_ta[7] >> 25;
+#endif		
+		halrf_wreg(rf, 0x80e4, 0x00000f00, 0xb);
+#if 0
+		calcu_ta[8] = halrf_rreg(rf, 0x80fc, 0x0000007e);
+		calcu_ta[9] = halrf_rreg(rf, 0x80fc, 0x00007e00);
+		calcu_ta[10] = halrf_rreg(rf, 0x80fc, 0x007e0000);
+		calcu_ta[11] = halrf_rreg(rf, 0x80fc, 0x7e000000);
+#else
+		rf_tmp = halrf_rreg(rf, 0x80fc, 0x7e7e7e7f) & 0x7e7e7e7e;
+		calcu_ta[8] = rf_tmp & (0x0000007e);
+		calcu_ta[9] = rf_tmp & (0x00007e00);
+		calcu_ta[10] = rf_tmp & (0x007e0000);
+		calcu_ta[11] = rf_tmp & (0x7e000000);
+				
+		calcu_ta[8] = calcu_ta[8] >> 1;
+		calcu_ta[9] = calcu_ta[9] >> 9;
+		calcu_ta[10] = calcu_ta[10] >> 17;
+		calcu_ta[11] = calcu_ta[11] >> 25;
+#endif
+		
+		halrf_wreg(rf, 0x80e4, 0x00000f00, 0xc);
+#if 0
+		calcu_ta[12] = halrf_rreg(rf, 0x80fc, 0x0000007e);
+		calcu_ta[13] = halrf_rreg(rf, 0x80fc, 0x00007e00);
+		calcu_ta[14] = halrf_rreg(rf, 0x80fc, 0x007e0000);
+		calcu_ta[15] = halrf_rreg(rf, 0x80fc, 0x7e000000);
+#else
+		rf_tmp = halrf_rreg(rf, 0x80fc, 0x7e7e7e7f) & 0x7e7e7e7e;
+		calcu_ta[12] = rf_tmp & (0x0000007e);
+		calcu_ta[13] = rf_tmp & (0x00007e00);
+		calcu_ta[14] = rf_tmp & (0x007e0000);
+		calcu_ta[15] = rf_tmp & (0x7e000000);
+			
+		calcu_ta[12] = calcu_ta[12] >> 1;
+		calcu_ta[13] = calcu_ta[13] >> 9;
+		calcu_ta[14] = calcu_ta[14] >> 17;
+		calcu_ta[15] = calcu_ta[15] >> 25;
+#endif	
+		halrf_wreg(rf, 0x80e4, 0x00000f00, 0xd);
+		calcu_ta[16] = halrf_rreg(rf, 0x80fc, 0x0000007e);
+	}
+//#endif
 
 
 #if 0	 
@@ -1167,20 +1195,37 @@ void _halrf_txgapk_track_table_nctl_8852c
 	u32 gain_stage_2g = 0x1554;
 	//u32 gain_stage_5g = 0x11554;
 	u32 gain_stage_5g[3] = {0x6aa8, 0xd550, 0xd550};
-	u32 gain_stage_5g_efem = 0x2aa8;
+	u32 gain_stage_5g_efem[3] = {0x2aa8, 0x2aa8, 0x2aa8};
 	
 	//u32 gain_stage_6g[4] = {0x10aaa, 0x11554, 0x11554, 0x10aaa}; //LB MB HB UHB
 	u32 gain_stage_6g[2][4] = {{0xd4d0, 0xd550, 0xd4d0, 0x6a68}, 
-							    {0xd4d0, 0xd550, 0xd250, 0x6964}}; //LB MB HB UHB
+					{0xd4d0, 0xd550, 0xd250, 0x6964}}; //LB MB HB UHB
 
+	u32 gain_stage_6g_efem[2][4] = {{0xd4a8, 0xd2a8, 0xd2a8, 0x6a68}, 
+					{0xd4a8, 0xd2a8, 0xd2a8, 0x6a68}}; //LB MB HB UHB
 
 	group_of_6g = halrf_rrf(rf, path, 0x17, 0x6000);
+
+	if (group_of_6g > 3) {
+		RF_WARNING("abnormal group_of_6g = 0x%x\n", group_of_6g);
+		group_of_6g = 3;
+	}
+		
 	
 	if (rfe_type > 50) { //efem
 		if (band == BAND_ON_24G) //TBD
 			_halrf_txgapk_track_table_nctl_2g_8852c(rf, phy, path, gain_stage_2g);
-		else
-			_halrf_txgapk_track_table_nctl_5g_8852c(rf, phy, path, gain_stage_5g_efem);
+		else if (band == BAND_ON_5G) {
+			if (channel >= 36 && channel <= 64)
+				_halrf_txgapk_track_table_nctl_5g_8852c(rf, phy, path, gain_stage_5g_efem[0]);
+			else if (channel >= 100 && channel <= 144)
+				_halrf_txgapk_track_table_nctl_5g_8852c(rf, phy, path, gain_stage_5g_efem[1]);
+			else if (channel >= 149 && channel <= 177)
+				_halrf_txgapk_track_table_nctl_5g_8852c(rf, phy, path, gain_stage_5g_efem[2]);
+		} else {
+			RF_DBG(rf, DBG_RF_TXGAPK, "[TXGAPK]======> %s, 6G band RF 0x17[14:13] = %d\n", __func__, group_of_6g);
+			_halrf_txgapk_track_table_nctl_5g_8852c(rf, phy, path, gain_stage_6g_efem[path][group_of_6g]);
+		}
 	} else {
 	//if (channel >= 1 && channel <= 14)
 		if (band == BAND_ON_24G)
@@ -1210,19 +1255,17 @@ void _halrf_txgapk_power_table_nctl_2g_8852c
 	//u32 ta[17] = {0};
 	u32 calcu_ta[17] = {0};
 
-#ifndef HALRF_CONFIG_FW_IO_OFLD_SUPPORT
+//#ifndef HALRF_CONFIG_FW_IO_OFLD_SUPPORT
 	u32 rf_tmp = 0;
-#endif
+//#endif
 
-
-	u32 itqt[2] = {0x81cc, 0x82cc};
-	
+	u32 itqt[2] = {0x81cc, 0x82cc};	
 	u32 iqk_ctrl_rfc_addr[2] = {0x5670, 0x7670};
-	u32 gapk_on_tbl_setting[2] = {0x8170, 0x8270};
-	
+	u32 gapk_on_tbl_setting[2] = {0x8170, 0x8270};	
 	u32 process_id1[2] = {0x00001119, 0x00001129};
 	u32 process_id2[2] = {0x00001619, 0x00001629};
 
+	rf_tmp = 0;
 
 	RF_DBG(rf, DBG_RF_TXGAPK, "[TXGAPK]======> %s, gain_stage = 0x%x\n", __func__, gain_stage);
 
@@ -1267,190 +1310,193 @@ void _halrf_txgapk_power_table_nctl_2g_8852c
 	halrf_wreg(rf, 0x801c, 0x000e0000, 0x0); //Rx_P_avg
 	//  ========END : Do PA GapK =====
 
-#ifndef HALRF_CONFIG_FW_IO_OFLD_SUPPORT
-
-	// ===== Read GapK Results, Bcut resolution = 0.0625 dB =====
-	halrf_wreg(rf, 0x80d4, MASKDWORD, 0x00130000); //gapk_report
-	
-	halrf_wreg(rf, 0x80e4, 0x00000f00, 0x3);
+//#ifndef HALRF_CONFIG_FW_IO_OFLD_SUPPORT
+#ifdef HALRF_CONFIG_FW_IO_OFLD_SUPPORT
+	if (!rf->phl_com->dev_cap.io_ofld) 
+#endif	
+	{
+		// ===== Read GapK Results, Bcut resolution = 0.0625 dB =====
+		halrf_wreg(rf, 0x80d4, MASKDWORD, 0x00130000); //gapk_report
+		
+		halrf_wreg(rf, 0x80e4, 0x00000f00, 0x3);
 #if 0
-	d[0] = halrf_rreg(rf, 0x80fc, 0x0000007f);
-	d[1] = halrf_rreg(rf, 0x80fc, 0x00003f80);
-	d[2] = halrf_rreg(rf, 0x80fc, 0x001fc000);
-	d[3] = halrf_rreg(rf, 0x80fc, 0x0fe00000);
+		d[0] = halrf_rreg(rf, 0x80fc, 0x0000007f);
+		d[1] = halrf_rreg(rf, 0x80fc, 0x00003f80);
+		d[2] = halrf_rreg(rf, 0x80fc, 0x001fc000);
+		d[3] = halrf_rreg(rf, 0x80fc, 0x0fe00000);
 #else
-	rf_tmp = halrf_rreg(rf, 0x80fc, 0x0fffffff);
-	d[0] = rf_tmp & (0x0000007f);
-	d[1] = rf_tmp & (0x00003f80);
-	d[2] = rf_tmp & (0x001fc000);
-	d[3] = rf_tmp & (0x0fe00000);
+		rf_tmp = halrf_rreg(rf, 0x80fc, 0x0fffffff);
+		d[0] = rf_tmp & (0x0000007f);
+		d[1] = rf_tmp & (0x00003f80);
+		d[2] = rf_tmp & (0x001fc000);
+		d[3] = rf_tmp & (0x0fe00000);
 
-	d[1] = d[1] >> 7;
-	d[2] = d[2] >> 14;
-	d[3] = d[3] >> 21;
+		d[1] = d[1] >> 7;
+		d[2] = d[2] >> 14;
+		d[3] = d[3] >> 21;
 #endif
 
-	halrf_wreg(rf, 0x80e4, 0x00000f00, 0x4);
+		halrf_wreg(rf, 0x80e4, 0x00000f00, 0x4);
 #if 0
-	d[4] = halrf_rreg(rf, 0x80fc, 0x0000007f);
-	d[5] = halrf_rreg(rf, 0x80fc, 0x00003f80);
-	d[6] = halrf_rreg(rf, 0x80fc, 0x001fc000);
-	d[7] = halrf_rreg(rf, 0x80fc, 0x0fe00000);
+		d[4] = halrf_rreg(rf, 0x80fc, 0x0000007f);
+		d[5] = halrf_rreg(rf, 0x80fc, 0x00003f80);
+		d[6] = halrf_rreg(rf, 0x80fc, 0x001fc000);
+		d[7] = halrf_rreg(rf, 0x80fc, 0x0fe00000);
 #else
-	rf_tmp = halrf_rreg(rf, 0x80fc, 0x0fffffff);
-	d[4] = rf_tmp & (0x0000007f);
-	d[5] = rf_tmp & (0x00003f80);
-	d[6] = rf_tmp & (0x001fc000);
-	d[7] = rf_tmp & (0x0fe00000);
+		rf_tmp = halrf_rreg(rf, 0x80fc, 0x0fffffff);
+		d[4] = rf_tmp & (0x0000007f);
+		d[5] = rf_tmp & (0x00003f80);
+		d[6] = rf_tmp & (0x001fc000);
+		d[7] = rf_tmp & (0x0fe00000);
 
-	d[5] = d[5] >> 7;
-	d[6] = d[6] >> 14;
-	d[7] = d[7] >> 21;
+		d[5] = d[5] >> 7;
+		d[6] = d[6] >> 14;
+		d[7] = d[7] >> 21;
 #endif
 
-	halrf_wreg(rf, 0x80e4, 0x00000f00, 0x5);
+		halrf_wreg(rf, 0x80e4, 0x00000f00, 0x5);
 #if 0
-	d[8] = halrf_rreg(rf, 0x80fc, 0x0000007f);
-	d[9] = halrf_rreg(rf, 0x80fc, 0x00003f80);
-	d[10] = halrf_rreg(rf, 0x80fc, 0x001fc000);
-	d[11] = halrf_rreg(rf, 0x80fc, 0x0fe00000);
+		d[8] = halrf_rreg(rf, 0x80fc, 0x0000007f);
+		d[9] = halrf_rreg(rf, 0x80fc, 0x00003f80);
+		d[10] = halrf_rreg(rf, 0x80fc, 0x001fc000);
+		d[11] = halrf_rreg(rf, 0x80fc, 0x0fe00000);
 #else
-	rf_tmp = halrf_rreg(rf, 0x80fc, 0x0fffffff);
-	d[8] = rf_tmp & (0x0000007f);
-	d[9] = rf_tmp & (0x00003f80);
-	d[10] = rf_tmp & (0x001fc000);
-	d[11] = rf_tmp & (0x0fe00000);
+		rf_tmp = halrf_rreg(rf, 0x80fc, 0x0fffffff);
+		d[8] = rf_tmp & (0x0000007f);
+		d[9] = rf_tmp & (0x00003f80);
+		d[10] = rf_tmp & (0x001fc000);
+		d[11] = rf_tmp & (0x0fe00000);
 
-	d[9] = d[9] >> 7;
-	d[10] = d[10] >> 14;
-	d[11] = d[11] >> 21;
+		d[9] = d[9] >> 7;
+		d[10] = d[10] >> 14;
+		d[11] = d[11] >> 21;
 #endif
 
-	halrf_wreg(rf, 0x80e4, 0x00000f00, 0x6);
+		halrf_wreg(rf, 0x80e4, 0x00000f00, 0x6);
 #if 0
-	d[12] = halrf_rreg(rf, 0x80fc, 0x0000007f);
-	d[13] = halrf_rreg(rf, 0x80fc, 0x00003f80);
-	d[14] = halrf_rreg(rf, 0x80fc, 0x001fc000);
-	d[15] = halrf_rreg(rf, 0x80fc, 0x0fe00000);
+		d[12] = halrf_rreg(rf, 0x80fc, 0x0000007f);
+		d[13] = halrf_rreg(rf, 0x80fc, 0x00003f80);
+		d[14] = halrf_rreg(rf, 0x80fc, 0x001fc000);
+		d[15] = halrf_rreg(rf, 0x80fc, 0x0fe00000);
 #else
-	rf_tmp = halrf_rreg(rf, 0x80fc, 0x0fffffff);
-	d[12] = rf_tmp & (0x0000007f);
-	d[13] = rf_tmp & (0x00003f80);
-	d[14] = rf_tmp & (0x001fc000);
-	d[15] = rf_tmp & (0x0fe00000);
+		rf_tmp = halrf_rreg(rf, 0x80fc, 0x0fffffff);
+		d[12] = rf_tmp & (0x0000007f);
+		d[13] = rf_tmp & (0x00003f80);
+		d[14] = rf_tmp & (0x001fc000);
+		d[15] = rf_tmp & (0x0fe00000);
 
-	d[13] = d[13] >> 7;
-	d[14] = d[14] >> 14;
-	d[15] = d[15] >> 21;
+		d[13] = d[13] >> 7;
+		d[14] = d[14] >> 14;
+		d[15] = d[15] >> 21;
 #endif
 
-	halrf_wreg(rf, 0x80e4, 0x00000f00, 0x7);
-	d[16] = halrf_rreg(rf, 0x80fc, 0x0000007f);
+		halrf_wreg(rf, 0x80e4, 0x00000f00, 0x7);
+		d[16] = halrf_rreg(rf, 0x80fc, 0x0000007f);
 
 #if 0	 
-	halrf_wreg(rf, 0x80e4, 0x00000f00, 0x9);
-	ta[0] = halrf_rreg(rf, 0x80fc, 0x000000ff);
-	ta[1] = halrf_rreg(rf, 0x80fc, 0x0000ff00);
-	ta[2] = halrf_rreg(rf, 0x80fc, 0x00ff0000);
-	ta[3] = halrf_rreg(rf, 0x80fc, 0xff000000);
-	halrf_wreg(rf, 0x80e4, 0x00000f00, 0xa);
-	ta[4] = halrf_rreg(rf, 0x80fc, 0x000000ff);
-	ta[5] = halrf_rreg(rf, 0x80fc, 0x0000ff00);
-	ta[6] = halrf_rreg(rf, 0x80fc, 0x00ff0000);
-	ta[7] = halrf_rreg(rf, 0x80fc, 0xff000000);
-	halrf_wreg(rf, 0x80e4, 0x00000f00, 0xb);
-	ta[8] = halrf_rreg(rf, 0x80fc, 0x000000ff);
-	ta[9] = halrf_rreg(rf, 0x80fc, 0x0000ff00);
-	ta[10] = halrf_rreg(rf, 0x80fc, 0x00ff0000);
-	ta[11] = halrf_rreg(rf, 0x80fc, 0xff000000);
-	halrf_wreg(rf, 0x80e4, 0x00000f00, 0xc);
-	ta[12] = halrf_rreg(rf, 0x80fc, 0x000000ff);
-	ta[13] = halrf_rreg(rf, 0x80fc, 0x0000ff00);
-	ta[14] = halrf_rreg(rf, 0x80fc, 0x00ff0000);
-	ta[15] = halrf_rreg(rf, 0x80fc, 0xff000000);
-	halrf_wreg(rf, 0x80e4, 0x00000f00, 0xd);
-	ta[16] = halrf_rreg(rf, 0x80fc, 0x000000ff);
+		halrf_wreg(rf, 0x80e4, 0x00000f00, 0x9);
+		ta[0] = halrf_rreg(rf, 0x80fc, 0x000000ff);
+		ta[1] = halrf_rreg(rf, 0x80fc, 0x0000ff00);
+		ta[2] = halrf_rreg(rf, 0x80fc, 0x00ff0000);
+		ta[3] = halrf_rreg(rf, 0x80fc, 0xff000000);
+		halrf_wreg(rf, 0x80e4, 0x00000f00, 0xa);
+		ta[4] = halrf_rreg(rf, 0x80fc, 0x000000ff);
+		ta[5] = halrf_rreg(rf, 0x80fc, 0x0000ff00);
+		ta[6] = halrf_rreg(rf, 0x80fc, 0x00ff0000);
+		ta[7] = halrf_rreg(rf, 0x80fc, 0xff000000);
+		halrf_wreg(rf, 0x80e4, 0x00000f00, 0xb);
+		ta[8] = halrf_rreg(rf, 0x80fc, 0x000000ff);
+		ta[9] = halrf_rreg(rf, 0x80fc, 0x0000ff00);
+		ta[10] = halrf_rreg(rf, 0x80fc, 0x00ff0000);
+		ta[11] = halrf_rreg(rf, 0x80fc, 0xff000000);
+		halrf_wreg(rf, 0x80e4, 0x00000f00, 0xc);
+		ta[12] = halrf_rreg(rf, 0x80fc, 0x000000ff);
+		ta[13] = halrf_rreg(rf, 0x80fc, 0x0000ff00);
+		ta[14] = halrf_rreg(rf, 0x80fc, 0x00ff0000);
+		ta[15] = halrf_rreg(rf, 0x80fc, 0xff000000);
+		halrf_wreg(rf, 0x80e4, 0x00000f00, 0xd);
+		ta[16] = halrf_rreg(rf, 0x80fc, 0x000000ff);
 #endif
-	// Get The Value --> Ta 6bit
-	halrf_wreg(rf, 0x80e4, 0x00000f00, 0x9);
+		// Get The Value --> Ta 6bit
+		halrf_wreg(rf, 0x80e4, 0x00000f00, 0x9);
 #if 0
-	calcu_ta[0] = halrf_rreg(rf, 0x80fc, 0x0000007e);
-	calcu_ta[1] = halrf_rreg(rf, 0x80fc, 0x00007e00);
-	calcu_ta[2] = halrf_rreg(rf, 0x80fc, 0x007e0000);
-	calcu_ta[3] = halrf_rreg(rf, 0x80fc, 0x7e000000);
+		calcu_ta[0] = halrf_rreg(rf, 0x80fc, 0x0000007e);
+		calcu_ta[1] = halrf_rreg(rf, 0x80fc, 0x00007e00);
+		calcu_ta[2] = halrf_rreg(rf, 0x80fc, 0x007e0000);
+		calcu_ta[3] = halrf_rreg(rf, 0x80fc, 0x7e000000);
 #else
-	rf_tmp = halrf_rreg(rf, 0x80fc, 0x7e7e7e7f) & 0x7e7e7e7e;
-	calcu_ta[0] = rf_tmp & (0x0000007e);
-	calcu_ta[1] = rf_tmp & (0x00007e00);
-	calcu_ta[2] = rf_tmp & (0x007e0000);
-	calcu_ta[3] = rf_tmp & (0x7e000000);
+		rf_tmp = halrf_rreg(rf, 0x80fc, 0x7e7e7e7f) & 0x7e7e7e7e;
+		calcu_ta[0] = rf_tmp & (0x0000007e);
+		calcu_ta[1] = rf_tmp & (0x00007e00);
+		calcu_ta[2] = rf_tmp & (0x007e0000);
+		calcu_ta[3] = rf_tmp & (0x7e000000);
 
-	
-	calcu_ta[0] = calcu_ta[0] >> 1;
-	calcu_ta[1] = calcu_ta[1] >> 9;
-	calcu_ta[2] = calcu_ta[2] >> 17;
-	calcu_ta[3] = calcu_ta[3] >> 25;
-#endif
-	halrf_wreg(rf, 0x80e4, 0x00000f00, 0xa);
-#if 0
-	calcu_ta[4] = halrf_rreg(rf, 0x80fc, 0x0000007e);
-	calcu_ta[5] = halrf_rreg(rf, 0x80fc, 0x00007e00);
-	calcu_ta[6] = halrf_rreg(rf, 0x80fc, 0x007e0000);
-	calcu_ta[7] = halrf_rreg(rf, 0x80fc, 0x7e000000);
-#else
-	rf_tmp = halrf_rreg(rf, 0x80fc, 0x7e7e7e7f) & 0x7e7e7e7e;
-	calcu_ta[4] = rf_tmp & (0x0000007e);
-	calcu_ta[5] = rf_tmp & (0x00007e00);
-	calcu_ta[6] = rf_tmp & (0x007e0000);
-	calcu_ta[7] = rf_tmp & (0x7e000000);
-	
 		
-	calcu_ta[4] = calcu_ta[4] >> 1;
-	calcu_ta[5] = calcu_ta[5] >> 9;
-	calcu_ta[6] = calcu_ta[6] >> 17;
-	calcu_ta[7] = calcu_ta[7] >> 25;
+		calcu_ta[0] = calcu_ta[0] >> 1;
+		calcu_ta[1] = calcu_ta[1] >> 9;
+		calcu_ta[2] = calcu_ta[2] >> 17;
+		calcu_ta[3] = calcu_ta[3] >> 25;
 #endif
-	halrf_wreg(rf, 0x80e4, 0x00000f00, 0xb);
+		halrf_wreg(rf, 0x80e4, 0x00000f00, 0xa);
 #if 0
-	calcu_ta[8] = halrf_rreg(rf, 0x80fc, 0x0000007e);
-	calcu_ta[9] = halrf_rreg(rf, 0x80fc, 0x00007e00);
-	calcu_ta[10] = halrf_rreg(rf, 0x80fc, 0x007e0000);
-	calcu_ta[11] = halrf_rreg(rf, 0x80fc, 0x7e000000);
+		calcu_ta[4] = halrf_rreg(rf, 0x80fc, 0x0000007e);
+		calcu_ta[5] = halrf_rreg(rf, 0x80fc, 0x00007e00);
+		calcu_ta[6] = halrf_rreg(rf, 0x80fc, 0x007e0000);
+		calcu_ta[7] = halrf_rreg(rf, 0x80fc, 0x7e000000);
 #else
-	rf_tmp = halrf_rreg(rf, 0x80fc, 0x7e7e7e7f) & 0x7e7e7e7e;
-	calcu_ta[8] = rf_tmp & (0x0000007e);
-	calcu_ta[9] = rf_tmp & (0x00007e00);
-	calcu_ta[10] = rf_tmp & (0x007e0000);
-	calcu_ta[11] = rf_tmp & (0x7e000000);
-				
-	calcu_ta[8] = calcu_ta[8] >> 1;
-	calcu_ta[9] = calcu_ta[9] >> 9;
-	calcu_ta[10] = calcu_ta[10] >> 17;
-	calcu_ta[11] = calcu_ta[11] >> 25;
-#endif
-	halrf_wreg(rf, 0x80e4, 0x00000f00, 0xc);
-#if 0
-	calcu_ta[12] = halrf_rreg(rf, 0x80fc, 0x0000007e);
-	calcu_ta[13] = halrf_rreg(rf, 0x80fc, 0x00007e00);
-	calcu_ta[14] = halrf_rreg(rf, 0x80fc, 0x007e0000);
-	calcu_ta[15] = halrf_rreg(rf, 0x80fc, 0x7e000000);
-#else
-	rf_tmp = halrf_rreg(rf, 0x80fc, 0x7e7e7e7f) & 0x7e7e7e7e;
-	calcu_ta[12] = rf_tmp & (0x0000007e);
-	calcu_ta[13] = rf_tmp & (0x00007e00);
-	calcu_ta[14] = rf_tmp & (0x007e0000);
-	calcu_ta[15] = rf_tmp & (0x7e000000);
-	
+		rf_tmp = halrf_rreg(rf, 0x80fc, 0x7e7e7e7f) & 0x7e7e7e7e;
+		calcu_ta[4] = rf_tmp & (0x0000007e);
+		calcu_ta[5] = rf_tmp & (0x00007e00);
+		calcu_ta[6] = rf_tmp & (0x007e0000);
+		calcu_ta[7] = rf_tmp & (0x7e000000);
 		
-	calcu_ta[12] = calcu_ta[12] >> 1;
-	calcu_ta[13] = calcu_ta[13] >> 9;
-	calcu_ta[14] = calcu_ta[14] >> 17;
-	calcu_ta[15] = calcu_ta[15] >> 25;
+			
+		calcu_ta[4] = calcu_ta[4] >> 1;
+		calcu_ta[5] = calcu_ta[5] >> 9;
+		calcu_ta[6] = calcu_ta[6] >> 17;
+		calcu_ta[7] = calcu_ta[7] >> 25;
 #endif
-	halrf_wreg(rf, 0x80e4, 0x00000f00, 0xd);
-	calcu_ta[16] = halrf_rreg(rf, 0x80fc, 0x0000007e);
-
+		halrf_wreg(rf, 0x80e4, 0x00000f00, 0xb);
+#if 0
+		calcu_ta[8] = halrf_rreg(rf, 0x80fc, 0x0000007e);
+		calcu_ta[9] = halrf_rreg(rf, 0x80fc, 0x00007e00);
+		calcu_ta[10] = halrf_rreg(rf, 0x80fc, 0x007e0000);
+		calcu_ta[11] = halrf_rreg(rf, 0x80fc, 0x7e000000);
+#else
+		rf_tmp = halrf_rreg(rf, 0x80fc, 0x7e7e7e7f) & 0x7e7e7e7e;
+		calcu_ta[8] = rf_tmp & (0x0000007e);
+		calcu_ta[9] = rf_tmp & (0x00007e00);
+		calcu_ta[10] = rf_tmp & (0x007e0000);
+		calcu_ta[11] = rf_tmp & (0x7e000000);
+					
+		calcu_ta[8] = calcu_ta[8] >> 1;
+		calcu_ta[9] = calcu_ta[9] >> 9;
+		calcu_ta[10] = calcu_ta[10] >> 17;
+		calcu_ta[11] = calcu_ta[11] >> 25;
 #endif
+		halrf_wreg(rf, 0x80e4, 0x00000f00, 0xc);
+#if 0
+		calcu_ta[12] = halrf_rreg(rf, 0x80fc, 0x0000007e);
+		calcu_ta[13] = halrf_rreg(rf, 0x80fc, 0x00007e00);
+		calcu_ta[14] = halrf_rreg(rf, 0x80fc, 0x007e0000);
+		calcu_ta[15] = halrf_rreg(rf, 0x80fc, 0x7e000000);
+#else
+		rf_tmp = halrf_rreg(rf, 0x80fc, 0x7e7e7e7f) & 0x7e7e7e7e;
+		calcu_ta[12] = rf_tmp & (0x0000007e);
+		calcu_ta[13] = rf_tmp & (0x00007e00);
+		calcu_ta[14] = rf_tmp & (0x007e0000);
+		calcu_ta[15] = rf_tmp & (0x7e000000);
+		
+			
+		calcu_ta[12] = calcu_ta[12] >> 1;
+		calcu_ta[13] = calcu_ta[13] >> 9;
+		calcu_ta[14] = calcu_ta[14] >> 17;
+		calcu_ta[15] = calcu_ta[15] >> 25;
+#endif
+		halrf_wreg(rf, 0x80e4, 0x00000f00, 0xd);
+		calcu_ta[16] = halrf_rreg(rf, 0x80fc, 0x0000007e);
+	}
+//#endif
 
 
 #if 0	
@@ -1525,21 +1571,17 @@ void _halrf_txgapk_power_table_nctl_5g_8852c
 	//u32 ta[17] = {0};
 	u32 calcu_ta[17] = {0};
 
-#ifndef HALRF_CONFIG_FW_IO_OFLD_SUPPORT
+//#ifndef HALRF_CONFIG_FW_IO_OFLD_SUPPORT
 	u32 rf_tmp = 0;
-#endif
+//#endif
 
-
-	
 	u32 itqt[2] = {0x81cc, 0x82cc};
-
 	u32 gapk_on_tbl_setting[2] = {0x8170, 0x8270};
-	u32 iqk_ctrl_rfc_addr[2] = {0x5670, 0x7670};
-	
-		
+	u32 iqk_ctrl_rfc_addr[2] = {0x5670, 0x7670};		
 	u32 process_id1[2] = {0x00001119, 0x00001129};
 	u32 process_id2[2] = {0x00001619, 0x00001629};
-	
+
+	rf_tmp = 0;	
 
 	RF_DBG(rf, DBG_RF_TXGAPK, "[TXGAPK]======> %s, gain_stage = 0x%x\n", __func__, gain_stage);
 
@@ -1601,198 +1643,201 @@ void _halrf_txgapk_power_table_nctl_5g_8852c
 	//	========END : Do PA GapK =====
 
 
-#ifndef HALRF_CONFIG_FW_IO_OFLD_SUPPORT
+//#ifndef HALRF_CONFIG_FW_IO_OFLD_SUPPORT
+#ifdef HALRF_CONFIG_FW_IO_OFLD_SUPPORT
+	if (!rf->phl_com->dev_cap.io_ofld) 
+#endif	
+	{
+		// ===== Read GapK Results, Bcut resolution = 0.0625 dB =====
+		halrf_wreg(rf, 0x80d4, MASKDWORD, 0x00130000); //gapk_report
 
-	// ===== Read GapK Results, Bcut resolution = 0.0625 dB =====
-	halrf_wreg(rf, 0x80d4, MASKDWORD, 0x00130000); //gapk_report
-
-	halrf_wreg(rf, 0x80e4, 0x00000f00, 0x3);
+		halrf_wreg(rf, 0x80e4, 0x00000f00, 0x3);
 #if 0
-	d[0] = halrf_rreg(rf, 0x80fc, 0x0000007f);
-	d[1] = halrf_rreg(rf, 0x80fc, 0x00003f80);
-	d[2] = halrf_rreg(rf, 0x80fc, 0x001fc000);
-	d[3] = halrf_rreg(rf, 0x80fc, 0x0fe00000);
+		d[0] = halrf_rreg(rf, 0x80fc, 0x0000007f);
+		d[1] = halrf_rreg(rf, 0x80fc, 0x00003f80);
+		d[2] = halrf_rreg(rf, 0x80fc, 0x001fc000);
+		d[3] = halrf_rreg(rf, 0x80fc, 0x0fe00000);
 #else
-	rf_tmp = halrf_rreg(rf, 0x80fc, 0x0fffffff);
-	d[0] = rf_tmp & (0x0000007f);
-	d[1] = rf_tmp & (0x00003f80);
-	d[2] = rf_tmp & (0x001fc000);
-	d[3] = rf_tmp & (0x0fe00000);
+		rf_tmp = halrf_rreg(rf, 0x80fc, 0x0fffffff);
+		d[0] = rf_tmp & (0x0000007f);
+		d[1] = rf_tmp & (0x00003f80);
+		d[2] = rf_tmp & (0x001fc000);
+		d[3] = rf_tmp & (0x0fe00000);
 
-	d[1] = d[1] >> 7;
-	d[2] = d[2] >> 14;
-	d[3] = d[3] >> 21;
+		d[1] = d[1] >> 7;
+		d[2] = d[2] >> 14;
+		d[3] = d[3] >> 21;
 #endif
 
-	halrf_wreg(rf, 0x80e4, 0x00000f00, 0x4);
+		halrf_wreg(rf, 0x80e4, 0x00000f00, 0x4);
 #if 0
-	d[4] = halrf_rreg(rf, 0x80fc, 0x0000007f);
-	d[5] = halrf_rreg(rf, 0x80fc, 0x00003f80);
-	d[6] = halrf_rreg(rf, 0x80fc, 0x001fc000);
-	d[7] = halrf_rreg(rf, 0x80fc, 0x0fe00000);
+		d[4] = halrf_rreg(rf, 0x80fc, 0x0000007f);
+		d[5] = halrf_rreg(rf, 0x80fc, 0x00003f80);
+		d[6] = halrf_rreg(rf, 0x80fc, 0x001fc000);
+		d[7] = halrf_rreg(rf, 0x80fc, 0x0fe00000);
 #else
-	rf_tmp = halrf_rreg(rf, 0x80fc, 0x0fffffff);
-	d[4] = rf_tmp & (0x0000007f);
-	d[5] = rf_tmp & (0x00003f80);
-	d[6] = rf_tmp & (0x001fc000);
-	d[7] = rf_tmp & (0x0fe00000);
+		rf_tmp = halrf_rreg(rf, 0x80fc, 0x0fffffff);
+		d[4] = rf_tmp & (0x0000007f);
+		d[5] = rf_tmp & (0x00003f80);
+		d[6] = rf_tmp & (0x001fc000);
+		d[7] = rf_tmp & (0x0fe00000);
 
-	d[5] = d[5] >> 7;
-	d[6] = d[6] >> 14;
-	d[7] = d[7] >> 21;
+		d[5] = d[5] >> 7;
+		d[6] = d[6] >> 14;
+		d[7] = d[7] >> 21;
 #endif
 
-	halrf_wreg(rf, 0x80e4, 0x00000f00, 0x5);
+		halrf_wreg(rf, 0x80e4, 0x00000f00, 0x5);
 #if 0
-	d[8] = halrf_rreg(rf, 0x80fc, 0x0000007f);
-	d[9] = halrf_rreg(rf, 0x80fc, 0x00003f80);
-	d[10] = halrf_rreg(rf, 0x80fc, 0x001fc000);
-	d[11] = halrf_rreg(rf, 0x80fc, 0x0fe00000);
+		d[8] = halrf_rreg(rf, 0x80fc, 0x0000007f);
+		d[9] = halrf_rreg(rf, 0x80fc, 0x00003f80);
+		d[10] = halrf_rreg(rf, 0x80fc, 0x001fc000);
+		d[11] = halrf_rreg(rf, 0x80fc, 0x0fe00000);
 #else
-	rf_tmp = halrf_rreg(rf, 0x80fc, 0x0fffffff);
-	d[8] = rf_tmp & (0x0000007f);
-	d[9] = rf_tmp & (0x00003f80);
-	d[10] = rf_tmp & (0x001fc000);
-	d[11] = rf_tmp & (0x0fe00000);
+		rf_tmp = halrf_rreg(rf, 0x80fc, 0x0fffffff);
+		d[8] = rf_tmp & (0x0000007f);
+		d[9] = rf_tmp & (0x00003f80);
+		d[10] = rf_tmp & (0x001fc000);
+		d[11] = rf_tmp & (0x0fe00000);
 
-	d[9] = d[9] >> 7;
-	d[10] = d[10] >> 14;
-	d[11] = d[11] >> 21;	
+		d[9] = d[9] >> 7;
+		d[10] = d[10] >> 14;
+		d[11] = d[11] >> 21;	
 #endif
 
-	halrf_wreg(rf, 0x80e4, 0x00000f00, 0x6);
+		halrf_wreg(rf, 0x80e4, 0x00000f00, 0x6);
 #if 0
-	d[12] = halrf_rreg(rf, 0x80fc, 0x0000007f);
-	d[13] = halrf_rreg(rf, 0x80fc, 0x00003f80);
-	d[14] = halrf_rreg(rf, 0x80fc, 0x001fc000);
-	d[15] = halrf_rreg(rf, 0x80fc, 0x0fe00000);
+		d[12] = halrf_rreg(rf, 0x80fc, 0x0000007f);
+		d[13] = halrf_rreg(rf, 0x80fc, 0x00003f80);
+		d[14] = halrf_rreg(rf, 0x80fc, 0x001fc000);
+		d[15] = halrf_rreg(rf, 0x80fc, 0x0fe00000);
 #else
-	rf_tmp = halrf_rreg(rf, 0x80fc, 0x0fffffff);
-	d[12] = rf_tmp & (0x0000007f);
-	d[13] = rf_tmp & (0x00003f80);
-	d[14] = rf_tmp & (0x001fc000);
-	d[15] = rf_tmp & (0x0fe00000);
+		rf_tmp = halrf_rreg(rf, 0x80fc, 0x0fffffff);
+		d[12] = rf_tmp & (0x0000007f);
+		d[13] = rf_tmp & (0x00003f80);
+		d[14] = rf_tmp & (0x001fc000);
+		d[15] = rf_tmp & (0x0fe00000);
 
-	d[13] = d[13] >> 7;
-	d[14] = d[14] >> 14;
-	d[15] = d[15] >> 21;
+		d[13] = d[13] >> 7;
+		d[14] = d[14] >> 14;
+		d[15] = d[15] >> 21;
 #endif
 
-	halrf_wreg(rf, 0x80e4, 0x00000f00, 0x7);
-	d[16] = halrf_rreg(rf, 0x80fc, 0x0000007f);
+		halrf_wreg(rf, 0x80e4, 0x00000f00, 0x7);
+		d[16] = halrf_rreg(rf, 0x80fc, 0x0000007f);
 
 #if 0
-	halrf_wreg(rf, 0x80e4, 0x00000f00, 0x9);
-	ta[0] = halrf_rreg(rf, 0x80fc, 0x000000ff);
-	ta[1] = halrf_rreg(rf, 0x80fc, 0x0000ff00);
-	ta[2] = halrf_rreg(rf, 0x80fc, 0x00ff0000);
-	ta[3] = halrf_rreg(rf, 0x80fc, 0xff000000);
+		halrf_wreg(rf, 0x80e4, 0x00000f00, 0x9);
+		ta[0] = halrf_rreg(rf, 0x80fc, 0x000000ff);
+		ta[1] = halrf_rreg(rf, 0x80fc, 0x0000ff00);
+		ta[2] = halrf_rreg(rf, 0x80fc, 0x00ff0000);
+		ta[3] = halrf_rreg(rf, 0x80fc, 0xff000000);
 
-	halrf_wreg(rf, 0x80e4, 0x00000f00, 0xa);
-	ta[4] = halrf_rreg(rf, 0x80fc, 0x000000ff);
-	ta[5] = halrf_rreg(rf, 0x80fc, 0x0000ff00);
-	ta[6] = halrf_rreg(rf, 0x80fc, 0x00ff0000);
-	ta[7] = halrf_rreg(rf, 0x80fc, 0xff000000);
+		halrf_wreg(rf, 0x80e4, 0x00000f00, 0xa);
+		ta[4] = halrf_rreg(rf, 0x80fc, 0x000000ff);
+		ta[5] = halrf_rreg(rf, 0x80fc, 0x0000ff00);
+		ta[6] = halrf_rreg(rf, 0x80fc, 0x00ff0000);
+		ta[7] = halrf_rreg(rf, 0x80fc, 0xff000000);
 
-	halrf_wreg(rf, 0x80e4, 0x00000f00, 0xb);
-	ta[8] = halrf_rreg(rf, 0x80fc, 0x000000ff);
-	ta[9] = halrf_rreg(rf, 0x80fc, 0x0000ff00);
-	ta[10] = halrf_rreg(rf, 0x80fc, 0x00ff0000);
-	ta[11] = halrf_rreg(rf, 0x80fc, 0xff000000);
+		halrf_wreg(rf, 0x80e4, 0x00000f00, 0xb);
+		ta[8] = halrf_rreg(rf, 0x80fc, 0x000000ff);
+		ta[9] = halrf_rreg(rf, 0x80fc, 0x0000ff00);
+		ta[10] = halrf_rreg(rf, 0x80fc, 0x00ff0000);
+		ta[11] = halrf_rreg(rf, 0x80fc, 0xff000000);
 
-	halrf_wreg(rf, 0x80e4, 0x00000f00, 0xc);
-	ta[12] = halrf_rreg(rf, 0x80fc, 0x000000ff);
-	ta[13] = halrf_rreg(rf, 0x80fc, 0x0000ff00);
-	ta[14] = halrf_rreg(rf, 0x80fc, 0x00ff0000);
-	ta[15] = halrf_rreg(rf, 0x80fc, 0xff000000);
+		halrf_wreg(rf, 0x80e4, 0x00000f00, 0xc);
+		ta[12] = halrf_rreg(rf, 0x80fc, 0x000000ff);
+		ta[13] = halrf_rreg(rf, 0x80fc, 0x0000ff00);
+		ta[14] = halrf_rreg(rf, 0x80fc, 0x00ff0000);
+		ta[15] = halrf_rreg(rf, 0x80fc, 0xff000000);
 
-	halrf_wreg(rf, 0x80e4, 0x00000f00, 0xd);
-	ta[16] = halrf_rreg(rf, 0x80fc, 0x000000ff);
+		halrf_wreg(rf, 0x80e4, 0x00000f00, 0xd);
+		ta[16] = halrf_rreg(rf, 0x80fc, 0x000000ff);
 #endif
 
-	// Get The Value --> Ta 6bit
-	halrf_wreg(rf, 0x80e4, 0x00000f00, 0x9);
+		// Get The Value --> Ta 6bit
+		halrf_wreg(rf, 0x80e4, 0x00000f00, 0x9);
 #if 0
-	calcu_ta[0] = halrf_rreg(rf, 0x80fc, 0x0000007e);
-	calcu_ta[1] = halrf_rreg(rf, 0x80fc, 0x00007e00);
-	calcu_ta[2] = halrf_rreg(rf, 0x80fc, 0x007e0000);
-	calcu_ta[3] = halrf_rreg(rf, 0x80fc, 0x7e000000);
+		calcu_ta[0] = halrf_rreg(rf, 0x80fc, 0x0000007e);
+		calcu_ta[1] = halrf_rreg(rf, 0x80fc, 0x00007e00);
+		calcu_ta[2] = halrf_rreg(rf, 0x80fc, 0x007e0000);
+		calcu_ta[3] = halrf_rreg(rf, 0x80fc, 0x7e000000);
 #else
-	rf_tmp = halrf_rreg(rf, 0x80fc, 0x7e7e7e7f) & 0x7e7e7e7e;
-	calcu_ta[0] = rf_tmp & (0x0000007e);
-	calcu_ta[1] = rf_tmp & (0x00007e00);
-	calcu_ta[2] = rf_tmp & (0x007e0000);
-	calcu_ta[3] = rf_tmp & (0x7e000000);
-
-	
-	calcu_ta[0] = calcu_ta[0] >> 1;
-	calcu_ta[1] = calcu_ta[1] >> 9;
-	calcu_ta[2] = calcu_ta[2] >> 17;
-	calcu_ta[3] = calcu_ta[3] >> 25;
-#endif
-	halrf_wreg(rf, 0x80e4, 0x00000f00, 0xa);
-#if 0
-	calcu_ta[4] = halrf_rreg(rf, 0x80fc, 0x0000007e);
-	calcu_ta[5] = halrf_rreg(rf, 0x80fc, 0x00007e00);
-	calcu_ta[6] = halrf_rreg(rf, 0x80fc, 0x007e0000);
-	calcu_ta[7] = halrf_rreg(rf, 0x80fc, 0x7e000000);
-#else
-	rf_tmp = halrf_rreg(rf, 0x80fc, 0x7e7e7e7f) & 0x7e7e7e7e;
-	calcu_ta[4] = rf_tmp & (0x0000007e);
-	calcu_ta[5] = rf_tmp & (0x00007e00);
-	calcu_ta[6] = rf_tmp & (0x007e0000);
-	calcu_ta[7] = rf_tmp & (0x7e000000);
-	
-		
-	calcu_ta[4] = calcu_ta[4] >> 1;
-	calcu_ta[5] = calcu_ta[5] >> 9;
-	calcu_ta[6] = calcu_ta[6] >> 17;
-	calcu_ta[7] = calcu_ta[7] >> 25;
-#endif
+		rf_tmp = halrf_rreg(rf, 0x80fc, 0x7e7e7e7f) & 0x7e7e7e7e;
+		calcu_ta[0] = rf_tmp & (0x0000007e);
+		calcu_ta[1] = rf_tmp & (0x00007e00);
+		calcu_ta[2] = rf_tmp & (0x007e0000);
+		calcu_ta[3] = rf_tmp & (0x7e000000);
 
 		
-	halrf_wreg(rf, 0x80e4, 0x00000f00, 0xb);
+		calcu_ta[0] = calcu_ta[0] >> 1;
+		calcu_ta[1] = calcu_ta[1] >> 9;
+		calcu_ta[2] = calcu_ta[2] >> 17;
+		calcu_ta[3] = calcu_ta[3] >> 25;
+#endif
+		halrf_wreg(rf, 0x80e4, 0x00000f00, 0xa);
 #if 0
-	calcu_ta[8] = halrf_rreg(rf, 0x80fc, 0x0000007e);
-	calcu_ta[9] = halrf_rreg(rf, 0x80fc, 0x00007e00);
-	calcu_ta[10] = halrf_rreg(rf, 0x80fc, 0x007e0000);
-	calcu_ta[11] = halrf_rreg(rf, 0x80fc, 0x7e000000);
+		calcu_ta[4] = halrf_rreg(rf, 0x80fc, 0x0000007e);
+		calcu_ta[5] = halrf_rreg(rf, 0x80fc, 0x00007e00);
+		calcu_ta[6] = halrf_rreg(rf, 0x80fc, 0x007e0000);
+		calcu_ta[7] = halrf_rreg(rf, 0x80fc, 0x7e000000);
 #else
-	rf_tmp = halrf_rreg(rf, 0x80fc, 0x7e7e7e7f) & 0x7e7e7e7e;
-	calcu_ta[8] = rf_tmp & (0x0000007e);
-	calcu_ta[9] = rf_tmp & (0x00007e00);
-	calcu_ta[10] = rf_tmp & (0x007e0000);
-	calcu_ta[11] = rf_tmp & (0x7e000000);
+		rf_tmp = halrf_rreg(rf, 0x80fc, 0x7e7e7e7f) & 0x7e7e7e7e;
+		calcu_ta[4] = rf_tmp & (0x0000007e);
+		calcu_ta[5] = rf_tmp & (0x00007e00);
+		calcu_ta[6] = rf_tmp & (0x007e0000);
+		calcu_ta[7] = rf_tmp & (0x7e000000);
+		
 			
-	calcu_ta[8] = calcu_ta[8] >> 1;
-	calcu_ta[9] = calcu_ta[9] >> 9;
-	calcu_ta[10] = calcu_ta[10] >> 17;
-	calcu_ta[11] = calcu_ta[11] >> 25;
+		calcu_ta[4] = calcu_ta[4] >> 1;
+		calcu_ta[5] = calcu_ta[5] >> 9;
+		calcu_ta[6] = calcu_ta[6] >> 17;
+		calcu_ta[7] = calcu_ta[7] >> 25;
 #endif
-	
-	halrf_wreg(rf, 0x80e4, 0x00000f00, 0xc);
-#if 0
-	calcu_ta[12] = halrf_rreg(rf, 0x80fc, 0x0000007e);
-	calcu_ta[13] = halrf_rreg(rf, 0x80fc, 0x00007e00);
-	calcu_ta[14] = halrf_rreg(rf, 0x80fc, 0x007e0000);
-	calcu_ta[15] = halrf_rreg(rf, 0x80fc, 0x7e000000);
-#else
-	rf_tmp = halrf_rreg(rf, 0x80fc, 0x7e7e7e7f) & 0x7e7e7e7e;
-	calcu_ta[12] = rf_tmp & (0x0000007e);
-	calcu_ta[13] = rf_tmp & (0x00007e00);
-	calcu_ta[14] = rf_tmp & (0x007e0000);
-	calcu_ta[15] = rf_tmp & (0x7e000000);
-	
-		
-	calcu_ta[12] = calcu_ta[12] >> 1;
-	calcu_ta[13] = calcu_ta[13] >> 9;
-	calcu_ta[14] = calcu_ta[14] >> 17;
-	calcu_ta[15] = calcu_ta[15] >> 25;
-#endif
-	halrf_wreg(rf, 0x80e4, 0x00000f00, 0xd);
-	calcu_ta[16] = halrf_rreg(rf, 0x80fc, 0x0000007e);
 
+			
+		halrf_wreg(rf, 0x80e4, 0x00000f00, 0xb);
+#if 0
+		calcu_ta[8] = halrf_rreg(rf, 0x80fc, 0x0000007e);
+		calcu_ta[9] = halrf_rreg(rf, 0x80fc, 0x00007e00);
+		calcu_ta[10] = halrf_rreg(rf, 0x80fc, 0x007e0000);
+		calcu_ta[11] = halrf_rreg(rf, 0x80fc, 0x7e000000);
+#else
+		rf_tmp = halrf_rreg(rf, 0x80fc, 0x7e7e7e7f) & 0x7e7e7e7e;
+		calcu_ta[8] = rf_tmp & (0x0000007e);
+		calcu_ta[9] = rf_tmp & (0x00007e00);
+		calcu_ta[10] = rf_tmp & (0x007e0000);
+		calcu_ta[11] = rf_tmp & (0x7e000000);
+				
+		calcu_ta[8] = calcu_ta[8] >> 1;
+		calcu_ta[9] = calcu_ta[9] >> 9;
+		calcu_ta[10] = calcu_ta[10] >> 17;
+		calcu_ta[11] = calcu_ta[11] >> 25;
 #endif
+		
+		halrf_wreg(rf, 0x80e4, 0x00000f00, 0xc);
+#if 0
+		calcu_ta[12] = halrf_rreg(rf, 0x80fc, 0x0000007e);
+		calcu_ta[13] = halrf_rreg(rf, 0x80fc, 0x00007e00);
+		calcu_ta[14] = halrf_rreg(rf, 0x80fc, 0x007e0000);
+		calcu_ta[15] = halrf_rreg(rf, 0x80fc, 0x7e000000);
+#else
+		rf_tmp = halrf_rreg(rf, 0x80fc, 0x7e7e7e7f) & 0x7e7e7e7e;
+		calcu_ta[12] = rf_tmp & (0x0000007e);
+		calcu_ta[13] = rf_tmp & (0x00007e00);
+		calcu_ta[14] = rf_tmp & (0x007e0000);
+		calcu_ta[15] = rf_tmp & (0x7e000000);
+		
+			
+		calcu_ta[12] = calcu_ta[12] >> 1;
+		calcu_ta[13] = calcu_ta[13] >> 9;
+		calcu_ta[14] = calcu_ta[14] >> 17;
+		calcu_ta[15] = calcu_ta[15] >> 25;
+#endif
+		halrf_wreg(rf, 0x80e4, 0x00000f00, 0xd);
+		calcu_ta[16] = halrf_rreg(rf, 0x80fc, 0x0000007e);
+	}
+//#endif
 
 
 #if 0	 
@@ -1911,7 +1956,11 @@ void _halrf_txgapk_iqk_bk_reg_by_mode_8852c
 		
 	halrf_wrf(rf, path, 0xef, 0x00004, 0x0);
 	halrf_wrf(rf, path, 0x0, 0xf0000, 0x3);	
+#ifdef PHL_PLATFORM_AP
+	halrf_wrf(rf, path, 0x5, MASKRF, 0x1);
+#else
 	halrf_wrf(rf, path, 0x5, 0x00001, 0x1);
+#endif
 	
 	
 }
@@ -2017,9 +2066,9 @@ void _halrf_do_reset_tbl_txgapk_8852c(struct rf_info *rf,
 	u32 rf_bkup[TXGAPK_RF_PATH_MAX_8852C][TXGAPK_RF_REG_NUM_8852C] = {{0}};
 
 
-	u32 kip_reg[] = {0x813c, 0x8124, 0x8120, 0xc0d4, 0xc0d8};
+	u32 kip_reg[] = {0x813c, 0x8124, 0x8120, 0xc0c4, 0xc0d4, 0xc0d8,0xc0ec};
 	//u32 bb_reg[] = {0x2344, 0xc0d4, 0xc0d8, 0xc1d4, 0xc1d8};
-	u32 rf_reg[] = {0x5, 0x10005, 0xdf};
+	u32 rf_reg[] = {0x0, 0x5, 0x10005, 0xdf};
 
 
 	RF_DBG(rf, DBG_RF_TXGAPK, "[TXGAPK]======> %s   phy=%d, table_idx = %d, band = %d, ch = %d\n", __func__, phy, rf->gapk.txgapk_table_idx, band, rf->hal_com->band[phy].cur_chandef.center_ch);
@@ -2067,6 +2116,9 @@ void _halrf_do_reset_tbl_txgapk_8852c(struct rf_info *rf,
 	for (path = 0; path < TXGAPK_RF_PATH_MAX_8852C; path++) {
 		_txgapk_reload_kip_8852c(rf, kip_reg, kip_bkup, path, TXGAPK_KIP_REG_NUM_8852C);
 		_txgapk_reload_rf_8852c(rf, rf_reg, rf_bkup, path, TXGAPK_RF_REG_NUM_8852C);
+		#ifdef PHL_PLATFORM_AP
+		halrf_wrf(rf, path, 0x5, MASKRF, 0x1);
+		#endif
 
 		//follow dpk flow
 		_halrf_txgapk_rxagc_onoff_8852c(rf, path, true);
@@ -2089,7 +2141,7 @@ void _halrf_do_non_dbcc_txgapk_8852c(struct rf_info *rf,
 	u32 rf_bkup[TXGAPK_RF_PATH_MAX_8852C][TXGAPK_RF_REG_NUM_8852C] = {{0}};
 
 
-	u32 kip_reg[] = {0x813c, 0x8124, 0x8120, 0xc0d4, 0xc0d8};
+	u32 kip_reg[] = {0x813c, 0x8124, 0x8120, 0xc0c4, 0xc0d4, 0xc0d8,0xc0ec};
 	//u32 bb_reg[] = {0x2344, 0xc0d4, 0xc0d8, 0xc1d4, 0xc1d8};
 	u32 rf_reg[] = {0x0, 0x5, 0x10005, 0xdf};
 
@@ -2106,8 +2158,10 @@ void _halrf_do_non_dbcc_txgapk_8852c(struct rf_info *rf,
 	halrf_write_fwofld_start(rf);	/*FW Offload Start*/
 
 	for (path = 0; path < TXGAPK_RF_PATH_MAX_8852C; path++) {
+		_txgapk_befr_or_aftr_w0x18_8852c(rf, path, true);
 		halrf_wrf(rf, path, 0x18, 0x80000, txgapk_info->txgapk_table_idx);
 		halrf_wrf(rf, path, 0x10018, 0x80000, txgapk_info->txgapk_table_idx);
+		_txgapk_befr_or_aftr_w0x18_8852c(rf, path, false);
 
 		//follow dpk flow
 		_halrf_txgapk_rxagc_onoff_8852c(rf, path, false);
@@ -2120,6 +2174,9 @@ void _halrf_do_non_dbcc_txgapk_8852c(struct rf_info *rf,
 	for (path = 0; path < TXGAPK_RF_PATH_MAX_8852C; path++) {
 		_txgapk_reload_kip_8852c(rf, kip_reg, kip_bkup, path, TXGAPK_KIP_REG_NUM_8852C);
 		_txgapk_reload_rf_8852c(rf, rf_reg, rf_bkup, path, TXGAPK_RF_REG_NUM_8852C);
+		#ifdef PHL_PLATFORM_AP
+		halrf_wrf(rf, path, 0x5, MASKRF, 0x1);
+		#endif
 
 		//follow dpk flow
 		_halrf_txgapk_rxagc_onoff_8852c(rf, path, true);
@@ -2143,8 +2200,10 @@ void _halrf_do_dbcc_txgapk_8852c(struct rf_info *rf,
 	
 	//DBCC use the same table
 	/* 0:table_0, 1:table_1 */
+	_txgapk_befr_or_aftr_w0x18_8852c(rf, path, true);
 	halrf_wrf(rf, path, 0x18, 0x80000, 0);
 	halrf_wrf(rf, path, 0x10018, 0x80000, 0);
+	_txgapk_befr_or_aftr_w0x18_8852c(rf, path, false);
 }
 void _halrf_txgapk_get_ch_info_8852c(struct rf_info *rf, enum phl_phy_idx phy)
 {
@@ -2202,6 +2261,9 @@ void  _halrf_sel_hw_table_txgapk_8852c(struct rf_info *rf, bool is_hw)
 void halrf_do_txgapk_8852c(struct rf_info *rf,
 					enum phl_phy_idx phy)
 {
+	struct halrf_gapk_info *txgapk_info = &rf->gapk;
+	txgapk_info->is_txgapk_ok = true;
+	txgapk_info->r0x8010[0] = halrf_rreg(rf, 0x8010, MASKDWORD);
 #if 0
 	u8 rfe_type = rf->phl_com->dev_cap.rfe_type;
 	
@@ -2215,6 +2277,11 @@ void halrf_do_txgapk_8852c(struct rf_info *rf,
 		return;
 	}
 #endif
+	if ((rf->phl_com->dev_cap.rfe_type == 21) || (rf->phl_com->dev_cap.rfe_type == 22)) {
+		RF_DBG(rf, DBG_RF_TXGAPK, "[TXGAPK]======> %s rfe_type = %d,Not efem or ifem, skip txgapk process\n", __func__, rf->phl_com->dev_cap.rfe_type);
+		return; 
+	}
+		
 
 	_halrf_txgapk_get_ch_info_8852c(rf, phy);
 	
@@ -2222,16 +2289,16 @@ void halrf_do_txgapk_8852c(struct rf_info *rf,
 	RF_DBG(rf, DBG_RF_TXGAPK, "[TXGAPK]======> %s, ref_type=%d, phy=%d, dbcc_en = %d, band = %d, ch = %d\n", __func__, rf->phl_com->dev_cap.rfe_type, phy, rf->hal_com->dbcc_en, 
 		rf->hal_com->band[phy].cur_chandef.band, rf->hal_com->band[phy].cur_chandef.center_ch);
 	RF_DBG(rf, DBG_RF_TXGAPK, "[TXGAPK]======> version = 0x%x\n", TXGAPK_VER_8852C); 
-	RF_DBG(rf, DBG_RF_TXGAPK, "[TXGAPK]======> before GapK process, 0x%x= 0x%x\n", 0x8010, halrf_rreg(rf, 0x8010, MASKDWORD));
-	
+	RF_DBG(rf, DBG_RF_TXGAPK, "[TXGAPK]======> before GapK process, 0x%x= 0x%x\n", 0x8010, txgapk_info->r0x8010[0]);
+
 	
 	if (rf->hal_com->dbcc_en)
 		_halrf_do_dbcc_txgapk_8852c(rf, phy);
 	else
 		_halrf_do_non_dbcc_txgapk_8852c(rf, phy);
 	
-		
-	RF_DBG(rf, DBG_RF_TXGAPK, "[TXGAPK]======> After GapK process, 0x%x= 0x%x\n", 0x8010, halrf_rreg(rf, 0x8010, MASKDWORD));
+	txgapk_info->r0x8010[1] = halrf_rreg(rf, 0x8010, MASKDWORD);	
+	RF_DBG(rf, DBG_RF_TXGAPK, "[TXGAPK]======> After GapK process, 0x%x= 0x%x\n", 0x8010, txgapk_info->r0x8010[1]);
 }
 
 

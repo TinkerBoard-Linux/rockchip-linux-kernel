@@ -109,6 +109,8 @@ void phl_record_wow_stat(struct phl_wow_info *wow_info);
 
 void phl_wow_handle_wake_rsn(struct phl_wow_info *wow_info, u8 *reset);
 
+void phl_set_wowlan(struct phl_wow_info *wow_info, u8 enter);
+
 enum rtw_phl_status phl_wow_init_precfg(struct phl_wow_info *wow_info);
 
 enum rtw_phl_status phl_wow_init_postcfg(struct phl_wow_info *wow_info);
@@ -130,7 +132,7 @@ void phl_wow_func_dis(struct phl_wow_info *wow_info);
 void phl_wow_decide_op_mode(struct phl_wow_info *wow_info, struct rtw_phl_stainfo_t *sta);
 #ifdef CONFIG_POWER_SAVE
 enum rtw_phl_status phl_wow_ps_proto_cfg(struct phl_wow_info *wow_info, bool enter_ps);
-
+void phl_wow_ps_judge_pwr_lvl(struct phl_wow_info *wow_info, bool enter_ps);
 void phl_wow_ps_pwr_ntfy(struct phl_wow_info *wow_info, bool enter_ps);
 
 enum rtw_phl_status phl_wow_ps_pwr_cfg(struct phl_wow_info *wow_info, bool enter_ps);

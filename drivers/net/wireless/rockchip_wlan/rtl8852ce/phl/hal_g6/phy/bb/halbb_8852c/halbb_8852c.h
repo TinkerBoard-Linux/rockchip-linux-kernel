@@ -29,6 +29,7 @@
 #include "../halbb_pmac_setting_ex.h"
 
 struct bb_info;
+void halbb_bfee_en_8852c(struct bb_info *bb, bool csi_en);
 bool halbb_chk_pkg_valid_8852c(struct bb_info *bb, u8 bb_ver, u8 rf_ver);
 void halbb_set_pmac_tx_8852c(struct bb_info *bb, struct halbb_pmac_info *tx_info,
 			     enum phl_phy_idx phy_idx);

@@ -34,6 +34,8 @@
  			Enumeration
     ============================================================
  */
+#include "halbb_bb_wrapper_outsrc.h"
+
 enum mlo0_mode {
 	MLO0_0_PATH  = 0x0,
 	MLO0_1_PATH  = 0x1,
@@ -256,6 +258,26 @@ struct bb_h2c_sig_info {
 #endif
 
 //========== [Outer-Input] ==========//
+enum path_div_en_t {
+	BB_PATH_DIV_DISABLE	= 0,
+	BB_PATH_DIV_ENABLE	= 1/*for auto path selection*/
+};
+
+struct bb_tx_path_en_info {
+	bool max_tx_path_en; /*[Dbg mode] if = 1, set path with MAX_num in all different sts. Path_div will be disabled*/
+	u8 max_tx_ss; /*TXss: phl_com->phy_cap[0].txss*/
+	enum path_div_en_t path_div_en; /*if = 1, logic map control by HALBB path_div algorithm*/
+	enum bb_path bb_path_1sts; /*if (bb_path_1sts == BB_PATH_BCD), means TX 1ss by path B & C & D, simultaneously*/
+	enum bb_path bb_path_2sts;
+	enum bb_path bb_path_3sts;
+	enum bb_path bb_path_4sts;
+};
+
+struct bb_rx_path_en_info {
+	enum bb_path rx_path_en; /*(rx_path_en == BB_PATH_ABCD), means RX by path A & B & C & D, simultaneously*/
+	u8 rx_ss; /*RXss: phl_com->phy_cap[0].rxss*/
+};
+
 struct usr_plcp_gen_in {
 	u8 mcs; //6-bit
 	u16 mpdu_len; //14-bit
@@ -294,7 +316,7 @@ struct halbb_plcp_info {
 	u8 he_mcs_sigb; //3-bit: 0~5
 	u8 he_dcm_sigb; //1-bit
 	u8 he_sigb_compress_en; //1-bit
-	u8 max_tx_time_0p4us; //14-bit
+	u16 max_tx_time_0p4us; //14-bit
 
 	u8 ul_flag; //1-bit
 	u8 tb_ldpc_extra; //1-bit

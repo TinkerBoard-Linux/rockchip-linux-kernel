@@ -59,6 +59,7 @@
 #define GAIN_HIDE_EFUSE_B_6GH_6_8852C 0x586
 #define GAIN_HIDE_EFUSE_B_6GH_7_8852C 0x585
 
+/*@--------------------------[Feature]---------------------------------------*/
 /*@--------------------------[Enum]------------------------------------------*/
 /*@--------------------------[Structure]-------------------------------------*/
 struct bb_h2c_lps_info_8852c {
@@ -140,7 +141,7 @@ bool halbb_spur_location_for_CSI_8852c(struct bb_info *bb, u8 central_ch,
 			       u32 *intf);
 
 bool halbb_ctrl_bw_8852c(struct bb_info *bb, u8 pri_ch, enum channel_width bw,
-			 enum phl_phy_idx phy_idx);
+			 bool is_efem, enum phl_phy_idx phy_idx);
 
 bool halbb_query_cck_en_8852c(struct bb_info *bb, enum phl_phy_idx phy_idx,
 			      u8 func_idx);
@@ -172,7 +173,7 @@ void halbb_tssi_bb_reset_8852c(struct bb_info *bb);
 
 bool halbb_ctrl_sco_cck_8852c(struct bb_info *bb, u8 pri_ch);
 
-bool halbb_adc_cfg_8852c(struct bb_info *bb, enum channel_width bw,
+bool halbb_adc_cfg_8852c(struct bb_info *bb, enum channel_width bw, bool is_efem,
 			 enum rf_path path);
 
 void halbb_ctrl_rf_mode_8852c(struct bb_info *bb,  enum phl_rf_mode mode);
@@ -265,10 +266,11 @@ void halbb_agc_step_en_8852c(struct bb_info *bb, bool pre_pd_agc_en,
 void halbb_get_efuse_ofst_init_8852c(struct bb_info *bb);
 void halbb_get_normal_efuse_init_8852c(struct bb_info *bb);
 void halbb_get_hidden_efuse_init_8852c(struct bb_info *bb);
-void halbb_set_hidden_efuse_8852c(struct bb_info *bb, u8 central_ch, enum band_type band_type, enum rf_path path);
+void halbb_set_hidden_efuse_8852c(struct bb_info *bb, u8 central_ch, enum band_type band_type, bool is_efem, enum rf_path path);
 void halbb_set_normal_efuse_8852c(struct bb_info *bb, u8 central_ch, enum band_type band_type, enum rf_path path);
 void halbb_set_gain_cr_init_8852c(struct bb_info *bb);
-void halbb_set_gain_error_8852c(struct bb_info *bb, u8 central_ch, enum band_type band, enum rf_path path);
+void halbb_set_gain_error_8852c(struct bb_info *bb, u8 central_ch, enum band_type band, bool is_efem, enum rf_path path);
+void halbb_set_rxsc_rpl_comp_8852c(struct bb_info* bb, u8 central_ch, enum band_type band_type);
 void halbb_normal_efuse_verify_8852c(struct bb_info *bb, s8 rx_gain_offset,
 				       enum rf_path rx_path,
 				       enum phl_phy_idx phy_idx);

@@ -42,6 +42,11 @@
 #if MAC_AX_8852D_SUPPORT
 #include "../fw_ax/rtl8852d/hal8852d_fw_log.h"
 #endif
+#if MAC_AX_8852BT_SUPPORT
+#include "../fw_ax/rtl8852bt/hal8852bt_fw_log.h"
+#endif
+
+/*--------------------Define MACRO--------------------------------------*/
 
 #define FWDGB_CFG_OP_SET 0
 #define FWDGB_CFG_OP_CLR 1
@@ -84,9 +89,34 @@
 #define	MAC_DBG_MSG(max_buff_len, used_len, buff_addr, remain_len, fmt, ...)\
 	do {									\
 		u32 *used_len_tmp = &(used_len);				\
+		PLTFM_MUTEX_LOCK(&adapter->fw_dbgcmd.lock);			\
 		if (*used_len_tmp < max_buff_len)				\
 			*used_len_tmp += PLTFM_SNPRINTF(buff_addr, remain_len, fmt, ##__VA_ARGS__);\
+		PLTFM_MUTEX_UNLOCK(&adapter->fw_dbgcmd.lock);			\
 	} while (0)
+
+#define F_MSID_FUNC_NUM_MAX 20
+#define S_MSID_FUNC_NUM_MAX 60
+#define HEAP_DETAIL_C2H_SISE 2012
+
+#define MAC_AX_MP_TEST_CNT_SH   16
+#define MAC_AX_MP_TEST_CNT_MSK 0xffff
+#define MAC_AX_MP_TEST_SEL 0x8
+#define MAC_AX_MP_TEST_PASS BIT(25)
+#define MAC_AX_MP_TEST_FAIL BIT(26)
+
+#define CHK_REG_INTF_USB BIT(0)
+#define CHK_REG_INTF_SDIO BIT(1)
+#define CHK_REG_INTF_PCIE BIT(2)
+
+#define QC_CMD_DLY_MS 200
+#define QC_POLL_DLY_MS 1
+#define QC_POLL_CNT 1000
+
+#define WOW_REQ_RX_PKT_MAX_NUM 32
+#define WOW_REQ_RX_PKT_MAX_SIZE 255
+#define WOW_REQ_RX_PKT_DEF_NUM 8
+#define WOW_REQ_RX_PKT_DEF_SIZE 32
 
 /**
  * @enum mac_hal_cmd_id
@@ -112,6 +142,8 @@
  * @var mac_hal_cmd_id::MAC_MAC_QC_END
  * Please Place Description here.
  */
+
+/*--------------------Define Enum---------------------------------------*/
 enum mac_hal_cmd_id {
 	MAC_HAL_HELP = 0,
 	MAC_MAC_DD_DBG,
@@ -133,6 +165,7 @@ enum mac_hal_cmd_id {
 	MAC_MAC_SET_SER_LVL,
 	MAC_MAC_GET_SER_LVL,
 	MAC_MAC_DL_SYM,
+	MAC_MAC_SELF_DIAG,
 	MAC_MAC_QC_START,
 	MAC_MAC_QC_END,
 	MAC_MAC_REQ_PWR_ST,
@@ -146,7 +179,20 @@ enum mac_hal_cmd_id {
 	MAC_MAC_TRX_INFO_GLOBAL,
 	MAC_MAC_DL_RESULT,
 	MAC_MAC_CURR_WD_CNT,
-	MAC_MAC_PKT_CAL
+	MAC_MAC_PKT_CAL,
+	MAC_MAC_RPT_QUEUE_STS,
+	MAC_MAC_TRG_SER_L0,
+	MAC_MAC_TRG_SER_L1,
+	MAC_MAC_SET_SER_L0_DBG,
+	MAC_MAC_SET_SER_L1_DBG,
+	MAC_MAC_RST_SER_DBG,
+	MAC_MAC_CHK_REG,
+	MAC_MAC_SWTXMODE,
+	MAC_MAC_H2C_MON,
+	MAC_MAC_WDT_LOG,
+	MAC_MAC_DBG_MSG_EN,
+	MAC_TXRPT_DBG,
+	MAC_MAC_WOW_TRI_EVT,
 };
 
 /**
@@ -185,6 +231,7 @@ enum mac_ax_fw_status {
 	FW_STATUS_DBGINFO_REG,
 	FW_STATUS_SERINFO,
 	FW_STATUS_CHSW_TIMING,
+	FW_STATUS_HEAP_DETAIL,
 	FW_STATUS_MAX
 };
 
@@ -301,6 +348,16 @@ enum ISRStatistic {
 	ISRStatistic_MAX = 31
 };
 
+enum mac_diag_level {
+	MAC_DIAG_LEVEL_0 = 0,// Driver quick diag
+	MAC_DIAG_LEVEL_1 = 1,// Driver full diag
+	MAC_DIAG_LEVEL_2 = 2,// IQC quick diag
+	MAC_DIAG_LEVEL_3 = 3, // IQC full diag
+	MAC_DIAG_LEVEL_4 = 4,// SER L2 diag
+	MAC_DIAG_LEVEL_5 = 5// Error Flag diag
+};
+
+/*--------------------Define Struct-------------------------------------*/
 /**
  * @struct mac_hal_cmd_info
  * @brief mac_hal_cmd_info
@@ -380,6 +437,23 @@ struct mem_info {
 };
 
 /**
+ * @struct mem_info
+ * @brief mem_info
+ *
+ * @var mem_info::owner_id
+ * Please Place Description here.
+ * @var mem_info::owner_type
+ * Please Place Description here.
+ * @var mem_info::total_size
+ * Please Place Description here.
+ */
+struct heap_info {
+	u8 msid;
+	u8 group;
+	int total_size;
+};
+
+/**
  * @struct isr_info
  * @brief isr_info
  *
@@ -417,6 +491,7 @@ struct chswofld_timing_info {
 	u32 bb;
 	u32 rf;
 	u32 rf_reld;
+	u32 hal_rst;
 	u32 total;
 };
 
@@ -434,6 +509,12 @@ struct chswofld_timing_info {
 struct halcmd_proc_class {
 	u16 id;
 	u32 (*handler)(struct mac_ax_adapter *adapter, char input[][MAC_MAX_ARGV]);
+};
+
+struct check_reg_info {
+	u32 addr;
+	u32 mask;
+	u8 intf; //bit0:USB, bit1:SDIO, bit2:PCIE
 };
 
 /**
@@ -542,6 +623,17 @@ u32 fw_status_meminfo_fast_handler(struct mac_ax_adapter *adapter, u8 *buf, u32 
  * @retval void
  */
 u32 fw_status_meminfo_slow_handler(struct mac_ax_adapter *adapter, u8 *buf, u32 len);
+
+/**
+ * @brief fw_status_meminfo_all_handler
+ *
+ * @param *adapter
+ * @param *buf
+ * @param *len
+ * @return Please Place Description here.
+ * @retval void
+ */
+u32 fw_status_heap_detail_handler(struct mac_ax_adapter *adapter, u8 *buf, u32 len);
 
 /**
  * @brief fw_status_psinfo_handler
@@ -1022,6 +1114,9 @@ u32 cmd_mac_curr_wd_cnt(struct mac_ax_adapter *adapter, char input[][MAC_MAX_ARG
 u32 cmd_mac_pkt_cal(struct mac_ax_adapter *adapter, char input[][MAC_MAX_ARGV], u32 input_num,
 		    char *output, u32 out_len, u32 *used);
 
+u32 cmd_mac_rpt_queue_sts(struct mac_ax_adapter *adapter, char input[][MAC_MAX_ARGV], u32 input_num,
+			  char *output, u32 out_len, u32 *used);
+
 /**
  * @brief mac_bdinfo_dump
  *
@@ -1030,7 +1125,6 @@ u32 cmd_mac_pkt_cal(struct mac_ax_adapter *adapter, char input[][MAC_MAX_ARGV], 
  * @retval u32
  */
 u32 mac_bdinfo_dump(struct mac_ax_adapter *adapter);
-#endif
 
 /**
  * @brief cmd_mac_dbg_read
@@ -1059,3 +1153,87 @@ u32 cmd_mac_dbg_write(struct mac_ax_adapter *adapter,
 		      char input[][MAC_MAX_ARGV],
 		      u32 input_num,
 		      char *output, u32 out_len, u32 *used);
+/**
+ * @brief cmd_mac_trigger_l0_err
+ *
+ * @param *adapter
+ * @return Please Place Description here.
+ * @retval u32
+ */
+u32 cmd_mac_trigger_l0_err(struct mac_ax_adapter *adapter, char input[][MAC_MAX_ARGV],
+			   u32 input_num, char *output, u32 out_len, u32 *used);
+
+/**
+ * @brief cmd_mac_trigger_l1_err
+ *
+ * @param *adapter
+ * @return Please Place Description here.
+ * @retval u32
+ */
+u32 cmd_mac_trigger_l1_err(struct mac_ax_adapter *adapter, char input[][MAC_MAX_ARGV],
+			   u32 input_num, char *output, u32 out_len, u32 *used);
+
+/**
+ * @brief cmd_mac_set_l0_dbg_mode
+ *
+ * @param *adapter
+ * @return Please Place Description here.
+ * @retval u32
+ */
+u32 cmd_mac_set_l0_dbg_mode(struct mac_ax_adapter *adapter, char input[][MAC_MAX_ARGV],
+			    u32 input_num, char *output, u32 out_len, u32 *used);
+
+/**
+ * @brief cmd_mac_set_l0_dbg_mode
+ *
+ * @param *adapter
+ * @return Please Place Description here.
+ * @retval u32
+ */
+u32 cmd_mac_set_l1_dbg_mode(struct mac_ax_adapter *adapter, char input[][MAC_MAX_ARGV],
+			    u32 input_num, char *output, u32 out_len, u32 *used);
+
+u32 cmd_mac_rst_dbg_mode(struct mac_ax_adapter *adapter, char input[][MAC_MAX_ARGV],
+			 u32 input_num, char *output, u32 out_len, u32 *used);
+
+u32 fw_status_heap_detail_parser(struct mac_ax_adapter *adapter, u8 *buf);
+
+u32 fw_status_heap_detail_search_diff(struct mac_ax_adapter *adapter,
+				      u8 msid, u8 group, int total_size);
+
+u32 cmd_check_reg(struct mac_ax_adapter *adapter, char input[][MAC_MAX_ARGV],
+		  u32 input_num, char *output, u32 out_len, u32 *used);
+
+u32 mac_fw_general_io_test(struct mac_ax_adapter *adapter);
+
+u32 cmd_mac_fw_swtx(struct mac_ax_adapter *adapter, char input[][MAC_MAX_ARGV], u32 input_num,
+		    char *output, u32 out_len, u32 *used);
+
+u32 cmd_h2c_mon(struct mac_ax_adapter *adapter, char input[][MAC_MAX_ARGV],
+		u32 input_num, char *output, u32 out_len, u32 *used);
+
+u32 cmd_mac_wdt_log(struct mac_ax_adapter *adapter, char input[][MAC_MAX_ARGV], u32 input_num,
+		    char *output, u32 out_len, u32 *used);
+
+u32 cmd_mac_dbg_msg_en(struct mac_ax_adapter *adapter, char input[][MAC_MAX_ARGV], u32 input_num,
+		       char *output, u32 out_len, u32 *used);
+
+static void print_qc_result(struct mac_ax_adapter *adapter);
+
+u32 cmd_mac_fw_cap(struct mac_ax_adapter *adapter, char input[][MAC_MAX_ARGV], u32 input_num,
+		   char *output, u32 out_len, u32 *used);
+
+u32 cmd_mac_self_diagnosis(struct mac_ax_adapter *adapter,  char input[][MAC_MAX_ARGV],
+			   u32 input_num, char *output, u32 out_len, u32 *used);
+
+u32 mac_fw_log_cfg(struct mac_ax_adapter *adapter,
+		   struct mac_ax_fw_log *log_cfg);
+
+u32 cmd_dump_txrpt_dbg_info(struct mac_ax_adapter *adapter, char input[][MAC_MAX_ARGV],
+			    u32 input_num, char *output, u32 out_len, u32 *used);
+
+u32 cmd_wow_tri_evt(struct mac_ax_adapter *adapter,
+		    char input[][MAC_MAX_ARGV], u32 input_num, char *output,
+		    u32 out_len, u32 *used);
+#endif
+

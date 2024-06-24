@@ -23,6 +23,7 @@
 #define CHIP_ID_HW_DEF_8851B	0x54
 #define CHIP_ID_HW_DEF_8851E	0x55
 #define CHIP_ID_HW_DEF_8852D	0x56
+#define CHIP_ID_HW_DEF_8852BT	0x57
 #define CHIP_ID_HW_DEF_1115E	0x70
 
 #define PID_HW_DEF_8852AS	0xA852
@@ -36,6 +37,7 @@
 #define PID_HW_DEF_8851BSM	0xB51A
 #define PID_HW_DEF_8851ES	0x851E
 #define PID_HW_DEF_8852DS	0xD852
+#define PID_HW_DEF_8852BTS	0xB925
 #define PID_HW_DEF_1115ES	0x892A
 
 #define SDIO_FN0_CIS_PID	0x1004
@@ -48,7 +50,6 @@ static u8 r8_indir_cmd52_sdio(void *drv_adapter,
 			      struct mac_ax_pltfm_cb *pltfm_cb, u32 adr);
 #endif
 
-#ifndef CONFIG_NEW_HALMAC_INTERFACE
 static u8 chk_pltfm_cb(void *drv_adapter, enum mac_ax_intf intf,
 		       struct mac_ax_pltfm_cb *pltfm_cb)
 {
@@ -82,6 +83,8 @@ static u8 chk_pltfm_cb(void *drv_adapter, enum mac_ax_intf intf,
 	    !pltfm_cb->rtl_memcpy || !pltfm_cb->rtl_memset ||
 	    !pltfm_cb->rtl_delay_us || !pltfm_cb->rtl_delay_ms ||
 	    !pltfm_cb->rtl_sleep_us || !pltfm_cb->rtl_sleep_ms ||
+	    !pltfm_cb->rtl_get_current_times_ms || !pltfm_cb->rtl_get_current_times_us ||
+	    !pltfm_cb->rtl_get_passing_times_ms || !pltfm_cb->rtl_get_passing_times_us ||
 	    !pltfm_cb->rtl_mutex_init || !pltfm_cb->rtl_mutex_deinit ||
 	    !pltfm_cb->rtl_mutex_lock || !pltfm_cb->rtl_mutex_unlock ||
 	    !pltfm_cb->event_notify || !pltfm_cb->get_chip_id) {
@@ -91,7 +94,6 @@ static u8 chk_pltfm_cb(void *drv_adapter, enum mac_ax_intf intf,
 
 	return MACPFCB;
 }
-#endif /*CONFIG_NEW_HALMAC_INTERFACE*/
 
 static u8 chk_pltfm_endian(void)
 {
@@ -106,12 +108,13 @@ static u8 chk_pltfm_endian(void)
 
 static u8 get_analog_info(struct mac_ax_adapter *adapter)
 {
-#if MAC_AX_8852B_SUPPORT || MAC_AX_8851B_SUPPORT
+#if MAC_AX_8852B_SUPPORT || MAC_AX_8851B_SUPPORT || MAC_AX_8852BT_SUPPORT
 	u32 ret;
 	u8 xtal_si_val;
 
 	if (is_chip_id(adapter, MAC_AX_CHIP_ID_8852B) ||
-	    is_chip_id(adapter, MAC_AX_CHIP_ID_8851B)) {
+	    is_chip_id(adapter, MAC_AX_CHIP_ID_8851B) ||
+	    is_chip_id(adapter, MAC_AX_CHIP_ID_8852BT)) {
 		ret = mac_read_xtal_si(adapter, XTAL_SI_CV, &xtal_si_val);
 		if (ret)
 			PLTFM_MSG_ERR("Read XTAL_SI fail!\n");
@@ -123,184 +126,6 @@ static u8 get_analog_info(struct mac_ax_adapter *adapter)
 
 	return MACSUCCESS;
 }
-
-#ifdef CONFIG_NEW_HALMAC_INTERFACE
-#if MAC_AX_SDIO_SUPPORT
-static u8 r8_indir_cmd52_sdio(void *drv_adapter,
-			      struct mac_ax_pltfm_cb *pltfm_cb, u32 adr)
-{
-	u8 tmp;
-	u32 cnt;
-
-	PLTFM_SDIO_CMD52_W8(R_AX_SDIO_INDIRECT_ADDR, (u8)adr);
-	PLTFM_SDIO_CMD52_W8(R_AX_SDIO_INDIRECT_ADDR + 1, (u8)(adr >> 8));
-	PLTFM_SDIO_CMD52_W8(R_AX_SDIO_INDIRECT_ADDR + 2, (u8)(adr >> 16));
-	PLTFM_SDIO_CMD52_W8(R_AX_SDIO_INDIRECT_ADDR + 3,
-			    (u8)((adr | B_AX_INDIRECT_RDY) >> 24));
-	PLTFM_SDIO_CMD52_W8(R_AX_SDIO_INDIRECT_CTRL, (u8)B_AX_INDIRECT_REG_R);
-
-	cnt = SDIO_WAIT_CNT;
-	do {
-		tmp = PLTFM_SDIO_CMD52_R8(R_AX_SDIO_INDIRECT_ADDR + 3);
-		cnt--;
-	} while (((tmp & BIT(7)) == 0) && (cnt > 0));
-
-	if (((tmp & BIT(7)) == 0) && cnt == 0)
-		PLTFM_MSG_ERR("[ERR]sdio indirect CMD52 read\n");
-
-	return PLTFM_SDIO_CMD52_R8(R_AX_SDIO_INDIRECT_DATA);
-}
-
-static u8 get_chip_id_hw_def_sdio(void *drv_adapter,
-				  struct mac_ax_pltfm_cb *pltfm_cb, u32 adr)
-{
-	u16 pid;
-
-	pid = PLTFM_SDIO_CMD52_CIA_R8(SDIO_FN0_CIS_PID) |
-	      (PLTFM_SDIO_CMD52_CIA_R8(SDIO_FN0_CIS_PID + 1) << 8);
-
-	switch (pid) {
-	case PID_HW_DEF_8852AS:
-		return CHIP_ID_HW_DEF_8852A;
-	case PID_HW_DEF_8852BS:
-	case PID_HW_DEF_8852BSA:
-	case PID_HW_DEF_8851ASA:
-	case PID_HW_DEF_8852BPS:
-		return CHIP_ID_HW_DEF_8852B;
-	case PID_HW_DEF_8852CS:
-		return CHIP_ID_HW_DEF_8852C;
-	case PID_HW_DEF_8192XBS:
-		return CHIP_ID_HW_DEF_8192XB;
-	case PID_HW_DEF_8851BS:
-	case PID_HW_DEF_8851BSM:
-		return CHIP_ID_HW_DEF_8851B;
-	case PID_HW_DEF_8851ES:
-		return CHIP_ID_HW_DEF_8851E;
-	case PID_HW_DEF_8852DS:
-		return CHIP_ID_HW_DEF_8852D;
-	case PID_HW_DEF_1115ES:
-		return CHIP_ID_HW_DEF_1115E;
-	default:
-		PLTFM_MSG_WARN("[WARN]read sdio local PID fail\n");
-		break;
-	}
-
-	return r8_dir_cmd52_sdio(drv_adapter, adr);
-}
-
-#endif
-static bool chk_get_chip_info(u8 chip_id, u8 cv)
-{
-	switch (chip_id) {
-	case MAC_AX_CHIP_ID_8852A:
-		switch (cv) {
-		case CAV:
-			return PATCH_ENABLE;
-		case CBV:
-			return PATCH_ENABLE;
-		case CCV:
-			return PATCH_DISABLE;
-		case CDV:
-			//fall through
-		default:
-			return PATCH_DISABLE;
-	}
-	default:
-		return PATCH_DISABLE;
-	}
-}
-
-static u32 get_chip_info(struct mac_ax_adapter *adapter,
-			 struct mac_ax_pltfm_cb *pltfm_cb,
-			 enum mac_ax_intf intf, u8 *id, u8 *cv)
-{
-	u32 cv_temp;
-	u8 cur_id;
-	u32 ret;
-
-	if (!cv || !id)
-		return MACNPTR;
-
-	switch (intf) {
-#if MAC_AX_SDIO_SUPPORT
-	case MAC_AX_INTF_SDIO:
-		cur_id = r8_indir_cmd52_sdio(adapter, R_AX_SYS_CHIPINFO);
-		*cv = r8_indir_cmd52_sdio(adapter, R_AX_SYS_CFG1 + 1) >> 4;
-		break;
-#endif
-#if (MAC_AX_USB_SUPPORT || MAC_AX_PCIE_SUPPORT)
-	case MAC_AX_INTF_USB:
-	case MAC_AX_INTF_PCIE:
-		cur_id = PLTFM_REG_R8(R_AX_SYS_CHIPINFO);
-		*cv = PLTFM_REG_R8(R_AX_SYS_CFG1 + 1) >> 4;
-
-		if (chk_get_chip_info(cur_id, *cv) == PATCH_ENABLE) {
-			cv_temp = PLTFM_REG_R32(R_AX_GPIO0_7_FUNC_SEL);
-			if (cv_temp == 0xdeadbeef)
-				*cv = CAV;
-			else
-				*cv = CBV;
-		}
-		break;
-#endif
-	default:
-		return MACINTF;
-	}
-
-	ret = xlat_chip_id(cur_id, id);
-	if (ret != MACSUCCESS)
-		return ret;
-
-	return MACSUCCESS;
-}
-
-u32 mac_ax_ops_init_v1(void *phl_adapter, void *drv_adapter,
-		       enum rtw_chip_id chip_id,
-		       enum rtw_hci_type hci,
-		       struct mac_ax_adapter **mac_adapter,
-		       struct mac_ax_ops **mac_ops)
-{
-	u32 ret;
-	u8 cv;
-	struct mac_ax_adapter *adapter;
-	enum mac_ax_intf intf = MAC_AX_INTF_INVALID;
-
-	if (!chk_pltfm_endian())
-		return MACPFED;
-
-	ret = 0;
-
-	if (hci == RTW_HCI_PCIE)
-		intf = MAC_AX_INTF_PCIE;
-	else if (hci == RTW_HCI_USB)
-		intf = MAC_AX_INTF_USB;
-	else if (hci == RTW_HCI_SDIO)
-		intf = MAC_AX_INTF_SDIO;
-
-	ret = get_chip_info(drv_adapter, NULL, intf, &chip_id, &cv);
-	if (ret)
-		return ret;
-
-	adapter = get_mac_ax_adapter(intf, chip_id, cv, phl_adapter,
-				     drv_adapter, NULL);
-	if (!adapter) {
-		PLTFM_MSG_PRINT("[ERR]Get MAC adapter\n");
-		return MACADAPTER;
-	}
-	PLTFM_MSG_ALWAYS("MAC_AX_MAJOR_VER = %d\n"
-			    "MAC_AX_PROTOTYPE_VER = %d\n"
-			    "MAC_AX_SUB_VER = %d\n"
-			    "MAC_AX_SUB_INDEX = %d\n",
-			    MAC_AX_MAJOR_VER, MAC_AX_PROTOTYPE_VER,
-			    MAC_AX_SUB_VER, MAC_AX_SUB_INDEX);
-
-	*mac_adapter = adapter;
-	*mac_ops = adapter->ops;
-
-	return MACSUCCESS;
-}
-
-#else
 
 #if MAC_AX_SDIO_SUPPORT
 static u8 r8_indir_cmd52_sdio(void *drv_adapter,
@@ -383,6 +208,8 @@ static u8 get_chip_id_hw_def_sdio(void *drv_adapter,
 		return CHIP_ID_HW_DEF_8852D;
 	case PID_HW_DEF_1115ES:
 		return CHIP_ID_HW_DEF_1115E;
+	case PID_HW_DEF_8852BTS:
+		return CHIP_ID_HW_DEF_8852BT;
 	default:
 		break;
 	}
@@ -490,6 +317,15 @@ u32 mac_ax_ops_init(void *drv_adapter, struct mac_ax_pltfm_cb *pltfm_cb,
 	*mac_adapter = adapter;
 	*mac_ops = adapter->ops;
 
+#if MAC_AX_SDIO_SUPPORT
+	/* should call halmac IO API before SDIO tbl (mutex) init*/
+	ret = sdio_tbl_init(adapter);
+	if (ret != MACSUCCESS) {
+		PLTFM_MSG_ERR("[ERR]sdio tbl init %d\n", ret);
+		return ret;
+	}
+#endif
+
 #if MAC_AX_FEATURE_HV
 	adapter->hv_ops = get_hv_ax_ops(adapter);
 #endif
@@ -511,15 +347,19 @@ u32 mac_ax_ops_init(void *drv_adapter, struct mac_ax_pltfm_cb *pltfm_cb,
 	}
 
 	p_ops = adapter_to_priv_ops(adapter);
+	if (!p_ops) {
+		PLTFM_MSG_ERR("%s p_ops alloc failed\n", __func__);
+		return MACBUFALLOC;
+	}
 	ret = p_ops->sec_info_tbl_init(adapter);
 	if (ret != MACSUCCESS) {
 		PLTFM_MSG_ERR("[ERR]sec info tbl init %d\n", ret);
 		return ret;
 	}
 
-	ret = efuse_tbl_init(adapter);
+	ret = efuse_info_init(adapter);
 	if (ret != MACSUCCESS) {
-		PLTFM_MSG_ERR("[ERR]efuse tbl init %d\n", ret);
+		PLTFM_MSG_ERR("[ERR]efuse info init %d\n", ret);
 		return ret;
 	}
 
@@ -540,14 +380,6 @@ u32 mac_ax_ops_init(void *drv_adapter, struct mac_ax_pltfm_cb *pltfm_cb,
 		PLTFM_MSG_ERR("[ERR]mix info init %d\n", ret);
 		return ret;
 	}
-
-#if MAC_AX_SDIO_SUPPORT
-	ret = sdio_tbl_init(adapter);
-	if (ret != MACSUCCESS) {
-		PLTFM_MSG_ERR("[ERR]sdio tbl init %d\n", ret);
-		return ret;
-	}
-#endif
 
 	ret = hfc_info_init(adapter);
 	if (ret != MACSUCCESS) {
@@ -575,7 +407,6 @@ u32 mac_ax_ops_init(void *drv_adapter, struct mac_ax_pltfm_cb *pltfm_cb,
 
 	return MACSUCCESS;
 }
-#endif /*CONFIG_NEW_HALMAC_INTERFACE*/
 
 #if MAC_AX_PHL_H2C
 u32 mac_ax_phl_init(void *phl_adapter, struct mac_ax_adapter *mac_adapter)
@@ -590,11 +421,8 @@ u32 mac_ax_phl_init(void *phl_adapter, struct mac_ax_adapter *mac_adapter)
 u32 mac_ax_ops_exit(struct mac_ax_adapter *adapter)
 {
 	u32 ret;
-	struct mac_ax_efuse_param *efuse_param = &adapter->efuse_param;
 	struct mac_ax_priv_ops *p_ops = adapter_to_priv_ops(adapter);
 	struct mac_ax_cmd_ofld_info *ofld_info = &adapter->cmd_ofld_info;
-	struct mac_ax_efuse_ofld_info *efuse_ofld_info = &adapter->efuse_ofld_info;
-	struct mac_ax_hw_info *hw_info = adapter->hw_info;
 	struct scan_chinfo_list *scan_list;
 	u32 priv_size;
 	u8 band_idx;
@@ -610,11 +438,6 @@ u32 mac_ax_ops_exit(struct mac_ax_adapter *adapter)
 		ofld_info->buf = NULL;
 	}
 
-	if (efuse_ofld_info->buf) {
-		PLTFM_FREE(efuse_ofld_info->buf, hw_info->dav_log_efuse_size);
-		efuse_ofld_info->buf = NULL;
-	}
-
 	ret = p_ops->free_sec_info_tbl(adapter);
 	if (ret != MACSUCCESS) {
 		PLTFM_MSG_ERR("[ERR]sec table exit %d\n", ret);
@@ -627,9 +450,9 @@ u32 mac_ax_ops_exit(struct mac_ax_adapter *adapter)
 		return ret;
 	}
 
-	ret = efuse_tbl_exit(adapter);
+	ret = efuse_info_exit(adapter);
 	if (ret != MACSUCCESS) {
-		PLTFM_MSG_ERR("[ERR]efuse table exit %d\n", ret);
+		PLTFM_MSG_ERR("[ERR]efuse info exit %d\n", ret);
 		return ret;
 	}
 
@@ -677,48 +500,6 @@ u32 mac_ax_ops_exit(struct mac_ax_adapter *adapter)
 		return ret;
 	}
 
-	if (efuse_param->efuse_map) {
-		PLTFM_FREE(efuse_param->efuse_map,
-			   adapter->hw_info->efuse_size);
-		efuse_param->efuse_map = (u8 *)NULL;
-	}
-
-	if (efuse_param->bt_efuse_map) {
-		PLTFM_FREE(efuse_param->bt_efuse_map,
-			   adapter->hw_info->bt_efuse_size);
-		efuse_param->bt_efuse_map = (u8 *)NULL;
-	}
-
-	if (efuse_param->log_efuse_map) {
-		PLTFM_FREE(efuse_param->log_efuse_map,
-			   adapter->hw_info->log_efuse_size);
-		efuse_param->log_efuse_map = (u8 *)NULL;
-	}
-
-	if (efuse_param->bt_log_efuse_map) {
-		PLTFM_FREE(efuse_param->bt_log_efuse_map,
-			   adapter->hw_info->bt_log_efuse_size);
-		efuse_param->bt_log_efuse_map = (u8 *)NULL;
-	}
-
-	if (efuse_param->dav_efuse_map) {
-		PLTFM_FREE(efuse_param->dav_efuse_map,
-			   adapter->hw_info->dav_efuse_size);
-		efuse_param->dav_efuse_map = (u8 *)NULL;
-	}
-
-	if (efuse_param->dav_log_efuse_map) {
-		PLTFM_FREE(efuse_param->dav_log_efuse_map,
-			   adapter->hw_info->dav_log_efuse_size);
-		efuse_param->dav_log_efuse_map = (u8 *)NULL;
-	}
-
-	if (efuse_param->hidden_rf_map) {
-		PLTFM_FREE(efuse_param->hidden_rf_map,
-			   adapter->hw_info->hidden_efuse_rf_size);
-		efuse_param->hidden_rf_map = (u8 *)NULL;
-	}
-
 	for (band_idx = 0; band_idx < MAC_AX_BAND_NUM; band_idx++) {
 		scan_list = adapter->scanofld_info.list[band_idx];
 		if (scan_list) {
@@ -749,27 +530,46 @@ u32 is_cv(struct mac_ax_adapter *adapter, enum rtw_cv cv)
 u32 xlat_chip_id(u8 hw_id, u8 *chip_id)
 {
 	switch (hw_id) {
+#if MAC_AX_8852A_SUPPORT
 	case CHIP_ID_HW_DEF_8852A:
 		*chip_id = MAC_AX_CHIP_ID_8852A;
 		break;
+#endif
+#if MAC_AX_8852B_SUPPORT
 	case CHIP_ID_HW_DEF_8852B:
 		*chip_id = MAC_AX_CHIP_ID_8852B;
 		break;
+#endif
+#if MAC_AX_8852C_SUPPORT
 	case CHIP_ID_HW_DEF_8852C:
 		*chip_id = MAC_AX_CHIP_ID_8852C;
 		break;
+#endif
+#if MAC_AX_8192XB_SUPPORT
 	case CHIP_ID_HW_DEF_8192XB:
 		*chip_id = MAC_AX_CHIP_ID_8192XB;
 		break;
+#endif
+#if MAC_AX_8851B_SUPPORT
 	case CHIP_ID_HW_DEF_8851B:
 		*chip_id = MAC_AX_CHIP_ID_8851B;
 		break;
+#endif
+#if MAC_AX_8851E_SUPPORT
 	case CHIP_ID_HW_DEF_8851E:
 		*chip_id = MAC_AX_CHIP_ID_8851E;
 		break;
+#endif
+#if MAC_AX_8852D_SUPPORT
 	case CHIP_ID_HW_DEF_8852D:
 		*chip_id = MAC_AX_CHIP_ID_8852D;
 		break;
+#endif
+#if MAC_AX_8852BT_SUPPORT
+	case CHIP_ID_HW_DEF_8852BT:
+		*chip_id = MAC_AX_CHIP_ID_8852BT;
+		break;
+#endif
 	default:
 		*chip_id = MAC_AX_CHIP_ID_INVALID;
 		return MACCHIPID;
@@ -778,3 +578,31 @@ u32 xlat_chip_id(u8 hw_id, u8 *chip_id)
 	return MACSUCCESS;
 }
 
+#if MAC_AX_CONSOLE_EN
+void mac_console_log(void *vadapter, s8 *prefix, s8 *fmt, ...)
+{
+	struct mac_ax_adapter *adapter = (struct mac_ax_adapter *)vadapter;
+	char *output_tmp = adapter->fw_dbgcmd.buf;
+	u32 output_len_tmp = adapter->fw_dbgcmd.out_len;
+	u32 *used_tmp = &adapter->fw_dbgcmd.used;
+	va_list	args;
+
+	if (adapter->fw_dbgcmd.dbg_console_log_on) {
+		PLTFM_MUTEX_LOCK(&adapter->fw_dbgcmd.lock);
+		if (*used_tmp < output_len_tmp)
+			*used_tmp += PLTFM_SNPRINTF(output_tmp + *used_tmp,
+						    output_len_tmp - *used_tmp, prefix);
+		if (*used_tmp < output_len_tmp) {
+			va_start(args, fmt);
+			*used_tmp += PLTFM_VSNPRINTF(output_tmp + *used_tmp,
+						     output_len_tmp - *used_tmp, fmt, args);
+			va_end(args);
+		}
+		PLTFM_MUTEX_UNLOCK(&adapter->fw_dbgcmd.lock);
+	}
+}
+#else
+void mac_console_log(void *vadapter, s8 *prefix, s8 *fmt, ...)
+{
+}
+#endif /* MAC_AX_CONSOLE_EN */

@@ -274,6 +274,25 @@ u8 mp_start(void *priv)
 	return (u8)phl_status;
 }
 
+void _mp_check_fg_cmd_empty(struct mp_context *mp_ctx)
+{
+	struct phl_info_t *phl_info = mp_ctx->phl;
+	void *drv = phl_to_drvpriv(phl_info);
+	u16 cnt = 0;
+	u16 timeout = 500;
+	u16 sleep_step = 10;
+
+	do {
+		if (phl_disp_eng_is_fg_empty(phl_info, HW_BAND_MAX))
+			break;
+		_os_sleep_ms(drv, sleep_step);
+		cnt++;
+	} while (cnt < timeout);
+	PHL_INFO("%s : fg cmd is %s\n", __FUNCTION__,
+		phl_disp_eng_is_fg_empty(phl_info, HW_BAND_MAX) ? "completed" : "not completed");
+	PHL_INFO("%s : wait for fg cmd %d ms\n", __FUNCTION__, cnt*sleep_step);
+}
+
 void mp_change_mode(struct mp_context *mp_ctx, enum rtw_drv_mode driver_mode)
 {
 	struct phl_info_t *phl_info = mp_ctx->phl;
@@ -292,6 +311,7 @@ void mp_change_mode(struct mp_context *mp_ctx, enum rtw_drv_mode driver_mode)
 #endif
 
 	if(true == phl_is_mp_mode(phl_info->phl_com)) {
+		_mp_check_fg_cmd_empty(mp_ctx);
 
 		/* Load bt map to shadow map */
 		rtw_hal_mp_efuse_bt_shadow_reload(mp_ctx);
@@ -300,8 +320,6 @@ void mp_change_mode(struct mp_context *mp_ctx, enum rtw_drv_mode driver_mode)
 		#ifdef RTW_WKARD_AP_MP
 		rtw_hal_bb_rx_ndp_mp(mp_ctx->hal);
 		/* RSSI flow process under MP mode */
-		rtw_hal_bb_dm_init_mp(mp_ctx->hal);
-		rtw_hal_rf_dm_init_mp(mp_ctx->hal);
 		rtw_hal_mac_set_rxfltr_mp_mode(hal_info, 0, 0x1c00);
 		#endif
 	}
@@ -333,6 +351,10 @@ enum rtw_phl_status phl_test_mp_alloc(struct phl_info_t *phl_info, void *hal, vo
 	mp_ctx->phl_com = phl_com;
 	mp_ctx->hal = hal;
 	mp_ctx->status = MP_STATUS_INIT;
+#ifdef CONFIG_POWER_SAVE
+	mp_ctx->cur_pwr_lvl = PS_PWR_LVL_PWRON;
+	mp_ctx->ps_macid = PS_MACID_NONE;
+#endif
 	*mp = mp_ctx;
 	phl_status = RTW_PHL_STATUS_SUCCESS;
 

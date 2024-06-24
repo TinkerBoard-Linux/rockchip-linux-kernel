@@ -70,13 +70,13 @@ static struct mac_ax_dle_dfi_info dle_dfi_wde_quemgn_nxtpkt = {
 
 static struct mac_ax_dle_dfi_info dle_dfi_wde_quemgn_qlnktbl = {
 	0,
-	0x453,
+	0x4A7,
 	1
 };
 
 static struct mac_ax_dle_dfi_info dle_dfi_wde_quemgn_qempty = {
 	0,
-	0x11,
+	0x12,
 	1
 };
 

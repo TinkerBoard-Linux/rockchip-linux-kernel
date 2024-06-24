@@ -20,7 +20,7 @@
 #include "../../mac_def.h"
 #if MAC_AX_8852C_SUPPORT
 
-#define PWR_SEQ_VER_8852C  8
+#define PWR_SEQ_VER_8852C  9
 
 u32 mac_pwr_on_sdio_8852c(struct mac_ax_adapter *adapter);
 u32 mac_pwr_on_usb_8852c(struct mac_ax_adapter *adapter);

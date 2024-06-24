@@ -28,14 +28,14 @@
 
 #ifdef RF_8852C_SUPPORT
 
-#define TXGAPK_VER_8852C 0x0e
+#define TXGAPK_VER_8852C 0x18
 #define TXGAPK_NCTL_FINAL_LINE_8852C 0x8000
 
 
 #define TXGAPK_DBG 0
 /*--------------------------Define Parameters-------------------------------*/
 
-#define TXGAPK_KIP_REG_NUM_8852C 5
+#define TXGAPK_KIP_REG_NUM_8852C 7
 #define TXGAPK_BB_REG_NUM_8852C 5
 #define TXGAPK_RF_REG_NUM_8852C 4
 

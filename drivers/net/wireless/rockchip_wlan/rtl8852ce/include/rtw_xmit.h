@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2007 - 2021 Realtek Corporation.
+ * Copyright(c) 2007 - 2023 Realtek Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -325,6 +325,7 @@ struct pkt_attrib {
 
 //WLAN HDR
 	u16	hdrlen;		/* the WLAN Header Len */
+	u8	a4_hdr;
 	u8	type;
 	u8	subtype;
 	u8	qos_en;
@@ -392,6 +393,9 @@ struct pkt_attrib {
 	u8	sgi;/* short GI */
 	u8	ampdu_spacing; /* ampdu_min_spacing for peer sta's rx */
 	u8	amsdu_ampdu_en;/* tx amsdu in ampdu enable */
+#ifdef CONFIG_TX_AMSDU
+	u8	tx_amsdu_en;/* tx amsdu enable */
+#endif
 	u8	pctrl;/* per packet txdesc control enable */
 	u8	triggered;/* for ap mode handling Power Saving sta */
 	/*u8	qsel;*/
@@ -586,6 +590,7 @@ struct  submit_ctx {
 	systime submit_time; /* */
 	u32 timeout_ms; /* <0: not synchronous, 0: wait forever, >0: up to ms waiting */
 	int status; /* status for operation */
+	void *rsp; /* rsp buffer allocated by handler */
 	_completion done;
 };
 
@@ -687,8 +692,8 @@ struct xmit_txreq_buf {
 	u8 *pkt[MAX_TXSC_SKB_NUM];
 	u8 pkt_cnt;
 	_adapter *adapter;
-	u8 macid;
-	u8 txsc_id;
+	u16 macid;
+	u16 txsc_id;
 #endif
 };
 
@@ -827,6 +832,7 @@ struct	xmit_priv	{
 	u8 *pxmit_frame_buf;
 	uint free_xmitframe_cnt;
 	_queue	free_xmit_queue;
+	uint full_xmitframe_cnt;
 
 	/* uint mapping_addr; */
 	/* uint pkt_sz; */
@@ -876,13 +882,13 @@ struct	xmit_priv	{
 	int bkq_cnt;
 	int viq_cnt;
 	int voq_cnt;
+#endif
 
 #ifdef PRIVATE_R
-	u64 tx_be_drop_cnt;
-	u64 tx_bk_drop_cnt;
-	u64 tx_vi_drop_cnt;
-	u64 tx_vo_drop_cnt;
-#endif
+        u64 tx_be_drop_cnt;
+        u64 tx_bk_drop_cnt;
+        u64 tx_vi_drop_cnt;
+        u64 tx_vo_drop_cnt;
 #endif
 
 #ifdef CONFIG_PCI_HCI
@@ -890,7 +896,11 @@ struct	xmit_priv	{
 	struct rtw_tx_ring	tx_ring[PCI_MAX_TX_QUEUE_COUNT];
 	int	txringcount[PCI_MAX_TX_QUEUE_COUNT];
 	u8 	beaconDMAing;		/* flag of indicating beacon is transmiting to HW by DMA */
+#ifdef CONFIG_RTW_TX_AMSDU_USE_WQ
+	_workitem_cpu xmit_workitem;
+#else
 	_tasklet xmit_tasklet;
+#endif
 #endif
 
 #if defined(CONFIG_SDIO_HCI) || defined(CONFIG_GSPI_HCI)
@@ -973,14 +983,24 @@ struct	xmit_priv	{
 #ifdef CONFIG_CORE_TXSC
 	_lock txsc_lock;
 	u8 txsc_enable;
-	u8 txsc_debug_mode;
-	u8 txsc_debug_mask;/* BIT0:core txsc(no use), BIT1: phl txsc enable, BIT2: debug_print */
-
 	struct sta_info *ptxsc_sta_cached;
+#ifdef CONFIG_TXSC_AMSDU
+	u8 txsc_amsdu_enable;
+	u8 txsc_amsdu_force_num;
+	u64 cnt_txsc_amsdu_enq[4];
+	u64 cnt_txsc_amsdu_enq_abort[4];
+	u64 cnt_txsc_amsdu_deq[4];
+	u64 cnt_txsc_amsdu_dump[MAX_TXSC_SKB_NUM + 1];
+	u64 cnt_txsc_amsdu_deq_empty;
 
-	/* for debug */
-	u32 txsc_phl_err_cnt1;
-	u32 txsc_phl_err_cnt2;
+	u64 cnt_txsc_amsdu_enq_ps;
+	u64 cnt_txsc_amsdu_deq_ps;
+
+	u64 cnt_txsc_amsdu_timeout_dump[MAX_TXSC_SKB_NUM + 1];
+	u64 cnt_txsc_amsdu_timeout_deq_empty;
+	u64 cnt_txsc_amsdu_timeout_ok[4];
+	u64 cnt_txsc_amsdu_timeout_fail[4];
+#endif /* CONFIG_TXSC_AMSDU */
 #endif /* CONFIG_CORE_TXSC */
 };
 
@@ -996,6 +1016,7 @@ extern s32 rtw_free_xmitbuf_ext(struct xmit_priv *pxmitpriv, struct xmit_buf *px
 extern struct xmit_buf *rtw_alloc_xmitbuf(struct xmit_priv *pxmitpriv);
 extern s32 rtw_free_xmitbuf(struct xmit_priv *pxmitpriv, struct xmit_buf *pxmitbuf);
 #endif
+enum rtw_data_rate _rate_mrate2phl(enum MGN_RATE mrate);
 void rtw_count_tx_stats(_adapter *padapter, struct xmit_frame *pxmitframe, int sz);
 extern void rtw_update_protection(_adapter *padapter, u8 *ie, uint ie_len);
 
@@ -1046,9 +1067,6 @@ void rtw_free_hwxmits(_adapter *padapter);
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 24))
 s32 rtw_monitor_xmit_entry(struct sk_buff *skb, struct net_device *ndev);
 #endif
-void rtw_xmit_dequeue_callback(_workitem *work);
-void rtw_xmit_queue_set(struct sta_info *sta);
-void rtw_xmit_queue_clear(struct sta_info *sta);
 s32 rtw_xmit_posthandle(_adapter *padapter, struct xmit_frame *pxmitframe, struct sk_buff *pkt);
 s32 rtw_xmit(_adapter *padapter, struct sk_buff **pkt, u16 os_qid);
 bool xmitframe_hiq_filter(struct xmit_frame *xmitframe);
@@ -1060,10 +1078,19 @@ void xmit_delivery_enabled_frames(_adapter *padapter, struct sta_info *psta);
 #endif
 
 #ifdef RTW_PHL_TX
+void dbg_dump_txreq_mdata(struct rtw_t_meta_data *mdata, const char *func);
 s32 core_tx_prepare_phl(_adapter *padapter, struct xmit_frame *pxframe);
 s32 core_tx_call_phl(_adapter *padapter, struct xmit_frame *pxframe, void *txsc_pkt);
+#ifdef CONFIG_CORE_TXSC
+struct txsc_pkt_entry;
+s32 core_tx_per_packet_sc(_adapter *padapter, struct xmit_frame *pxframe,
+		       struct sk_buff **pskb, struct sta_info *psta,
+		       struct txsc_pkt_entry *ptxsc_pkt);
+#define core_tx_per_packet(a,f,sk,s) core_tx_per_packet_sc(a,f,sk,s,NULL)
+#else
 s32 core_tx_per_packet(_adapter *padapter, struct xmit_frame *pxframe,
 		       struct sk_buff **pskb, struct sta_info *psta);
+#endif
 s32 rtw_core_tx(_adapter *padapter, struct sk_buff **ppkt, struct sta_info *psta, u16 os_qid);
 enum rtw_phl_status rtw_core_tx_recycle(void *drv_priv, struct rtw_xmit_req *txreq);
 s32 core_tx_alloc_xmitframe(_adapter *padapter, struct xmit_frame **pxmitframe, u16 os_qid);
@@ -1080,7 +1107,7 @@ u8 tos_to_up(u8 tos);
 #endif
 #endif
 
-void core_tx_amsdu_tasklet(_adapter *padapter);
+void core_tx_amsdu_handler(unsigned long priv);
 
 u8 rtw_get_tx_bw_mode(_adapter *adapter, struct sta_info *sta);
 
@@ -1116,9 +1143,13 @@ extern void rtw_amsdu_cancel_timer(_adapter *padapter, u8 priority);
 
 extern s32 rtw_xmitframe_coalesce_amsdu(_adapter *padapter, struct xmit_frame *pxmitframe, struct xmit_frame *pxmitframe_queue);
 extern s32 check_amsdu(struct xmit_frame *pxmitframe);
-extern s32 check_amsdu_tx_support(_adapter *padapter);
+extern s32 check_amsdu_tx_support(_adapter *padapter, struct pkt_attrib *pattrib);
 extern struct xmit_frame *rtw_get_xframe(struct xmit_priv *pxmitpriv, int *num_frame);
 #endif
+
+void fill_txreq_list_skb(_adapter *padapter,
+		struct rtw_xmit_req *txreq, struct rtw_pkt_buf_list **pkt_list,
+		struct sk_buff *head_skb, u32 req_sz, s32 offset);
 
 #ifdef DBG_TXBD_DESC_DUMP
 void rtw_tx_desc_backup(_adapter *padapter, struct xmit_frame *pxmitframe, u8 desc_size, u8 hwq);

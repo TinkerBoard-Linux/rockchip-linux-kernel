@@ -37,6 +37,7 @@
 #define LA_CLK_EN_M 	0x1 /*Just for dbg, will be removed*/
 
 #define FRC_PRINT_LINE 0xffffffff
+#define REG_DUMP_HISTORY_NUM 20
 
 #ifdef HALBB_DBG_TRACE_SUPPORT
 	#ifdef HALBB_DBCC_SUPPORT
@@ -162,6 +163,25 @@ enum bb_basic_dbg_info
 	BB_BASIC_DBG_09_DM_SUMMARY	= BIT9
 };
 
+enum FWBB_DBG_NUM {
+	BBDBG_NUM_RA_WRITE_CMAC_0 = 0,
+	BBDBG_NUM_RA_RATE_CHANGED_1 = 1,
+	BBDBG_NUM_RA_CAL_PARA_2 = 2,
+	BBDBG_NUM_RA_D_O_PARA_3 = 3,
+	BBDBG_NUM_RA_UP_DOWN_TH_4 = 4,
+	BBDBG_NUM_RA_TRY_RESULT_5 = 5,
+	BBDBG_NUM_RA_RATE_DOWN_6 = 6,
+	BBDBG_NUM_RA_RATE_FORCE_DOWN_7 = 7,
+	BBDBG_NUM_RA_RATE_UP_8 = 8,
+	BBDBG_NUM_RA_RATE_STAY_9 = 9
+};
+
+enum bb_dbg_bbcr_cnt_t {
+	BB_CR_CNT_DISABLE = 0,
+	BB_CR_CNT_ENABLE_ACCUMULATE = 1,
+	BB_CR_CNT_ENABLE_RESET = 2,
+};
+
 /*@--------------------------[Structure]-------------------------------------*/
 struct bb_dbg_cr_info {
 	u32 dbgport_ip;
@@ -184,7 +204,8 @@ struct bb_dbg_cr_info {
 	u32 bb_monitor1_m;
 	u32 mac_phy_intf_sel_phy1;
 	u32 mac_phy_intf_sel_phy1_m;
-	u32 mac_phy_txinfo[4];
+	u32 mac_phy_txinfo[6];
+	u32 mac_phy_txt2rct[2];
 	u32 mac_phy_txcomct[2];
 	u32 mac_phy_txusrct[4][2];
 	u32 mac_phy_txtimct;
@@ -192,15 +213,75 @@ struct bb_dbg_cr_info {
 	u32 mac_phy_siga_0;
 	u32 mac_phy_siga_1;
 	u32 mac_phy_vht_sigb_0;
+	u32 mac_phy_usig_1;
+	u32 mac_phy_usig_2;
 	u32 path_0_txpw;
 	u32 path_0_txpw_m;
 	u32 path_1_txpw;
 	u32 path_1_txpw_m;
+	u32 bmode_tx;
+
+	/*AGC cr*/
+	u32 agc_en_path[HALBB_MAX_PATH];
+	u32 agc_en_path_m[HALBB_MAX_PATH];
+	u32 lna_idx_init_path[HALBB_MAX_PATH];
+	u32 lna_idx_init_path_m[HALBB_MAX_PATH];
+	u32 tia_idx_init_path[HALBB_MAX_PATH];
+	u32 tia_idx_init_path_m[HALBB_MAX_PATH];
+	u32 rxbb_idx_init_path[HALBB_MAX_PATH];
+	u32 rxbb_idx_init_path_m[HALBB_MAX_PATH];
+	u32 tia_shrink_en_path[HALBB_MAX_PATH];
+	u32 tia_shrink_en_path_m[HALBB_MAX_PATH];
+	u32 tia_shrink_init_path[HALBB_MAX_PATH];
+	u32 tia_shrink_init_path_m[HALBB_MAX_PATH];
+	u32 elna_idx_pre_agc_rdy_path[HALBB_MAX_PATH];
+	u32 elna_idx_pre_agc_rdy_path_m[HALBB_MAX_PATH];
+	u32 lna_idx_pre_agc_rdy_path[HALBB_MAX_PATH];
+	u32 lna_idx_pre_agc_rdy_path_m[HALBB_MAX_PATH];
+	u32 tia_idx_pre_agc_rdy_path[HALBB_MAX_PATH];
+	u32 tia_idx_pre_agc_rdy_path_m[HALBB_MAX_PATH];
+	u32 tia_shrink_pre_agc_rdy_path[HALBB_MAX_PATH];
+	u32 tia_shrink_pre_agc_rdy_path_m[HALBB_MAX_PATH];
+	u32 rxbb_idx_pre_agc_rdy_path[HALBB_MAX_PATH];
+	u32 rxbb_idx_pre_agc_rdy_path_m[HALBB_MAX_PATH];
+	u32 elna_idx_post_agc_rdy_path[HALBB_MAX_PATH];
+	u32 elna_idx_post_agc_rdy_path_m[HALBB_MAX_PATH];
+	u32 lna_idx_post_agc_rdy_path[HALBB_MAX_PATH];
+	u32 lna_idx_post_agc_rdy_path_m[HALBB_MAX_PATH];
+	u32 tia_idx_post_agc_rdy_path[HALBB_MAX_PATH];
+	u32 tia_idx_post_agc_rdy_path_m[HALBB_MAX_PATH];
+	u32 tia_shrink_post_agc_rdy_path[HALBB_MAX_PATH];
+	u32 tia_shrink_post_agc_rdy_path_m[HALBB_MAX_PATH];
+	u32 rxbb_idx_post_agc_rdy_path[HALBB_MAX_PATH];
+	u32 rxbb_idx_post_agc_rdy_path_m[HALBB_MAX_PATH];
+	u32 elna_idx_nlgc_agc_rdy_path[HALBB_MAX_PATH];
+	u32 elna_idx_nlgc_agc_rdy_path_m[HALBB_MAX_PATH];
+	u32 lna_idx_nlgc_agc_rdy_path[HALBB_MAX_PATH];
+	u32 lna_idx_nlgc_agc_rdy_path_m[HALBB_MAX_PATH];
+	u32 tia_idx_nlgc_agc_rdy_path[HALBB_MAX_PATH];
+	u32 tia_idx_nlgc_agc_rdy_path_m[HALBB_MAX_PATH];
+	u32 tia_shrink_nlgc_agc_rdy_path[HALBB_MAX_PATH];
+	u32 tia_shrink_nlgc_agc_rdy_path_m[HALBB_MAX_PATH];
+	u32 rxbb_idx_nlgc_agc_rdy_path[HALBB_MAX_PATH];
+	u32 rxbb_idx_nlgc_agc_rdy_path_m[HALBB_MAX_PATH];
+	u32 p_diff_pre_agc_rdy_path[HALBB_MAX_PATH];
+	u32 p_diff_pre_agc_rdy_path_m[HALBB_MAX_PATH];
+	u32 p_diff_pd_hit_path[HALBB_MAX_PATH];
+	u32 p_diff_pd_hit_path_m[HALBB_MAX_PATH];
+	u32 p_diff_post_agc_rdy_path[HALBB_MAX_PATH];
+	u32 p_diff_post_agc_rdy_path_m[HALBB_MAX_PATH];
+	u32 p_diff_nlgc_agc_rdy_path[HALBB_MAX_PATH];
+	u32 p_diff_nlgc_agc_rdy_path_m[HALBB_MAX_PATH];
+	u32 rssi_agc_rdy_path[HALBB_MAX_PATH];
+	u32 rssi_agc_rdy_path_m[HALBB_MAX_PATH];
+	u32 rssi_always_run_path[HALBB_MAX_PATH];
+	u32 rssi_always_run_path_m[HALBB_MAX_PATH];
 };
 
 struct bb_tx_info {
 	/*From reg*/
 	u8 type;
+	u8 ppdu_var;
 	u8 tx_path_en;
 	u8 path_map;
 	u8 txcmd_num;
@@ -225,7 +306,10 @@ struct bb_tx_info {
 	u32 sig_a1;
 	u32 sig_a2;
 	u32 sig_b;
-	u32 txinfo[4];
+	u32 usig_1;
+	u32 usig_2;
+	u32 txinfo[6];
+	u32 txt2rct[2];
 	u32 txcomct[2];
 	u32 txusrct[4][2];
 	u32 txtimct;
@@ -242,6 +326,7 @@ struct bb_tx_info {
 };
 
 struct bb_ra_dbgreg {
+	u32 macid;
 	u32 cmac_tbl_id0;
 	u32 cmac_tbl_id1;
 	u32 per;
@@ -278,7 +363,15 @@ struct bb_ra_dbgreg {
 };
 
 struct bb_dbg_info {
+	enum bb_dbg_bbcr_cnt_t	cr_cnt_ctrl;
+	u32	cr_recorde_w_cnt;
+	u32	cr_recorde_r_cnt;
+	u32	wrapcr_recorde_w_cnt;
+	enum bb_dbg_bbcr_cnt_t	rfcr_cnt_ctrl;
+	u32	rfcr_recorde_w_cnt;
+	u32	rfcr_recorde_r_cnt;
 	bool	cr_recorder_en;
+	bool	cr_mp_recorder_en;
 	bool	cr_init_hook_recorder_en;
 	bool	cr_fake_init_hook_en;
 	u32	cr_fake_init_hook_val;
@@ -300,7 +393,6 @@ struct bb_dbg_info {
 #endif
 	struct bb_tx_info tx_info_i;
 	struct bb_ra_dbgreg ra_dbgreg_i;
-	struct bb_dbg_cr_info bb_dbg_cr_i;
 };
 
 /*@--------------------------[Prptotype]-------------------------------------*/
@@ -321,9 +413,10 @@ void halbb_set_bb_dbg_port_ip(struct bb_info *bb, enum bb_dbg_port_ip_t ip);
 void halbb_release_bb_dbg_port(struct bb_info *bb);
 bool halbb_bb_dbg_port_racing(struct bb_info *bb, u8 curr_dbg_priority);
 u32 halbb_get_bb_dbg_port_val(struct bb_info *bb);
-u16 halbb_rx_utility(struct bb_info *bb, u16 avg_phy_rate, u8 rx_max_ss,
-		     enum channel_width bw);
+u16 halbb_trx_utility(struct bb_info *bb, enum bb_mode_type mode,
+		      u16 avg_phy_rate, u8 rx_max_ss, enum channel_width bw);
 u16 halbb_rx_avg_phy_rate(struct bb_info *bb);
+u16 halbb_tx_avg_phy_rate(struct bb_info *bb);
 void halbb_get_tx_dbg_reg(struct bb_info *bb);
 void halbb_basic_dbg_message(struct bb_info *bb);
 void halbb_basic_profile_dbg(struct bb_info *bb, u32 *_used, char *output, u32 *_out_len);
@@ -332,6 +425,7 @@ void halbb_dump_reg_dbg(struct bb_info *bb, char input[][16], u32 *_used, char *
 void halbb_dd_dump_dbg(struct bb_info *bb, char input[][16], u32 *_used, char *output, u32 *_out_len);
 void halbb_cr_table_dump(struct bb_info *bb, u32 *cr_table, u32 cr_len);
 void halbb_cr_hook_fake_init(struct bb_info *bb, u32 *str_table, u32 len);
+void halbb_cr_struc_dump(struct bb_info *bb, u32 *str_table, u32 len);
 void halbb_cr_hook_init_dump(struct bb_info *bb, u32 *str_table, u32 len);
 void halbb_dump_bb_reg(struct bb_info *bb, u32 *_used, char *output,
 		       u32 *_out_len, bool dump_2_buff,
@@ -340,5 +434,11 @@ void halbb_tx_info_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 		       char *output, u32 *_out_len);
 void halbb_cmn_dbg(struct bb_info *bb, char input[][16], u32 *_used, char *output, u32 *_out_len);
 void halbb_dbg_setting_init(struct bb_info *bb);
+void halbb_agc_dbg(struct bb_info *bb, char input[][16], u32 *_used, char *output, u32 *_out_len);
 void halbb_cr_cfg_dbg_init(struct bb_info *bb);
+void halbb_mac_phy_intf_txcmd_txtp(struct bb_info *bb, u8 txcmd_num, char **txcmd);
+void halbb_mac_phy_intf_txcmd_txtp_7(struct bb_info *bb, u8 txcmd_num, char **txcmd);
+void halbb_mac_phy_intf_ppdu_type(struct bb_info *bb, u8 type, char **ppdu);
+void halbb_mac_phy_intf_ppdu_var_type_7(struct bb_info *bb, u8 ppdu_type, u8 ppdu_var, char **ppdu);
+u32 halbb_c2h_fw_dbg(struct bb_info *bb, u16 len, u8 *c2h);
 #endif

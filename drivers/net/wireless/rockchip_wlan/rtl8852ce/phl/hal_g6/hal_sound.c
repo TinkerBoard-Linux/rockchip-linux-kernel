@@ -446,10 +446,11 @@ rtw_hal_snd_chk_bf_res(void *hal, struct rtw_phl_stainfo_t *sta,
 	bool mu, enum channel_width bw)
 {
 	enum rtw_hal_status hstatus = RTW_HAL_STATUS_FAILURE;
-	struct rtw_hal_stainfo_t *hal_sta = sta->hal_sta;
+	struct rtw_hal_stainfo_t *hal_sta = NULL;
 	do {
 		if (sta == NULL)
 			break;
+		hal_sta = sta->hal_sta;
 
 		if (false == rtw_hal_bf_chk_bf_type(hal, sta, mu))
 			break;

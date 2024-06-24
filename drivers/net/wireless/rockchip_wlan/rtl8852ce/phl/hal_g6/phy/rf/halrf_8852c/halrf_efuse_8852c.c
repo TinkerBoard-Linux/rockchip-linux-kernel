@@ -34,8 +34,9 @@ bool halrf_get_efuse_info_8852c(struct rf_info *rf, u8 *efuse_map,
 
 	u32 offset = 0;
 	u8 default_value = 0;
+	u8 country_code_tmp1, country_code_tmp2;
 
-	if (length != 1)
+	if (length != 1 && length != 2)
 		return false;
 
 	switch (id) {
@@ -72,8 +73,8 @@ bool halrf_get_efuse_info_8852c(struct rf_info *rf, u8 *efuse_map,
 			default_value = EFUSE_INFO_RF_CHAN_PLAN_8852C_VALUE;
 			break;
 		case EFUSE_INFO_RF_COUNTRY:
-			offset = 0;
-			default_value = 0;
+			offset = EFUSE_INFO_RF_COUNTRY_CODE1_8852C_ADDR;
+			default_value = 0xff;
 			break;
 		/*TSSI DE PathA CCK*/
 		case EFUSE_INFO_RF_2G_CCK_A_TSSI_DE_1:
@@ -182,80 +183,80 @@ bool halrf_get_efuse_info_8852c(struct rf_info *rf, u8 *efuse_map,
 			break;
 		/*5G Diff A*/
 		case EFUSE_INFO_RF_5G_BW20M1S_BW40M1S_A_DIFF:
-			offset = EFUSE_INFO_RF_5G_BW20M1S_BW40M1S_A_DIFF_ADDR;
-			default_value = EFUSE_INFO_RF_5G_DIFF_VALUE_1;
+			offset = EFUSE_INFO_RF_5G_BW20M1S_BW40M1S_A_DIFF_8852C_ADDR;
+			default_value = EFUSE_INFO_RF_5G_DIFF_8852C_VALUE_1;
 			break;
 		case EFUSE_INFO_RF_5G_OFDM1T_BW40M1S_A_DIFF:
-			offset = EFUSE_INFO_RF_5G_OFDM1T_BW40M1S_A_DIFF_ADDR;
-			default_value = EFUSE_INFO_RF_5G_DIFF_VALUE_1;
+			offset = EFUSE_INFO_RF_5G_OFDM1T_BW40M1S_A_DIFF_8852C_ADDR;
+			default_value = EFUSE_INFO_RF_5G_DIFF_8852C_VALUE_1;
 			break;
 		case EFUSE_INFO_RF_5G_BW40M2S_BW40M1S_A_DIFF:
-			offset = EFUSE_INFO_RF_5G_BW40M2S_BW40M1S_A_DIFF_ADDR;
-			default_value = EFUSE_INFO_RF_5G_DIFF_VALUE_1;
+			offset = EFUSE_INFO_RF_5G_BW40M2S_BW40M1S_A_DIFF_8852C_ADDR;
+			default_value = EFUSE_INFO_RF_5G_DIFF_8852C_VALUE_1;
 			break;
 		case EFUSE_INFO_RF_5G_BW20M2S_BW20M1S_A_DIFF:
-			offset = EFUSE_INFO_RF_5G_BW20M2S_BW20M1S_A_DIFF_ADDR;
-			default_value = EFUSE_INFO_RF_5G_DIFF_VALUE_1;
+			offset = EFUSE_INFO_RF_5G_BW20M2S_BW20M1S_A_DIFF_8852C_ADDR;
+			default_value = EFUSE_INFO_RF_5G_DIFF_8852C_VALUE_1;
 			break;
 		case EFUSE_INFO_RF_5G_BW40M3S_BW40M2S_A_DIFF:
-			offset = EFUSE_INFO_RF_5G_BW40M3S_BW40M2S_A_DIFF_ADDR;
-			default_value = EFUSE_INFO_RF_5G_DIFF_VALUE_2;
+			offset = EFUSE_INFO_RF_5G_BW40M3S_BW40M2S_A_DIFF_8852C_ADDR;
+			default_value = EFUSE_INFO_RF_5G_DIFF_8852C_VALUE_2;
 			break;
 		case EFUSE_INFO_RF_5G_BW20M3S_BW20M2S_A_DIFF:
-			offset = EFUSE_INFO_RF_5G_BW20M3S_BW20M2S_A_DIFF_ADDR;
-			default_value = EFUSE_INFO_RF_5G_DIFF_VALUE_2;
+			offset = EFUSE_INFO_RF_5G_BW20M3S_BW20M2S_A_DIFF_8852C_ADDR;
+			default_value = EFUSE_INFO_RF_5G_DIFF_8852C_VALUE_2;
 			break;
 		case EFUSE_INFO_RF_5G_BW40M4S_BW40M3S_A_DIFF:
-			offset = EFUSE_INFO_RF_5G_BW40M4S_BW40M3S_A_DIFF_ADDR;
-			default_value = EFUSE_INFO_RF_5G_DIFF_VALUE_2;
+			offset = EFUSE_INFO_RF_5G_BW40M4S_BW40M3S_A_DIFF_8852C_ADDR;
+			default_value = EFUSE_INFO_RF_5G_DIFF_8852C_VALUE_2;
 			break;
 		case EFUSE_INFO_RF_5G_BW20M4S_BW20M3S_A_DIFF:
-			offset = EFUSE_INFO_RF_5G_BW20M4S_BW20M3S_A_DIFF_ADDR;
-			default_value = EFUSE_INFO_RF_5G_DIFF_VALUE_2;
+			offset = EFUSE_INFO_RF_5G_BW20M4S_BW20M3S_A_DIFF_8852C_ADDR;
+			default_value = EFUSE_INFO_RF_5G_DIFF_8852C_VALUE_2;
 			break;
 		case EFUSE_INFO_RF_5G_OFDM2T_OFDM1T_A_DIFF:
-			offset = EFUSE_INFO_RF_5G_OFDM2T_OFDM1T_A_DIFF_ADDR;
-			default_value = EFUSE_INFO_RF_5G_DIFF_VALUE_1;
+			offset = EFUSE_INFO_RF_5G_OFDM2T_OFDM1T_A_DIFF_8852C_ADDR;
+			default_value = EFUSE_INFO_RF_5G_DIFF_8852C_VALUE_1;
 			break;
 		case EFUSE_INFO_RF_5G_OFDM3T_OFDM2T_A_DIFF:
-			offset = EFUSE_INFO_RF_5G_OFDM3T_OFDM2T_A_DIFF_ADDR;
-			default_value = EFUSE_INFO_RF_5G_DIFF_VALUE_1;
+			offset = EFUSE_INFO_RF_5G_OFDM3T_OFDM2T_A_DIFF_8852C_ADDR;
+			default_value = EFUSE_INFO_RF_5G_DIFF_8852C_VALUE_1;
 			break;
 		case EFUSE_INFO_RF_5G_OFDM4T_OFDM3T_A_DIFF:
-			offset = EFUSE_INFO_RF_5G_OFDM4T_OFDM3T_A_DIFF_ADDR;
-			default_value = EFUSE_INFO_RF_5G_DIFF_VALUE_1;
+			offset = EFUSE_INFO_RF_5G_OFDM4T_OFDM3T_A_DIFF_8852C_ADDR;
+			default_value = EFUSE_INFO_RF_5G_DIFF_8852C_VALUE_1;
 			break;
 		case EFUSE_INFO_RF_5G_BW80M1S_BW40M1S_A_DIFF:
-			offset = EFUSE_INFO_RF_5G_BW80M1S_BW40M1S_A_DIFF_ADDR;
-			default_value = EFUSE_INFO_RF_5G_DIFF_VALUE_1;
+			offset = EFUSE_INFO_RF_5G_BW80M1S_BW40M1S_A_DIFF_8852C_ADDR;
+			default_value = EFUSE_INFO_RF_5G_DIFF_8852C_VALUE_1;
 			break;
 		case EFUSE_INFO_RF_5G_BW160M1S_BW80M1S_A_DIFF:
-			offset = EFUSE_INFO_RF_5G_BW160M1S_BW80M1S_A_DIFF_ADDR;
-			default_value = EFUSE_INFO_RF_5G_DIFF_VALUE_1;
+			offset = EFUSE_INFO_RF_5G_BW160M1S_BW80M1S_A_DIFF_8852C_ADDR;
+			default_value = EFUSE_INFO_RF_5G_DIFF_8852C_VALUE_1;
 			break;
 		case EFUSE_INFO_RF_5G_BW80M2S_BW80M1S_A_DIFF:
-			offset = EFUSE_INFO_RF_5G_BW80M2S_BW80M1S_A_DIFF_ADDR;
-			default_value = EFUSE_INFO_RF_5G_DIFF_VALUE_1;
+			offset = EFUSE_INFO_RF_5G_BW80M2S_BW80M1S_A_DIFF_8852C_ADDR;
+			default_value = EFUSE_INFO_RF_5G_DIFF_8852C_VALUE_1;
 			break;
 		case EFUSE_INFO_RF_5G_BW160M2S_BW160M1S_A_DIFF:
-			offset = EFUSE_INFO_RF_5G_BW160M2S_BW160M1S_A_DIFF_ADDR;
-			default_value = EFUSE_INFO_RF_5G_DIFF_VALUE_1;
+			offset = EFUSE_INFO_RF_5G_BW160M2S_BW160M1S_A_DIFF_8852C_ADDR;
+			default_value = EFUSE_INFO_RF_5G_DIFF_8852C_VALUE_1;
 			break;
 		case EFUSE_INFO_RF_5G_BW80M3S_BW80M2S_A_DIFF:
-			offset = EFUSE_INFO_RF_5G_BW80M3S_BW80M2S_A_DIFF_ADDR;
-			default_value = EFUSE_INFO_RF_5G_DIFF_VALUE_2;
+			offset = EFUSE_INFO_RF_5G_BW80M3S_BW80M2S_A_DIFF_8852C_ADDR;
+			default_value = EFUSE_INFO_RF_5G_DIFF_8852C_VALUE_2;
 			break;
 		case EFUSE_INFO_RF_5G_BW160M3S_BW160M2S_A_DIFF:
-			offset = EFUSE_INFO_RF_5G_BW160M3S_BW160M2S_A_DIFF_ADDR;
-			default_value = EFUSE_INFO_RF_5G_DIFF_VALUE_2;
+			offset = EFUSE_INFO_RF_5G_BW160M3S_BW160M2S_A_DIFF_8852C_ADDR;
+			default_value = EFUSE_INFO_RF_5G_DIFF_8852C_VALUE_2;
 			break;
 		case EFUSE_INFO_RF_5G_BW80M4S_BW80M3S_A_DIFF:
-			offset = EFUSE_INFO_RF_5G_BW80M4S_BW80M3S_A_DIFF_ADDR;
-			default_value = EFUSE_INFO_RF_5G_DIFF_VALUE_2;
+			offset = EFUSE_INFO_RF_5G_BW80M4S_BW80M3S_A_DIFF_8852C_ADDR;
+			default_value = EFUSE_INFO_RF_5G_DIFF_8852C_VALUE_2;
 			break;
 		case EFUSE_INFO_RF_5G_BW160M4S_BW160M3S_A_DIFF:
-			offset = EFUSE_INFO_RF_5G_BW160M4S_BW160M3S_A_DIFF_ADDR;
-			default_value = EFUSE_INFO_RF_5G_DIFF_VALUE_2;
+			offset = EFUSE_INFO_RF_5G_BW160M4S_BW160M3S_A_DIFF_8852C_ADDR;
+			default_value = EFUSE_INFO_RF_5G_DIFF_8852C_VALUE_2;
 			break;
 
 		/*TSSI DE PathB CCK*/
@@ -366,80 +367,80 @@ bool halrf_get_efuse_info_8852c(struct rf_info *rf, u8 *efuse_map,
 
 		/*5G Diff B*/
 		case EFUSE_INFO_RF_5G_BW20M1S_BW40M1S_B_DIFF:
-			offset = EFUSE_INFO_RF_5G_BW20M1S_BW40M1S_B_DIFF_ADDR;
-			default_value = EFUSE_INFO_RF_5G_DIFF_VALUE_1;
+			offset = EFUSE_INFO_RF_5G_BW20M1S_BW40M1S_B_DIFF_8852C_ADDR;
+			default_value = EFUSE_INFO_RF_5G_DIFF_8852C_VALUE_1;
 			break;
 		case EFUSE_INFO_RF_5G_OFDM1T_BW40M1S_B_DIFF:
-			offset = EFUSE_INFO_RF_5G_OFDM1T_BW40M1S_B_DIFF_ADDR;
-			default_value = EFUSE_INFO_RF_5G_DIFF_VALUE_1;
+			offset = EFUSE_INFO_RF_5G_OFDM1T_BW40M1S_B_DIFF_8852C_ADDR;
+			default_value = EFUSE_INFO_RF_5G_DIFF_8852C_VALUE_1;
 			break;
 		case EFUSE_INFO_RF_5G_BW40M2S_BW40M1S_B_DIFF:
-			offset = EFUSE_INFO_RF_5G_BW40M2S_BW40M1S_B_DIFF_ADDR;
-			default_value = EFUSE_INFO_RF_5G_DIFF_VALUE_1;
+			offset = EFUSE_INFO_RF_5G_BW40M2S_BW40M1S_B_DIFF_8852C_ADDR;
+			default_value = EFUSE_INFO_RF_5G_DIFF_8852C_VALUE_1;
 			break;
 		case EFUSE_INFO_RF_5G_BW20M2S_BW20M1S_B_DIFF:
-			offset = EFUSE_INFO_RF_5G_BW20M2S_BW20M1S_B_DIFF_ADDR;
-			default_value = EFUSE_INFO_RF_5G_DIFF_VALUE_1;
+			offset = EFUSE_INFO_RF_5G_BW20M2S_BW20M1S_B_DIFF_8852C_ADDR;
+			default_value = EFUSE_INFO_RF_5G_DIFF_8852C_VALUE_1;
 			break;
 		case EFUSE_INFO_RF_5G_BW40M3S_BW40M2S_B_DIFF:
-			offset = EFUSE_INFO_RF_5G_BW40M3S_BW40M2S_B_DIFF_ADDR;
-			default_value = EFUSE_INFO_RF_5G_DIFF_VALUE_2;
+			offset = EFUSE_INFO_RF_5G_BW40M3S_BW40M2S_B_DIFF_8852C_ADDR;
+			default_value = EFUSE_INFO_RF_5G_DIFF_8852C_VALUE_2;
 			break;
 		case EFUSE_INFO_RF_5G_BW20M3S_BW20M2S_B_DIFF:
-			offset = EFUSE_INFO_RF_5G_BW20M3S_BW20M2S_B_DIFF_ADDR;
-			default_value = EFUSE_INFO_RF_5G_DIFF_VALUE_2;
+			offset = EFUSE_INFO_RF_5G_BW20M3S_BW20M2S_B_DIFF_8852C_ADDR;
+			default_value = EFUSE_INFO_RF_5G_DIFF_8852C_VALUE_2;
 			break;
 		case EFUSE_INFO_RF_5G_BW40M4S_BW40M3S_B_DIFF:
-			offset = EFUSE_INFO_RF_5G_BW40M4S_BW40M3S_B_DIFF_ADDR;
-			default_value = EFUSE_INFO_RF_5G_DIFF_VALUE_2;
+			offset = EFUSE_INFO_RF_5G_BW40M4S_BW40M3S_B_DIFF_8852C_ADDR;
+			default_value = EFUSE_INFO_RF_5G_DIFF_8852C_VALUE_2;
 			break;
 		case EFUSE_INFO_RF_5G_BW20M4S_BW20M3S_B_DIFF:
-			offset = EFUSE_INFO_RF_5G_BW20M4S_BW20M3S_B_DIFF_ADDR;
-			default_value = EFUSE_INFO_RF_5G_DIFF_VALUE_2;
+			offset = EFUSE_INFO_RF_5G_BW20M4S_BW20M3S_B_DIFF_8852C_ADDR;
+			default_value = EFUSE_INFO_RF_5G_DIFF_8852C_VALUE_2;
 			break;
 		case EFUSE_INFO_RF_5G_OFDM2T_OFDM1T_B_DIFF:
-			offset = EFUSE_INFO_RF_5G_OFDM2T_OFDM1T_B_DIFF_ADDR;
-			default_value = EFUSE_INFO_RF_5G_DIFF_VALUE_1;
+			offset = EFUSE_INFO_RF_5G_OFDM2T_OFDM1T_B_DIFF_8852C_ADDR;
+			default_value = EFUSE_INFO_RF_5G_DIFF_8852C_VALUE_1;
 			break;
 		case EFUSE_INFO_RF_5G_OFDM3T_OFDM2T_B_DIFF:
-			offset = EFUSE_INFO_RF_5G_OFDM3T_OFDM2T_B_DIFF_ADDR;
-			default_value = EFUSE_INFO_RF_5G_DIFF_VALUE_1;
+			offset = EFUSE_INFO_RF_5G_OFDM3T_OFDM2T_B_DIFF_8852C_ADDR;
+			default_value = EFUSE_INFO_RF_5G_DIFF_8852C_VALUE_1;
 			break;
 		case EFUSE_INFO_RF_5G_OFDM4T_OFDM3T_B_DIFF:
-			offset = EFUSE_INFO_RF_5G_OFDM4T_OFDM3T_B_DIFF_ADDR;
-			default_value = EFUSE_INFO_RF_5G_DIFF_VALUE_1;
+			offset = EFUSE_INFO_RF_5G_OFDM4T_OFDM3T_B_DIFF_8852C_ADDR;
+			default_value = EFUSE_INFO_RF_5G_DIFF_8852C_VALUE_1;
 			break;
 		case EFUSE_INFO_RF_5G_BW80M1S_BW40M1S_B_DIFF:
-			offset = EFUSE_INFO_RF_5G_BW80M1S_BW40M1S_B_DIFF_ADDR;
-			default_value = EFUSE_INFO_RF_5G_DIFF_VALUE_1;
+			offset = EFUSE_INFO_RF_5G_BW80M1S_BW40M1S_B_DIFF_8852C_ADDR;
+			default_value = EFUSE_INFO_RF_5G_DIFF_8852C_VALUE_1;
 			break;
 		case EFUSE_INFO_RF_5G_BW160M1S_BW80M1S_B_DIFF:
-			offset = EFUSE_INFO_RF_5G_BW160M1S_BW80M1S_B_DIFF_ADDR;
-			default_value = EFUSE_INFO_RF_5G_DIFF_VALUE_1;
+			offset = EFUSE_INFO_RF_5G_BW160M1S_BW80M1S_B_DIFF_8852C_ADDR;
+			default_value = EFUSE_INFO_RF_5G_DIFF_8852C_VALUE_1;
 			break;
 		case EFUSE_INFO_RF_5G_BW80M2S_BW80M1S_B_DIFF:
-			offset = EFUSE_INFO_RF_5G_BW80M2S_BW80M1S_B_DIFF_ADDR;
-			default_value = EFUSE_INFO_RF_5G_DIFF_VALUE_1;
+			offset = EFUSE_INFO_RF_5G_BW80M2S_BW80M1S_B_DIFF_8852C_ADDR;
+			default_value = EFUSE_INFO_RF_5G_DIFF_8852C_VALUE_1;
 			break;
 		case EFUSE_INFO_RF_5G_BW160M2S_BW160M1S_B_DIFF:
-			offset = EFUSE_INFO_RF_5G_BW160M2S_BW160M1S_B_DIFF_ADDR;
-			default_value = EFUSE_INFO_RF_5G_DIFF_VALUE_1;
+			offset = EFUSE_INFO_RF_5G_BW160M2S_BW160M1S_B_DIFF_8852C_ADDR;
+			default_value = EFUSE_INFO_RF_5G_DIFF_8852C_VALUE_1;
 			break;
 		case EFUSE_INFO_RF_5G_BW80M3S_BW80M2S_B_DIFF:
-			offset = EFUSE_INFO_RF_5G_BW80M3S_BW80M2S_B_DIFF_ADDR;
-			default_value = EFUSE_INFO_RF_5G_DIFF_VALUE_2;
+			offset = EFUSE_INFO_RF_5G_BW80M3S_BW80M2S_B_DIFF_8852C_ADDR;
+			default_value = EFUSE_INFO_RF_5G_DIFF_8852C_VALUE_2;
 			break;
 		case EFUSE_INFO_RF_5G_BW160M3S_BW160M2S_B_DIFF:
-			offset = EFUSE_INFO_RF_5G_BW160M3S_BW160M2S_B_DIFF_ADDR;
-			default_value = EFUSE_INFO_RF_5G_DIFF_VALUE_2;
+			offset = EFUSE_INFO_RF_5G_BW160M3S_BW160M2S_B_DIFF_8852C_ADDR;
+			default_value = EFUSE_INFO_RF_5G_DIFF_8852C_VALUE_2;
 			break;
 		case EFUSE_INFO_RF_5G_BW80M4S_BW80M3S_B_DIFF:
-			offset = EFUSE_INFO_RF_5G_BW80M4S_BW80M3S_B_DIFF_ADDR;
-			default_value = EFUSE_INFO_RF_5G_DIFF_VALUE_2;
+			offset = EFUSE_INFO_RF_5G_BW80M4S_BW80M3S_B_DIFF_8852C_ADDR;
+			default_value = EFUSE_INFO_RF_5G_DIFF_8852C_VALUE_2;
 			break;
 		case EFUSE_INFO_RF_5G_BW160M4S_BW160M3S_B_DIFF:
-			offset = EFUSE_INFO_RF_5G_BW160M4S_BW160M3S_B_DIFF_ADDR;
-			default_value = EFUSE_INFO_RF_5G_DIFF_VALUE_2;
+			offset = EFUSE_INFO_RF_5G_BW160M4S_BW160M3S_B_DIFF_8852C_ADDR;
+			default_value = EFUSE_INFO_RF_5G_DIFF_8852C_VALUE_2;
 			break;
 
 		case EFUSE_INFO_RF_RX_GAIN_K_A_2G_CCK:
@@ -509,8 +510,8 @@ bool halrf_get_efuse_info_8852c(struct rf_info *rf, u8 *efuse_map,
 			break;
 		/*5G DIFF*/
 		case EFUSE_INFO_RF_5G_BW160M_BW40M_DIFF:
-			offset = EFUSE_INFO_RF_5G_BW160M_BW40M_DIFF_ADDR;
-			default_value = EFUSE_INFO_RF_BW_DIFF_VALUE;
+			offset = EFUSE_INFO_RF_5G_BW160M_BW40M_DIFF_8852C_ADDR;
+			default_value = EFUSE_INFO_RF_BW_DIFF_8852C_VALUE;
 			break;
 		/*TSSI DE PathA 6G BW40M*/
 		case EFUSE_INFO_RF_6G_BW40M_A_TSSI_DE_1:
@@ -1030,35 +1031,31 @@ bool halrf_get_efuse_info_8852c(struct rf_info *rf, u8 *efuse_map,
 			break;
 		/*6G BW DIFF*/
 		case EFUSE_INFO_RF_6G_BW160M_BW40M_DIFF:
-			offset = EFUSE_INFO_RF_6G_BW160M_BW40M_DIFF_ADDR;
-			default_value = EFUSE_INFO_RF_BW_DIFF_VALUE;
+			offset = EFUSE_INFO_RF_6G_BW160M_BW40M_DIFF_8852C_ADDR;
+			default_value = EFUSE_INFO_RF_BW_DIFF_8852C_VALUE;
 			break;
 		case EFUSE_INFO_RF_6G_BW320M_BW160M_DIFF:
-			offset = EFUSE_INFO_RF_6G_BW160M_BW40M_DIFF_ADDR;
-			default_value = EFUSE_INFO_RF_BW_DIFF_VALUE;
+			offset = EFUSE_INFO_RF_6G_BW160M_BW40M_DIFF_8852C_ADDR;
+			default_value = EFUSE_INFO_RF_BW_DIFF_8852C_VALUE;
 			break;
 
 		default:
 			return false;
 	}
 
-	if (autoload_status == 0)
+	if (autoload_status == 0) {
 		hal_mem_cpy(hal, value, &default_value, 1);
-	else {
+
+		switch (id) {
+			case EFUSE_INFO_RF_COUNTRY:
+				(*(u16 *)value) = EFUSE_INFO_RF_COUNTRY_CODE_8852C_VALUE;
+				break;
+			default:
+				break;
+		}
+	} else {
 		hal_mem_cpy(hal, value, efuse_map + offset, length);
 
-#if 0
-		if (id == EFUSE_INFO_RF_XTAL) {
-			if (*((u8 *)value) == 0xff)
-				hal_mem_set(hal, value, 0x3f, 1);
-		} else if (id == EFUSE_INFO_RF_5G_BW80M1S_BW40M1S_A_DIFF ||
-				id == EFUSE_INFO_RF_5G_BW80M1S_BW40M1S_B_DIFF) {
-			*((u8 *)value) = *((u8 *)value) & 0xf0;
-		} else if (id == EFUSE_INFO_RF_5G_BW160M1S_BW80M1S_A_DIFF ||
-				id == EFUSE_INFO_RF_5G_BW160M1S_BW80M1S_B_DIFF) {
-			*((u8 *)value) = *((u8 *)value) & 0xf;
-		}
-#endif
 		switch (id) {
 			case EFUSE_INFO_RF_XTAL:
 				if (*((u8 *)value) == 0xff)
@@ -1074,6 +1071,13 @@ bool halrf_get_efuse_info_8852c(struct rf_info *rf, u8 *efuse_map,
 			case EFUSE_INFO_RF_5G_BW160M1S_BW80M1S_B_DIFF:
 			case EFUSE_INFO_RF_6G_BW320M_BW160M_DIFF:
 				*((u8 *)value) = *((u8 *)value) & 0xf;
+				break;
+			case EFUSE_INFO_RF_COUNTRY:
+				hal_mem_cpy(hal, &country_code_tmp1,
+					efuse_map + EFUSE_INFO_RF_COUNTRY_CODE1_8852C_ADDR, 1);
+				hal_mem_cpy(hal, &country_code_tmp2,
+					efuse_map + EFUSE_INFO_RF_COUNTRY_CODE2_8852C_ADDR, 1);
+				*((u16 *)value) = (u16)(((country_code_tmp1 << 8) | country_code_tmp2) & 0xffff);	
 				break;
 			default:
 				break;

@@ -15,6 +15,7 @@
 ******************************************************************************/
 #include "security_cam_8852c.h"
 
+#if MAC_AX_8852C_SUPPORT
 #define SEC_CAM_SIZE_8852C	0x14
 #define HW_SUPPORT_ENC_TYPE_NUM 0x0A
 #define OUTRANGE_KEY_INDEX	0xFF
@@ -186,6 +187,7 @@ u32 upt_dctl_secinfo_entry_8852c(struct mac_ax_adapter *adapter,
 	struct mac_ax_dctl_info info = {0}, mask = {0};
 	struct dctl_secinfo_entry_t *dctl_secinfo_entry = NULL;
 	struct dctl_sec_info_t *dctl_sec_info = adapter->hw_info->dctl_sec_info;
+	struct mac_ax_ops *mops = adapter_to_mac_ops(adapter);
 
 	if (!dctl_sec_info)
 		return MACNOKEYINDEX;
@@ -271,7 +273,7 @@ u32 upt_dctl_secinfo_entry_8852c(struct mac_ax_adapter *adapter,
 		mask.aes_iv_l = AES_IV_L_MSK;
 	}
 
-	ret = mac_upd_dctl_info_8852c(adapter, &info, &mask, macid, 1);
+	ret = mops->upd_dctl_info(adapter, &info, &mask, macid, 1);
 	if (ret != MACSUCCESS)
 		return ret;
 
@@ -315,28 +317,26 @@ u32 fill_sec_cam_info_8852c(struct mac_ax_adapter *adapter,
 u32 mac_upd_sec_infotbl_8852c(struct mac_ax_adapter *adapter,
 			      struct fwcmd_seccam_info *info)
 {
-	u32 ret = 0, s_info_tbl[6], cam_address = 0;
-	u8 *buf, i;
-	#if MAC_AX_PHL_H2C
-	struct rtw_h2c_pkt *h2cb;
-	#else
-	struct h2c_buf *h2cb;
-	#endif
+	u32 ret = MACSUCCESS;
+	struct h2c_info h2c_info = {0};
+	u32 s_info_tbl[6], cam_address = 0, i;
+
 	struct fwcmd_seccam_info *tbl;
 	struct mac_ax_sec_cam_info *s_info;
 
-	/*h2c access*/
-	h2cb = h2cb_alloc(adapter, H2CB_CLASS_CMD);
-	if (!h2cb)
+	h2c_info.agg_en = 0;
+	h2c_info.content_len = sizeof(struct fwcmd_seccam_info);
+	h2c_info.h2c_cat = FWCMD_H2C_CAT_MAC;
+	h2c_info.h2c_class = FWCMD_H2C_CL_SEC_CAM;
+	h2c_info.h2c_func = FWCMD_H2C_FUNC_SECCAM_INFO;
+	h2c_info.rec_ack = 0;
+	h2c_info.done_ack = 1;
+
+	tbl = (struct fwcmd_seccam_info *)PLTFM_MALLOC(h2c_info.content_len);
+	if (!tbl) {
+		PLTFM_MSG_ERR("%s malloc h2c error\n", __func__);
 		return MACNPTR;
-
-	buf = h2cb_put(h2cb, sizeof(struct fwcmd_seccam_info));
-	if (!buf) {
-		ret = MACNOBUF;
-		goto fail;
 	}
-
-	tbl = (struct fwcmd_seccam_info *)buf;
 
 	tbl->dword0 = info->dword0;
 	tbl->dword1 = info->dword1;
@@ -346,37 +346,8 @@ u32 mac_upd_sec_infotbl_8852c(struct mac_ax_adapter *adapter,
 	tbl->dword5 = info->dword5;
 
 	if (adapter->sm.fwdl == MAC_AX_FWDL_INIT_RDY) {
-		ret = h2c_pkt_set_hdr(adapter, h2cb,
-				      FWCMD_TYPE_H2C,
-				      FWCMD_H2C_CAT_MAC,
-				      FWCMD_H2C_CL_SEC_CAM,
-				      FWCMD_H2C_FUNC_SECCAM_INFO,
-				      0,
-				      1);
-
-		if (ret != MACSUCCESS)
-			goto fail;
-
-		ret = h2c_agg_enqueue(adapter, h2cb);
-		if (!ret)
-			return MACSUCCESS;
-
-		ret = h2c_pkt_build_txd(adapter, h2cb);
-		if (ret != MACSUCCESS)
-			goto fail;
-
-		#if MAC_AX_PHL_H2C
-		ret = PLTFM_TX(h2cb);
-		#else
-		ret = PLTFM_TX(h2cb->data, h2cb->len);
-		#endif
-		if (ret != MACSUCCESS)
-			goto fail;
-
-		h2cb_free(adapter, h2cb);
-		return MACSUCCESS;
-fail:
-		h2cb_free(adapter, h2cb);
+		ret = mac_h2c_common(adapter, &h2c_info, (u32 *)tbl);
+		PLTFM_FREE(tbl, h2c_info.content_len);
 	} else {
 		/* Indirect Access */
 		s_info = (struct mac_ax_sec_cam_info *)info;
@@ -395,8 +366,8 @@ fail:
 					   cpu_to_le32(s_info_tbl[i + 1]),
 					   SEC_CAM_SEL);
 		PLTFM_MSG_WARN("%s ind access end\n", __func__);
-
-		h2cb_free(adapter, h2cb);
+		// free allocate memory
+		PLTFM_FREE(tbl, h2c_info.content_len);
 		return MACSUCCESS;
 	}
 
@@ -610,6 +581,11 @@ u32 delete_key_from_dmac_tbl_8852c(struct mac_ax_adapter *adapter,
 
 	if (hit_flag == 0)
 		return MACKEYNOTEXT;
+
+	if (check_key_index_8852c(sec_ent_mode, key_type, keyidx)) {
+		PLTFM_MSG_TRACE("check addr key index fail\n");
+		return MACADDRCAMKEYFL;
+	}
 
 	*sec_cam_idx = dctl_secinfo_entry->sec_ent[keyidx];
 
@@ -1041,6 +1017,7 @@ u32 refresh_security_cam_info_8852c(struct mac_ax_adapter *adapter,
 	u8 keyidx = 0, sec_ent_mode = 0, sec_cam_idx = 0;
 	u32 dword[10] = {0};
 	u8 dmac_tbl_size = DCTRL_TBL_SIZE_8852C;
+	u32 ret = MACSUCCESS;
 
 	struct sec_cam_entry_t *s_entry = NULL;
 	struct sec_cam_table_t *sec_cam_table = adapter->hw_info->sec_cam_table;
@@ -1053,9 +1030,14 @@ u32 refresh_security_cam_info_8852c(struct mac_ax_adapter *adapter,
 	/*read HW key in dmac tbl*/
 	PLTFM_MSG_ERR("%s ind access macid %d start\n", __func__, mac_id);
 	dtbl_address = mac_id * dmac_tbl_size;
-	for (i = 0; i < 8; i++)
-		dword[i] = mac_sram_dbg_read(adapter, dtbl_address + (i * 4),
-					     DMAC_TBL_SEL);
+	for (i = 0; i < 8; i++) {
+		ret = mac_sram_dbg_read(adapter, dtbl_address + (i * 4), &dword[i],
+					DMAC_TBL_SEL);
+		if (ret != MACSUCCESS) {
+			PLTFM_MSG_ERR("%s read sram fail %d\n", __func__, ret);
+			return ret;
+		}
+	}
 	PLTFM_MSG_ERR("%s ind access macid %d end\n", __func__, mac_id);
 
 	/* parse sec info from read dmac tbl */
@@ -1189,3 +1171,4 @@ u32 mac_wowlan_secinfo_8852c(struct mac_ax_adapter *adapter,
 	return MACSUCCESS;
 }
 
+#endif /* #if MAC_AX_8852C_SUPPORT */

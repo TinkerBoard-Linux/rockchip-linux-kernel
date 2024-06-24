@@ -63,9 +63,9 @@ sint rtw_endofpktfile(struct pkt_file *pfile)
 	return _FALSE;
 }
 
+#ifdef CONFIG_TCP_CSUM_OFFLOAD_TX
 void rtw_set_tx_chksum_offload(struct sk_buff *pkt, struct pkt_attrib *pattrib)
 {
-#ifdef CONFIG_TCP_CSUM_OFFLOAD_TX	
 	struct sk_buff *skb = (struct sk_buff *)pkt;
 	struct iphdr *iph = NULL;
 	struct ipv6hdr *i6ph = NULL;
@@ -108,9 +108,9 @@ void rtw_set_tx_chksum_offload(struct sk_buff *pkt, struct pkt_attrib *pattrib)
 	default:
 		break;
 	}
+}
 #endif
 
-}
 #if 0 /*CONFIG_CORE_XMITBUF*/
 int rtw_os_xmit_resource_alloc(_adapter *padapter, struct xmit_buf *pxmitbuf, u32 alloc_sz, u8 flag)
 {
@@ -258,12 +258,6 @@ static inline bool rtw_os_need_wake_queue(_adapter *padapter, u16 os_qid)
 	if (padapter->registrypriv.wifi_spec) {
 		if (pxmitpriv->hwxmits[os_qid].accnt < WMM_XMIT_THRESHOLD)
 			return _TRUE;
-#ifdef DBG_CONFIG_ERROR_DETECT
-#ifdef DBG_CONFIG_ERROR_RESET
-	} else if (rtw_hal_sreset_inprogress(padapter) == _TRUE) {
-		return _FALSE;
-#endif/* #ifdef DBG_CONFIG_ERROR_RESET */
-#endif/* #ifdef DBG_CONFIG_ERROR_DETECT */
 	} else {
 		return _TRUE;
 	}
@@ -329,15 +323,19 @@ void rtw_os_xmit_schedule(_adapter *padapter)
 	_rtw_spinlock_bh(&pxmitpriv->lock);
 
 	if (rtw_txframes_pending(padapter))
-		rtw_tasklet_hi_schedule(&pxmitpriv->xmit_tasklet);
+#ifdef CONFIG_RTW_TX_AMSDU_USE_WQ
+	_set_workitem_cpu(&pxmitpriv->xmit_workitem);
+#else
+	rtw_tasklet_hi_schedule(&pxmitpriv->xmit_tasklet);
+#endif
 
 	_rtw_spinunlock_bh(&pxmitpriv->lock);
-	
+
 	#if 0 /*defined(CONFIG_PCI_HCI) && defined(CONFIG_XMIT_THREAD_MODE)*/
 	if (_rtw_queue_empty(&padapter->xmitpriv.pending_xmitbuf_queue) == _FALSE)
 		_rtw_up_sema(&padapter->xmitpriv.xmit_sema);
 	#endif
-	
+
 
 #endif
 }
@@ -411,7 +409,7 @@ int _rtw_xmit_entry(struct sk_buff *pkt, _nic_hdl pnetdev)
 {
 	_adapter *padapter = (_adapter *)rtw_netdev_priv(pnetdev);
 	struct xmit_priv *pxmitpriv = &padapter->xmitpriv;
-#ifdef CONFIG_TCP_CSUM_OFFLOAD_TX	
+#ifdef CONFIG_TCP_CSUM_OFFLOAD_TX
 	struct sk_buff *skb = pkt;
 	struct sk_buff *segs, *nskb;
 	netdev_features_t features = padapter->pnetdev->features;
@@ -533,6 +531,9 @@ int rtw_xmit_entry(struct sk_buff *pkt, _nic_hdl pnetdev)
 			}
 #endif
 			rtw_mstat_update(MSTAT_TYPE_SKB, MSTAT_ALLOC_SUCCESS, pkt->truesize);
+#ifdef CONFIG_TX_SKB_ORPHAN
+			skb_orphan(pkt);
+#endif
 			ret = rtw_os_tx(pkt, pnetdev);
 		}
 
@@ -587,6 +588,11 @@ int rtw_os_tx(struct sk_buff *pkt, _nic_hdl pnetdev)
 	u16 os_qid = 0;
 	s32 res = 0;
 
+#ifdef CONFIG_TCP_CSUM_OFFLOAD_TX
+	struct sk_buff *skb = pkt;
+	struct sk_buff *segs, *nskb;
+	netdev_features_t features = padapter->pnetdev->features;
+#endif
 #ifdef RTW_PHL_DBG_CMD
 	core_add_record(padapter, REC_TX_DATA, pkt);
 #endif
@@ -612,6 +618,33 @@ int rtw_os_tx(struct sk_buff *pkt, _nic_hdl pnetdev)
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 35))
 	os_qid = skb_get_queue_mapping(pkt);
+#endif
+
+#ifdef CONFIG_TCP_CSUM_OFFLOAD_TX
+	if (skb_shinfo(skb)->gso_size) {
+		/*	split a big(65k) skb into several small(1.5k) skbs */
+		features &= ~(NETIF_F_TSO | NETIF_F_TSO6);
+		segs = skb_gso_segment(skb, features);
+		if (IS_ERR(segs) || !segs)
+			goto drop_packet;
+
+		do {
+			nskb = segs;
+			segs = segs->next;
+			nskb->next = NULL;
+			rtw_mstat_update( MSTAT_TYPE_SKB, MSTAT_ALLOC_SUCCESS, nskb->truesize);
+			res = rtw_core_tx(padapter, &nskb, NULL, os_qid);
+			if (res < 0) {
+				#ifdef DBG_TX_DROP_FRAME
+				RTW_INFO("DBG_TX_DROP_FRAME %s rtw_xmit fail\n", __FUNCTION__);
+				#endif
+				pxmitpriv->tx_drop++;
+				rtw_os_pkt_complete(padapter, nskb);
+			}
+		} while (segs);
+		rtw_os_pkt_complete(padapter, skb);
+		goto exit;
+	}
 #endif
 
 	PHLTX_LOG;

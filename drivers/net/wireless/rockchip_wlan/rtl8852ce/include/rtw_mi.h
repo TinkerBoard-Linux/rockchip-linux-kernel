@@ -220,6 +220,7 @@ void rtw_mi_adapter_reset(_adapter *padapter);
 void rtw_mi_buddy_adapter_reset(_adapter *padapter);
 
 u8 rtw_mi_dynamic_check_handlder(struct _ADAPTER *padapter);
+u8 rtw_mi_keep_alive_pre_chk_hdl(struct _ADAPTER *padapter);
 #if 0 /*#ifdef CONFIG_CORE_DM_CHK_TIMER*/
 u8 rtw_mi_dynamic_check_timer_handlder(_adapter *padapter);
 u8 rtw_mi_buddy_dynamic_check_timer_handlder(_adapter *padapter);
@@ -234,14 +235,6 @@ u8 rtw_mi_buddy_os_xmit_schedule(_adapter *padapter);
 
 u8 rtw_mi_report_survey_event(_adapter *padapter, union recv_frame *precv_frame);
 u8 rtw_mi_buddy_report_survey_event(_adapter *padapter, union recv_frame *precv_frame);
-
-extern void sreset_start_adapter(_adapter *padapter);
-extern void sreset_stop_adapter(_adapter *padapter);
-u8 rtw_mi_sreset_adapter_hdl(_adapter *padapter, u8 bstart);
-u8 rtw_mi_buddy_sreset_adapter_hdl(_adapter *padapter, u8 bstart);
-#if defined(DBG_CONFIG_ERROR_RESET) && defined(CONFIG_CONCURRENT_MODE)
-void rtw_mi_ap_info_restore(_adapter *adapter);
-#endif
 
 u8 rtw_mi_tx_beacon_hdl(_adapter *padapter);
 u8 rtw_mi_buddy_tx_beacon_hdl(_adapter *padapter);
@@ -273,7 +266,7 @@ u8 rtw_mi_dump_mac_addr(_adapter *adapter);
 #endif
 
 u8 rtw_mi_disconnect(_adapter *adapter);
-u8 rtw_mi_buddy_disconnect(_adapter *adapter, Disconnect_type disc_code);
+u8 rtw_mi_buddy_disconnect(_adapter *adapter, struct disconnect_data *disc_data);
 
 bool rtw_iface_is_operate_at_hwband(_adapter *adapter, u8 band_idx);
 bool rtw_iface_at_same_hwband(_adapter *adapter, _adapter *iface);

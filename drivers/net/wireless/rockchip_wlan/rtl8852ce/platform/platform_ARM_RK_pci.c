@@ -38,7 +38,7 @@ int platform_wifi_power_on(void)
 	RTW_PRINT("==== Launching Wi-Fi driver! (Powered by Rockchip) ====\n");
 	RTW_PRINT("=======================================================\n");
 	RTW_PRINT("Realtek %s WiFi driver (Powered by Rockchip,Ver %s) init.\n", DRV_NAME, DRIVERVERSION);
-	//rockchip_wifi_power(1);
+	rockchip_wifi_power(1);
 	return ret;
 }
 
@@ -49,5 +49,5 @@ void platform_wifi_power_off(void)
 	RTW_PRINT("==== Dislaunching Wi-Fi driver! (Powered by Rockchip) ====\n");
 	RTW_PRINT("=======================================================\n");
 	RTW_PRINT("Realtek %s WiFi driver (Powered by Rockchip,Ver %s) init.\n", DRV_NAME, DRIVERVERSION);
-	//rockchip_wifi_power(0);
+	rockchip_wifi_power(0);
 }

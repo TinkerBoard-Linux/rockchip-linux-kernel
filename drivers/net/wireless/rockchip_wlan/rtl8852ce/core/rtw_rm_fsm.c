@@ -71,7 +71,7 @@ int rtw_init_rm(_adapter *padapter)
 		| BIT(RM_BCN_PASSIVE_MEAS_CAP_EN)
 		| BIT(RM_BCN_ACTIVE_MEAS_CAP_EN)
 		| BIT(RM_BCN_TABLE_MEAS_CAP_EN)
-		/*| BIT(RM_BCN_MEAS_REP_COND_CAP_EN)*/;
+		| BIT(RM_BCN_MEAS_REP_COND_CAP_EN);
 
 	/* bit  8-15 */
 	prmpriv->rm_en_cap_def[1] = 0
@@ -533,6 +533,7 @@ static int rm_state_idle(struct rm_obj *prm, enum RM_EV_ID evid)
 			prm->p.rpt = prm->q.rpt;
 			prm->p.ch_num = prm->q.ch_num;
 			prm->p.op_class = prm->q.op_class;
+			prm->p.band = prm->q.band;
 
 			if (prm->q.m_type == ch_load_req
 				|| prm->q.m_type == noise_histo_req) {
@@ -742,7 +743,6 @@ static int rm_state_do_meas(struct rm_obj *prm, enum RM_EV_ID evid)
 		break;
 	case RM_EV_cancel:
 		rm_set_rep_mode(prm, MEAS_REP_MOD_REFUSE);
-		issue_null_reply(prm);
 		rm_state_goto(prm, RM_ST_END);
 		break;
 	case RM_EV_state_out:

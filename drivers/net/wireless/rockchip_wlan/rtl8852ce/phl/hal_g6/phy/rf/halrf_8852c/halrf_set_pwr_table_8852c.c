@@ -1236,6 +1236,7 @@ bool halrf_set_power_limit_ru_to_struct_8852c(struct rf_info *rf, enum phl_phy_i
 	struct rtw_tpu_info *tpu = &rf->hal_com->band[phy].rtw_tpu_i;
 	u8 bw = rf->hal_com->band[phy].cur_chandef.bw;
 	u8 i, j, k;
+	u16 tmp;
 
 	RF_DBG(rf, DBG_RF_POWER, "======>%s   bandwidth=%d\n",
 		__func__, bw);
@@ -1249,7 +1250,8 @@ bool halrf_set_power_limit_ru_to_struct_8852c(struct rf_info *rf, enum phl_phy_i
 	else
 		halrf_get_power_limit_ru_to_struct_160m_8852c(rf, phy);
 
-	tpu->pwr_lmt_ru_mem_size = tpu->pwr_lmt_ru_mem_size;
+	tmp = tpu->pwr_lmt_ru_mem_size;
+	tmp++;
 
 	for (k = 0; k < 2; k++) {
 		for (j = 0; j < PW_LMT_RU_BW_NULL; j++) {
@@ -1295,69 +1297,75 @@ void _halrf_set_tx_shape_8852c(struct rf_info *rf, enum phl_phy_idx phy)
 	if (band == BAND_ON_24G) {
 		reg = halrf_get_regulation_info(rf, BAND_ON_24G);
 
-		RF_DBG(rf, DBG_RF_POWER, "======>%s   channel=%d   regulation=%d\n", __func__, ch, reg);
-		RF_DBG(rf, DBG_RF_POWER, "tpu->tx_ptrn_shap_idx=%d   pwr->tx_shap_idx[%d][CCK][%d]=%d   pwr->tx_shap_idx[%d][OFDM][%d]=%d\n",
-			tpu->tx_ptrn_shap_idx, PW_LMT_BAND_2_4G, reg,
-			pwr->tx_shap_idx[PW_LMT_BAND_2_4G][TX_SHAPE_CCK][reg],
-			PW_LMT_BAND_2_4G, reg,
-			pwr->tx_shap_idx[PW_LMT_BAND_2_4G][TX_SHAPE_OFDM][reg]);
+		if (reg < PW_LMT_MAX_PER_BAND_REGU_NUM) {
+			RF_DBG(rf, DBG_RF_POWER, "======>%s   channel=%d   regulation=%d\n", __func__, ch, reg);
+			RF_DBG(rf, DBG_RF_POWER, "tpu->tx_ptrn_shap_idx=%d   pwr->tx_shap_idx[%d][CCK][%d]=%d   pwr->tx_shap_idx[%d][OFDM][%d]=%d\n",
+				tpu->tx_ptrn_shap_idx, PW_LMT_BAND_2_4G, reg,
+				pwr->tx_shap_idx[PW_LMT_BAND_2_4G][TX_SHAPE_CCK][reg],
+				PW_LMT_BAND_2_4G, reg,
+				pwr->tx_shap_idx[PW_LMT_BAND_2_4G][TX_SHAPE_OFDM][reg]);
 
-		tpu->tx_ptrn_shap_idx = pwr->tx_shap_idx[PW_LMT_BAND_2_4G][TX_SHAPE_CCK][reg];
-		pwr->set_tx_ptrn_shap_idx[PW_LMT_BAND_2_4G][TX_SHAPE_CCK] =
-			pwr->tx_shap_idx[PW_LMT_BAND_2_4G][TX_SHAPE_CCK][reg];
+			tpu->tx_ptrn_shap_idx = pwr->tx_shap_idx[PW_LMT_BAND_2_4G][TX_SHAPE_CCK][reg];
+			pwr->set_tx_ptrn_shap_idx[PW_LMT_BAND_2_4G][TX_SHAPE_CCK] =
+				pwr->tx_shap_idx[PW_LMT_BAND_2_4G][TX_SHAPE_CCK][reg];
 
-		halrf_bb_set_pow_patten_sharp(rf, ch, true,
-			pwr->tx_shap_idx[PW_LMT_BAND_2_4G][TX_SHAPE_CCK][reg], phy);	/*cck*/
+			halrf_bb_set_pow_patten_sharp(rf, ch, true,
+				pwr->tx_shap_idx[PW_LMT_BAND_2_4G][TX_SHAPE_CCK][reg], phy);	/*cck*/
 
-		RF_DBG(rf, DBG_RF_POWER, "[TX shape] tpu->tx_ptrn_shap_idx=%d  channel=%d  Set CCK Tx Shape!!!\n",
-			tpu->tx_ptrn_shap_idx, ch);
+			RF_DBG(rf, DBG_RF_POWER, "[TX shape] tpu->tx_ptrn_shap_idx=%d  channel=%d  Set CCK Tx Shape!!!\n",
+				tpu->tx_ptrn_shap_idx, ch);
 
-		tpu->tx_ptrn_shap_idx = pwr->tx_shap_idx[PW_LMT_BAND_2_4G][TX_SHAPE_OFDM][reg];
+			tpu->tx_ptrn_shap_idx = pwr->tx_shap_idx[PW_LMT_BAND_2_4G][TX_SHAPE_OFDM][reg];
 
-		pwr->set_tx_ptrn_shap_idx[PW_LMT_BAND_2_4G][TX_SHAPE_OFDM] =
-			pwr->tx_shap_idx[PW_LMT_BAND_2_4G][TX_SHAPE_OFDM][reg];
+			pwr->set_tx_ptrn_shap_idx[PW_LMT_BAND_2_4G][TX_SHAPE_OFDM] =
+				pwr->tx_shap_idx[PW_LMT_BAND_2_4G][TX_SHAPE_OFDM][reg];
 
-		halrf_bb_set_pow_patten_sharp(rf, ch, false,
-			pwr->tx_shap_idx[PW_LMT_BAND_2_4G][TX_SHAPE_OFDM][reg], phy);	/*ofdm*/
+			halrf_bb_set_pow_patten_sharp(rf, ch, false,
+				pwr->tx_shap_idx[PW_LMT_BAND_2_4G][TX_SHAPE_OFDM][reg], phy);	/*ofdm*/
 
-		RF_DBG(rf, DBG_RF_POWER, "[TX shape] tpu->tx_ptrn_shap_idx=%d  channel=%d  Set OFDM Tx Shape!!!\n",
-			tpu->tx_ptrn_shap_idx, ch);
+			RF_DBG(rf, DBG_RF_POWER, "[TX shape] tpu->tx_ptrn_shap_idx=%d  channel=%d  Set OFDM Tx Shape!!!\n",
+				tpu->tx_ptrn_shap_idx, ch);
+		}
 	} else if (band == BAND_ON_5G) {
 		reg = halrf_get_regulation_info(rf, BAND_ON_5G);
 
-		RF_DBG(rf, DBG_RF_POWER, "======>%s   channel=%d   regulation=%d\n", __func__, ch, reg);
-		RF_DBG(rf, DBG_RF_POWER, "tpu->tx_ptrn_shap_idx=%d   pwr->tx_shap_idx[%d][OFDM][%d]=%d\n",
-			tpu->tx_ptrn_shap_idx, PW_LMT_BAND_5G, reg,
-			pwr->tx_shap_idx[PW_LMT_BAND_5G][TX_SHAPE_OFDM][reg]);
+		if (reg < PW_LMT_MAX_PER_BAND_REGU_NUM) {
+			RF_DBG(rf, DBG_RF_POWER, "======>%s   channel=%d   regulation=%d\n", __func__, ch, reg);
+			RF_DBG(rf, DBG_RF_POWER, "tpu->tx_ptrn_shap_idx=%d   pwr->tx_shap_idx[%d][OFDM][%d]=%d\n",
+				tpu->tx_ptrn_shap_idx, PW_LMT_BAND_5G, reg,
+				pwr->tx_shap_idx[PW_LMT_BAND_5G][TX_SHAPE_OFDM][reg]);
 
-		tpu->tx_ptrn_shap_idx = pwr->tx_shap_idx[PW_LMT_BAND_5G][TX_SHAPE_OFDM][reg];
+			tpu->tx_ptrn_shap_idx = pwr->tx_shap_idx[PW_LMT_BAND_5G][TX_SHAPE_OFDM][reg];
 
-		pwr->set_tx_ptrn_shap_idx[PW_LMT_BAND_5G][TX_SHAPE_OFDM] =
-			pwr->tx_shap_idx[PW_LMT_BAND_5G][TX_SHAPE_OFDM][reg];
+			pwr->set_tx_ptrn_shap_idx[PW_LMT_BAND_5G][TX_SHAPE_OFDM] =
+				pwr->tx_shap_idx[PW_LMT_BAND_5G][TX_SHAPE_OFDM][reg];
 
-		halrf_bb_set_pow_patten_sharp(rf, ch, false,
-			pwr->tx_shap_idx[PW_LMT_BAND_5G][TX_SHAPE_OFDM][reg], phy);	/*ofdm*/
+			halrf_bb_set_pow_patten_sharp(rf, ch, false,
+				pwr->tx_shap_idx[PW_LMT_BAND_5G][TX_SHAPE_OFDM][reg], phy);	/*ofdm*/
 
-		RF_DBG(rf, DBG_RF_POWER, "[TX shape] tpu->tx_ptrn_shap_idx=%d  channel=%d  Set Tx Shape!!!\n",
-			tpu->tx_ptrn_shap_idx, ch);
+			RF_DBG(rf, DBG_RF_POWER, "[TX shape] tpu->tx_ptrn_shap_idx=%d  channel=%d  Set Tx Shape!!!\n",
+				tpu->tx_ptrn_shap_idx, ch);
+		}
 	} else if (band == BAND_ON_6G) {
 		reg = halrf_get_regulation_info(rf, BAND_ON_6G);
 
-		RF_DBG(rf, DBG_RF_POWER, "======>%s   channel=%d   regulation=%d\n", __func__, ch, reg);
-		RF_DBG(rf, DBG_RF_POWER, "tpu->tx_ptrn_shap_idx=%d   pwr->tx_shap_idx[%d][OFDM][%d]=%d\n",
-			tpu->tx_ptrn_shap_idx, PW_LMT_BAND_6G, reg,
-			pwr->tx_shap_idx[PW_LMT_BAND_6G][TX_SHAPE_OFDM][reg]);
+		if (reg < PW_LMT_MAX_PER_BAND_REGU_NUM) {
+			RF_DBG(rf, DBG_RF_POWER, "======>%s   channel=%d   regulation=%d\n", __func__, ch, reg);
+			RF_DBG(rf, DBG_RF_POWER, "tpu->tx_ptrn_shap_idx=%d   pwr->tx_shap_idx[%d][OFDM][%d]=%d\n",
+				tpu->tx_ptrn_shap_idx, PW_LMT_BAND_6G, reg,
+				pwr->tx_shap_idx[PW_LMT_BAND_6G][TX_SHAPE_OFDM][reg]);
 
-		tpu->tx_ptrn_shap_idx = pwr->tx_shap_idx[PW_LMT_BAND_6G][TX_SHAPE_OFDM][reg];
+			tpu->tx_ptrn_shap_idx = pwr->tx_shap_idx[PW_LMT_BAND_6G][TX_SHAPE_OFDM][reg];
 
-		pwr->set_tx_ptrn_shap_idx[PW_LMT_BAND_6G][TX_SHAPE_OFDM] =
-			pwr->tx_shap_idx[PW_LMT_BAND_6G][TX_SHAPE_OFDM][reg];
+			pwr->set_tx_ptrn_shap_idx[PW_LMT_BAND_6G][TX_SHAPE_OFDM] =
+				pwr->tx_shap_idx[PW_LMT_BAND_6G][TX_SHAPE_OFDM][reg];
 
-		halrf_bb_set_pow_patten_sharp(rf, ch, false,
-			pwr->tx_shap_idx[PW_LMT_BAND_6G][TX_SHAPE_OFDM][reg], phy);	/*ofdm*/
+			halrf_bb_set_pow_patten_sharp(rf, ch, false,
+				pwr->tx_shap_idx[PW_LMT_BAND_6G][TX_SHAPE_OFDM][reg], phy);	/*ofdm*/
 
-		RF_DBG(rf, DBG_RF_POWER, "[TX shape] tpu->tx_ptrn_shap_idx=%d  channel=%d  Set Tx Shape!!!\n",
-			tpu->tx_ptrn_shap_idx, ch);
+			RF_DBG(rf, DBG_RF_POWER, "[TX shape] tpu->tx_ptrn_shap_idx=%d  channel=%d  Set Tx Shape!!!\n",
+				tpu->tx_ptrn_shap_idx, ch);
+		}
 
 	}
 }
@@ -1450,7 +1458,6 @@ bool _halrf_set_power_8852c(struct rf_info *rf, enum phl_phy_idx phy,
 
 void _halrf_set_ext_power_diff_8852c(struct rf_info *rf, enum phl_phy_idx phy)
 {
-#ifdef SPF_PHL_RF_019_SAR
 	struct halrf_pwr_info *pwr = &rf->pwr_info;
 	struct rtw_phl_ext_pwr_lmt_info *ext_pwr_info = &rf->hal_com->band[phy].rtw_tpu_i.ext_pwr_lmt_i;
 	u32 band = rf->hal_com->band[phy].cur_chandef.band;
@@ -1484,36 +1491,41 @@ void _halrf_set_ext_power_diff_8852c(struct rf_info *rf, enum phl_phy_idx phy)
 			pwr->ext_pwr[PW_LMT_PH_2T] = ext_pwr_info->ext_pwr_lmt_5g_band4[PW_LMT_PH_2T];
 		}
 	 } else if (band == BAND_ON_6G) {
-		if (channel >= 1 && channel <= 45) {
-			pwr->ext_pwr_org[RF_PATH_A] = ext_pwr_info->ext_pwr_lmt_6g_unii_5_1[RF_PATH_A];
-			pwr->ext_pwr_org[RF_PATH_B] = ext_pwr_info->ext_pwr_lmt_6g_unii_5_1[RF_PATH_B];
-			pwr->ext_pwr[PW_LMT_PH_1T] = ext_pwr_info->ext_pwr_lmt_ant_6g_unii_5_1[PW_LMT_PH_1T];
-			pwr->ext_pwr[PW_LMT_PH_2T] = ext_pwr_info->ext_pwr_lmt_ant_6g_unii_5_1[PW_LMT_PH_2T];
-		} else if (channel >= 49 && channel <= 93) {
-			pwr->ext_pwr_org[RF_PATH_A] = ext_pwr_info->ext_pwr_lmt_6g_unii_5_2[RF_PATH_A];
-			pwr->ext_pwr_org[RF_PATH_B] = ext_pwr_info->ext_pwr_lmt_6g_unii_5_2[RF_PATH_B];
-			pwr->ext_pwr[PW_LMT_PH_1T] = ext_pwr_info->ext_pwr_lmt_ant_6g_unii_5_2[PW_LMT_PH_1T];
-			pwr->ext_pwr[PW_LMT_PH_2T] = ext_pwr_info->ext_pwr_lmt_ant_6g_unii_5_2[PW_LMT_PH_2T];
-		} else if (channel >= 97 && channel <= 117) {
-			pwr->ext_pwr_org[RF_PATH_A] = ext_pwr_info->ext_pwr_lmt_6g_unii_6[RF_PATH_A];
-			pwr->ext_pwr_org[RF_PATH_B] = ext_pwr_info->ext_pwr_lmt_6g_unii_6[RF_PATH_B];
-			pwr->ext_pwr[PW_LMT_PH_1T] = ext_pwr_info->ext_pwr_lmt_ant_6g_unii_6[PW_LMT_PH_1T];
-			pwr->ext_pwr[PW_LMT_PH_2T] = ext_pwr_info->ext_pwr_lmt_ant_6g_unii_6[PW_LMT_PH_2T];
-		} else if (channel >= 121 && channel <= 149) {
-			pwr->ext_pwr_org[RF_PATH_A] = ext_pwr_info->ext_pwr_lmt_6g_unii_7_1[RF_PATH_A];
-			pwr->ext_pwr_org[RF_PATH_B] = ext_pwr_info->ext_pwr_lmt_6g_unii_7_1[RF_PATH_B];
-			pwr->ext_pwr[PW_LMT_PH_1T] = ext_pwr_info->ext_pwr_lmt_ant_6g_unii_7_1[PW_LMT_PH_1T];
-			pwr->ext_pwr[PW_LMT_PH_2T] = ext_pwr_info->ext_pwr_lmt_ant_6g_unii_7_1[PW_LMT_PH_2T];
-		} else if (channel >= 153 && channel <= 189) {
-			pwr->ext_pwr_org[RF_PATH_A] = ext_pwr_info->ext_pwr_lmt_6g_unii_7_2[RF_PATH_A];
-			pwr->ext_pwr_org[RF_PATH_B] = ext_pwr_info->ext_pwr_lmt_6g_unii_7_2[RF_PATH_B];
-			pwr->ext_pwr[PW_LMT_PH_1T] = ext_pwr_info->ext_pwr_lmt_ant_6g_unii_7_2[PW_LMT_PH_1T];
-			pwr->ext_pwr[PW_LMT_PH_2T] = ext_pwr_info->ext_pwr_lmt_ant_6g_unii_7_2[PW_LMT_PH_2T];
-		} else if (channel >= 193 && channel <= 237) {
-			pwr->ext_pwr_org[RF_PATH_A] = ext_pwr_info->ext_pwr_lmt_6g_unii_8[RF_PATH_A];
-			pwr->ext_pwr_org[RF_PATH_B] = ext_pwr_info->ext_pwr_lmt_6g_unii_8[RF_PATH_B];
-			pwr->ext_pwr[PW_LMT_PH_1T] = ext_pwr_info->ext_pwr_lmt_ant_6g_unii_8[PW_LMT_PH_1T];
-			pwr->ext_pwr[PW_LMT_PH_2T] = ext_pwr_info->ext_pwr_lmt_ant_6g_unii_8[PW_LMT_PH_2T];
+		if (channel >= 1 && channel <= 41) {
+			pwr->ext_pwr_org[RF_PATH_A] = ext_pwr_info->ext_pwr_lmt_ant_6g_unii_5_1[RF_PATH_A];
+			pwr->ext_pwr_org[RF_PATH_B] = ext_pwr_info->ext_pwr_lmt_ant_6g_unii_5_1[RF_PATH_B];
+			pwr->ext_pwr[PW_LMT_PH_1T] = ext_pwr_info->ext_pwr_lmt_6g_unii_5_1[PW_LMT_PH_1T];
+			pwr->ext_pwr[PW_LMT_PH_2T] = ext_pwr_info->ext_pwr_lmt_6g_unii_5_1[PW_LMT_PH_2T];
+		} else if (channel >= 45 && channel <= 93) {
+			pwr->ext_pwr_org[RF_PATH_A] = ext_pwr_info->ext_pwr_lmt_ant_6g_unii_5_2[RF_PATH_A];
+			pwr->ext_pwr_org[RF_PATH_B] = ext_pwr_info->ext_pwr_lmt_ant_6g_unii_5_2[RF_PATH_B];
+			pwr->ext_pwr[PW_LMT_PH_1T] = ext_pwr_info->ext_pwr_lmt_6g_unii_5_2[PW_LMT_PH_1T];
+			pwr->ext_pwr[PW_LMT_PH_2T] = ext_pwr_info->ext_pwr_lmt_6g_unii_5_2[PW_LMT_PH_2T];
+		} else if (channel >= 97 && channel <= 113) {
+			pwr->ext_pwr_org[RF_PATH_A] = ext_pwr_info->ext_pwr_lmt_ant_6g_unii_6[RF_PATH_A];
+			pwr->ext_pwr_org[RF_PATH_B] = ext_pwr_info->ext_pwr_lmt_ant_6g_unii_6[RF_PATH_B];
+			pwr->ext_pwr[PW_LMT_PH_1T] = ext_pwr_info->ext_pwr_lmt_6g_unii_6[PW_LMT_PH_1T];
+			pwr->ext_pwr[PW_LMT_PH_2T] = ext_pwr_info->ext_pwr_lmt_6g_unii_6[PW_LMT_PH_2T];
+		} else if (channel >= 117 && channel <= 149) {
+			pwr->ext_pwr_org[RF_PATH_A] = ext_pwr_info->ext_pwr_lmt_ant_6g_unii_7_1[RF_PATH_A];
+			pwr->ext_pwr_org[RF_PATH_B] = ext_pwr_info->ext_pwr_lmt_ant_6g_unii_7_1[RF_PATH_B];
+			pwr->ext_pwr[PW_LMT_PH_1T] = ext_pwr_info->ext_pwr_lmt_6g_unii_7_1[PW_LMT_PH_1T];
+			pwr->ext_pwr[PW_LMT_PH_2T] = ext_pwr_info->ext_pwr_lmt_6g_unii_7_1[PW_LMT_PH_2T];
+		} else if (channel >= 153 && channel <= 185) {
+			pwr->ext_pwr_org[RF_PATH_A] = ext_pwr_info->ext_pwr_lmt_ant_6g_unii_7_2[RF_PATH_A];
+			pwr->ext_pwr_org[RF_PATH_B] = ext_pwr_info->ext_pwr_lmt_ant_6g_unii_7_2[RF_PATH_B];
+			pwr->ext_pwr[PW_LMT_PH_1T] = ext_pwr_info->ext_pwr_lmt_6g_unii_7_2[PW_LMT_PH_1T];
+			pwr->ext_pwr[PW_LMT_PH_2T] = ext_pwr_info->ext_pwr_lmt_6g_unii_7_2[PW_LMT_PH_2T];
+		} else if (channel >= 189 && channel <= 233) {
+			pwr->ext_pwr_org[RF_PATH_A] = ext_pwr_info->ext_pwr_lmt_ant_6g_unii_8[RF_PATH_A];
+			pwr->ext_pwr_org[RF_PATH_B] = ext_pwr_info->ext_pwr_lmt_ant_6g_unii_8[RF_PATH_B];
+			pwr->ext_pwr[PW_LMT_PH_1T] = ext_pwr_info->ext_pwr_lmt_6g_unii_8[PW_LMT_PH_1T];
+			pwr->ext_pwr[PW_LMT_PH_2T] = ext_pwr_info->ext_pwr_lmt_6g_unii_8[PW_LMT_PH_2T];
+		} else {
+			pwr->ext_pwr_org[RF_PATH_A] = ext_pwr_info->ext_pwr_lmt_ant_6g_unii_8[RF_PATH_A];
+			pwr->ext_pwr_org[RF_PATH_B] = ext_pwr_info->ext_pwr_lmt_ant_6g_unii_8[RF_PATH_B];
+			pwr->ext_pwr[PW_LMT_PH_1T] = ext_pwr_info->ext_pwr_lmt_6g_unii_8[PW_LMT_PH_1T];
+			pwr->ext_pwr[PW_LMT_PH_2T] = ext_pwr_info->ext_pwr_lmt_6g_unii_8[PW_LMT_PH_2T];
 		}
 	}
 
@@ -1529,8 +1541,6 @@ void _halrf_set_ext_power_diff_8852c(struct rf_info *rf, enum phl_phy_idx phy)
 		RF_DBG(rf, DBG_RF_POWER, "======>%s   Set PathA=%d PathB=%d Different Power\n",
 			__func__, pwr->ext_pwr_org[RF_PATH_A], pwr->ext_pwr_org[RF_PATH_B]);
 	}
-
-#endif
 }
 
 void halrf_set_ref_power_to_struct_8852c(struct rf_info *rf, enum phl_phy_idx phy)
@@ -1578,6 +1588,8 @@ bool halrf_set_power_8852c(struct rf_info *rf, enum phl_phy_idx phy,
 
 	_halrf_set_ext_power_diff_8852c(rf, phy);
 	halrf_set_bw160m_diff_8852c(rf, phy);
+
+	halrf_set_power_limit_wa_8852c(rf, phy);
 
 	return true;
 }
@@ -1676,6 +1688,21 @@ void halrf_pwr_by_rate_info_8852c(struct rf_info *rf,
 		halrf_pwr_is_minus(rf, pwr->tx_rate_power_control[phy] / 2) ? "-" : "",
 		halrf_show_pwr_table(rf, pwr->tx_rate_power_control[phy] / 2) / 10,
 		halrf_show_pwr_table(rf, pwr->tx_rate_power_control[phy] / 2) % 10);
+
+	RF_DBG_CNSL(out_len, used, output + used, out_len - used, " %-30s = %s%d.%ddB\n",
+		"TX Rate MAX Power",
+		halrf_pwr_is_minus(rf, pwr->max_tx_rate_power[phy]) ? "-" : "",
+		halrf_show_pwr_table(rf, pwr->max_tx_rate_power[phy]) / 10,
+		halrf_show_pwr_table(rf, pwr->max_tx_rate_power[phy]) % 10);
+
+	RF_DBG_CNSL(out_len, used, output + used, out_len - used, " %-30s = %s%d.%ddB / %s%d.%ddB\n",
+		"TX Rate Increase Pwr 5G / 6G",
+		halrf_pwr_is_minus(rf, pwr->pwr_by_rate_bw_oft[PW_LMT_BAND_5G] / 2) ? "-" : "",
+		halrf_show_pwr_table(rf, pwr->pwr_by_rate_bw_oft[PW_LMT_BAND_5G] / 2) / 10,
+		halrf_show_pwr_table(rf, pwr->pwr_by_rate_bw_oft[PW_LMT_BAND_5G] / 2) % 10,
+		halrf_pwr_is_minus(rf, pwr->pwr_by_rate_bw_oft[PW_LMT_BAND_6G] / 2) ? "-" : "",
+		halrf_show_pwr_table(rf, pwr->pwr_by_rate_bw_oft[PW_LMT_BAND_6G] / 2) / 10,
+		halrf_show_pwr_table(rf, pwr->pwr_by_rate_bw_oft[PW_LMT_BAND_6G] / 2) % 10);
 
 	RF_DBG_CNSL(out_len, used, output + used, out_len - used, "1TX\n");
 
@@ -2020,12 +2047,6 @@ void halrf_pwr_limit_info_8852c(struct rf_info *rf,
 		((tmp1[RF_PATH_B] * 100) / 4) % 100
 		);
 
-	RF_DBG_CNSL(out_len, used, output + used, out_len - used, " %-30s = %s\n",
-		"6G Power limit",
-		pwr->power_limit_6g_type == PW_LMT_6G_LOW ? "LOW" :
-		(pwr->power_limit_6g_type == PW_LMT_6G_STD ? "STD" : "VLOW")
-		);
-
 	RF_DBG_CNSL(out_len, used, output + used, out_len - used, "1TX\n");
 
 	reg_tmp = halrf_mac_get_pwr_reg_8852c(rf, phy, 0xd2ec, 0xffffffff);
@@ -2248,11 +2269,6 @@ void halrf_pwr_limit_ru_info_8852c(struct rf_info *rf,
 		((tmp1[RF_PATH_B] * 100) / 4) % 100
 		);
 
-	RF_DBG_CNSL(out_len, used, output + used, out_len - used, " %-30s = %s\n",
-		"6G Power limit",
-		pwr->power_limit_6g_type == PW_LMT_6G_LOW ? "LOW" :
-		(pwr->power_limit_6g_type == PW_LMT_6G_STD ? "STD" : "VLOW")
-		);
 
 	RF_DBG_CNSL(out_len, used, output + used, out_len - used, "1TX\n");
 
@@ -2362,6 +2378,173 @@ void halrf_set_bw160m_diff_8852c(struct rf_info *rf, enum phl_phy_idx phy)
 
 	halrf_mac_write_pwr_ofst_bw(rf, phy);
 #endif
+}
+
+void halrf_set_power_limit_wa_8852c(struct rf_info *rf, enum phl_phy_idx phy)
+{
+
+	struct rtw_tpu_info *tpu = &rf->hal_com->band[phy].rtw_tpu_i;
+	struct rtw_tpu_pwr_by_rate_info *rate = &tpu->rtw_tpu_pwr_by_rate_i;
+	struct rtw_tpu_pwr_imt_info *lmt = &rf->hal_com->band[phy].rtw_tpu_i.rtw_tpu_pwr_imt_i;
+	u32 band = rf->hal_com->band[phy].cur_chandef.band;
+	u8 channel = rf->hal_com->band[phy].cur_chandef.center_ch;
+	u8 bw =  rf->hal_com->band[phy].cur_chandef.bw;
+	u8 add_dbm = 6;
+	u32 pc_type = 0;
+
+	pc_type = ((rf->phl_com->id.id) >> 8) & 0xff;
+
+	RF_DBG(rf, DBG_RF_POWER, "======>%s   band=%d   channel=%d   bw=%d   id.id=0x%x   pc_type=0x%x\n",
+		__func__, band, channel, bw, rf->phl_com->id.id, pc_type);
+
+	if (band == BAND_ON_6G && channel == 207 && bw == CHANNEL_WIDTH_160 && pc_type == 4) {
+		/*pc_type == 4 Lenovo PC*/
+		RF_DBG(rf, DBG_RF_POWER, "======>%s   1TX power=%d\n",
+			__func__, halrf_get_power_limit(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, bw,
+			PW_LMT_NONBF, PW_LMT_PH_1T, channel));
+
+		RF_DBG(rf, DBG_RF_POWER, "======>%s   2TX power=%d\n",
+			__func__, halrf_get_power_limit(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, bw,
+			PW_LMT_NONBF, PW_LMT_PH_2T, channel));
+
+		/*1TX power by rate*/
+		rate->pwr_by_rate[PW_LMT_PH_1T][0] = halrf_get_power_limit(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, bw, PW_LMT_NONBF, PW_LMT_PH_1T, channel) / 2;
+		rate->pwr_by_rate[PW_LMT_PH_1T][1] = halrf_get_power_limit(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, bw, PW_LMT_NONBF, PW_LMT_PH_1T, channel) / 2 + add_dbm;
+		rate->pwr_by_rate[PW_LMT_PH_1T][2] = halrf_get_power_limit(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, bw, PW_LMT_NONBF, PW_LMT_PH_1T, channel) / 2;
+		rate->pwr_by_rate[PW_LMT_PH_1T][3] = halrf_get_power_limit(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, bw, PW_LMT_NONBF, PW_LMT_PH_1T, channel) / 2;
+
+		rate->pwr_by_rate[PW_LMT_PH_1T][4] = halrf_get_power_limit(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, bw, PW_LMT_NONBF, PW_LMT_PH_1T, channel) / 2;
+		rate->pwr_by_rate[PW_LMT_PH_1T][5] = halrf_get_power_limit(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, bw, PW_LMT_NONBF, PW_LMT_PH_1T, channel) / 2;
+		rate->pwr_by_rate[PW_LMT_PH_1T][6] = halrf_get_power_limit(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, bw, PW_LMT_NONBF, PW_LMT_PH_1T, channel) / 2;
+		rate->pwr_by_rate[PW_LMT_PH_1T][7] = halrf_get_power_limit(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, bw, PW_LMT_NONBF, PW_LMT_PH_1T, channel) / 2;
+
+		rate->pwr_by_rate[PW_LMT_PH_1T][8] = halrf_get_power_limit(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, bw, PW_LMT_NONBF, PW_LMT_PH_1T, channel) / 2;
+		rate->pwr_by_rate[PW_LMT_PH_1T][9] = halrf_get_power_limit(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, bw, PW_LMT_NONBF, PW_LMT_PH_1T, channel) / 2;
+		rate->pwr_by_rate[PW_LMT_PH_1T][10] = halrf_get_power_limit(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, bw, PW_LMT_NONBF, PW_LMT_PH_1T, channel) / 2;
+		rate->pwr_by_rate[PW_LMT_PH_1T][11] = halrf_get_power_limit(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, bw, PW_LMT_NONBF, PW_LMT_PH_1T, channel) / 2;
+
+		/*2TX power by rate*/
+		rate->pwr_by_rate[PW_LMT_PH_2T][0] = halrf_get_power_limit(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, bw, PW_LMT_NONBF, PW_LMT_PH_2T, channel) / 2;
+		rate->pwr_by_rate[PW_LMT_PH_2T][1] = halrf_get_power_limit(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, bw, PW_LMT_NONBF, PW_LMT_PH_2T, channel) / 2 + add_dbm;
+		rate->pwr_by_rate[PW_LMT_PH_2T][2] = halrf_get_power_limit(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, bw, PW_LMT_NONBF, PW_LMT_PH_2T, channel) / 2;
+		rate->pwr_by_rate[PW_LMT_PH_2T][3] = halrf_get_power_limit(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, bw, PW_LMT_NONBF, PW_LMT_PH_2T, channel) / 2;
+
+		rate->pwr_by_rate[PW_LMT_PH_2T][4] = halrf_get_power_limit(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, bw, PW_LMT_NONBF, PW_LMT_PH_2T, channel) / 2;
+		rate->pwr_by_rate[PW_LMT_PH_2T][5] = halrf_get_power_limit(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, bw, PW_LMT_NONBF, PW_LMT_PH_2T, channel) / 2;
+		rate->pwr_by_rate[PW_LMT_PH_2T][6] = halrf_get_power_limit(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, bw, PW_LMT_NONBF, PW_LMT_PH_2T, channel) / 2;
+		rate->pwr_by_rate[PW_LMT_PH_2T][7] = halrf_get_power_limit(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, bw, PW_LMT_NONBF, PW_LMT_PH_2T, channel) / 2;
+
+		rate->pwr_by_rate[PW_LMT_PH_2T][8] = halrf_get_power_limit(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, bw, PW_LMT_NONBF, PW_LMT_PH_2T, channel) / 2;
+		rate->pwr_by_rate[PW_LMT_PH_2T][9] = halrf_get_power_limit(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, bw, PW_LMT_NONBF, PW_LMT_PH_2T, channel) / 2;
+		rate->pwr_by_rate[PW_LMT_PH_2T][10] = halrf_get_power_limit(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, bw, PW_LMT_NONBF, PW_LMT_PH_2T, channel) / 2;
+		rate->pwr_by_rate[PW_LMT_PH_2T][11] = halrf_get_power_limit(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, bw, PW_LMT_NONBF, PW_LMT_PH_2T, channel) / 2;
+
+		halrf_modify_pwr_table_bitmask(rf, phy, PWR_BY_RATE);
+		halrf_mac_write_pwr_by_rate_reg(rf, phy);
+		halrf_mac_write_pwr_ofst_mode(rf, phy);
+
+		
+		/*1Tx 160m NOBF*/
+		lmt->pwr_lmt_160m[PW_LMT_PH_1T][PW_LMT_NONBF] =
+			halrf_get_power_limit(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, PW_LMT_BW_160M, PW_LMT_NONBF, PW_LMT_PH_1T, channel) / 2 + add_dbm;
+
+		/*2Tx 160m NOBF*/
+		lmt->pwr_lmt_160m[PW_LMT_PH_2T][PW_LMT_NONBF] =
+			halrf_get_power_limit(rf, phy, RF_PATH_A, RTW_DATA_RATE_HE_NSS1_MCS7, PW_LMT_BW_160M, PW_LMT_NONBF, PW_LMT_PH_2T, channel) / 2 + add_dbm;
+
+		halrf_modify_pwr_table_bitmask(rf, phy, PWR_LIMIT);
+		halrf_mac_write_pwr_limit_reg(rf, phy);
+	} else {
+		RF_DBG(rf, DBG_RF_POWER, "======>%s   band=%d	channel=%d   bw=%d   Return!!!\n",
+			__func__, band, channel, bw);
+		return;	
+	}
+}
+
+void halrf_set_bw_power_by_rate_offset_8852c(struct rf_info *rf, u32 pwr_by_rate_bw_ofst)
+{
+	struct halrf_pwr_info *pwr = &rf->pwr_info;
+
+	pwr->pwr_by_rate_bw_oft[PW_LMT_BAND_5G] = (pwr_by_rate_bw_ofst & 0xff) * 2;
+	pwr->pwr_by_rate_bw_oft[PW_LMT_BAND_6G] = ((pwr_by_rate_bw_ofst & 0xff00) >> 8) * 2;
+
+	pwr->pwr_by_rate_bw_oft_en = true;
+
+	RF_DBG(rf, DBG_RF_POWER, "======>%s   pwr_by_rate_bw_ofst=0x%x pwr_by_rate_bw_oft=%d pwr_by_rate_bw_oft=%d\n",
+		__func__, pwr_by_rate_bw_ofst,
+		pwr ->pwr_by_rate_bw_oft[PW_LMT_BAND_5G],
+		pwr ->pwr_by_rate_bw_oft[PW_LMT_BAND_6G]);
+}
+
+s8 halrf_get_pwr_by_rate_bw_control_8852c(struct rf_info *rf, enum phl_phy_idx phy, u16 rate, u32 band, s8 pwr_by_rate)
+{
+	struct halrf_pwr_info *pwr = &rf->pwr_info;
+
+	s8 ofdm6m_pwr_5g =
+		halrf_get_power_by_rate_band(rf, HW_PHY_0, RTW_DATA_RATE_OFDM6, 0, 0, PW_LMT_BAND_5G);
+	s8 he_mcs0_nss2_pwr_5g =
+		halrf_get_power_by_rate_band(rf, HW_PHY_0, RTW_DATA_RATE_HE_NSS2_MCS0, 0, 0, PW_LMT_BAND_5G);
+	s8 ofdm6m_pwr_6g =
+		halrf_get_power_by_rate_band(rf, HW_PHY_0, RTW_DATA_RATE_OFDM6, 0, 0, PW_LMT_BAND_6G);
+	s8 he_mcs0_nss2_pwr_6g =
+		halrf_get_power_by_rate_band(rf, HW_PHY_0, RTW_DATA_RATE_HE_NSS2_MCS0, 0, 0, PW_LMT_BAND_6G);
+
+	RF_DBG(rf, DBG_RF_POWER, "======>%s   rate=%d   band=%d   pwr_by_rate=%d\n",
+		__func__, rate, band, pwr_by_rate);
+
+	if (band == PW_LMT_BAND_5G) {
+		if ((rate >= RTW_DATA_RATE_OFDM6 && rate <= RTW_DATA_RATE_OFDM54) ||
+			(rate >= RTW_DATA_RATE_HE_NSS1_MCS0 && rate <= RTW_DATA_RATE_HE_NSS1_MCS11)) {
+			if ((pwr_by_rate + pwr->pwr_by_rate_bw_oft[PW_LMT_BAND_5G]) > ofdm6m_pwr_5g) {
+				pwr_by_rate = ofdm6m_pwr_5g;
+				RF_DBG(rf, DBG_RF_POWER, "======>%s   Reslut > Base ofdm6m_pwr_5g. pwr_by_rate = ofdm6m_pwr_5g(%d)\n",
+					__func__, pwr_by_rate);
+			} else {
+				pwr_by_rate = pwr_by_rate + pwr->pwr_by_rate_bw_oft[PW_LMT_BAND_5G];
+				RF_DBG(rf, DBG_RF_POWER, "======>%s   Reslut <= Base ofdm6m_pwr_5g. pwr_by_rate(%d) =  pwr_by_rate + pwr->pwr_by_rate_bw_oft(%d)\n",
+					__func__, pwr_by_rate, pwr->pwr_by_rate_bw_oft[PW_LMT_BAND_5G]);
+			}
+		}
+
+		if (rate >= RTW_DATA_RATE_HE_NSS2_MCS0 && rate <= RTW_DATA_RATE_HE_NSS2_MCS11) {
+			if (pwr_by_rate + pwr->pwr_by_rate_bw_oft[PW_LMT_BAND_5G] > he_mcs0_nss2_pwr_5g) {
+				pwr_by_rate = he_mcs0_nss2_pwr_5g;
+				RF_DBG(rf, DBG_RF_POWER, "======>%s   Reslut > Base he_mcs0_nss2_pwr_5g. pwr_by_rate = he_mcs0_nss2_pwr_5g(%d)\n",
+					__func__, pwr_by_rate);
+			} else {
+				pwr_by_rate = pwr_by_rate + pwr->pwr_by_rate_bw_oft[PW_LMT_BAND_5G];
+				RF_DBG(rf, DBG_RF_POWER, "======>%s   Reslut <= Base he_mcs0_nss2_pwr_5g. pwr_by_rate(%d) =  pwr_by_rate + pwr->pwr_by_rate_bw_oft(%d)\n",
+					__func__, pwr_by_rate, pwr->pwr_by_rate_bw_oft[PW_LMT_BAND_5G]);
+			}
+		}
+	}
+
+	if (band == PW_LMT_BAND_6G) {
+		if ((rate >= RTW_DATA_RATE_OFDM6 && rate <= RTW_DATA_RATE_OFDM54) ||
+			(rate >= RTW_DATA_RATE_HE_NSS1_MCS0 && rate <= RTW_DATA_RATE_HE_NSS1_MCS11)) {
+			if ((pwr_by_rate + pwr->pwr_by_rate_bw_oft[PW_LMT_BAND_6G]) > ofdm6m_pwr_6g) {
+				pwr_by_rate = ofdm6m_pwr_6g;
+				RF_DBG(rf, DBG_RF_POWER, "Reslut > Base ofdm6m_pwr_6g. pwr_by_rate = ofdm6m_pwr_6g(%d)\n", pwr_by_rate);
+			} else {
+				pwr_by_rate = pwr_by_rate + pwr->pwr_by_rate_bw_oft[PW_LMT_BAND_6G];
+				RF_DBG(rf, DBG_RF_POWER, "Reslut <= Base ofdm6m_pwr_6g. pwr_by_rate(%d) =  pwr_by_rate + pwr->pwr_by_rate_bw_oft(%d)\n",
+					pwr_by_rate, pwr->pwr_by_rate_bw_oft[PW_LMT_BAND_6G]);
+			}
+		}
+
+		if (rate >= RTW_DATA_RATE_HE_NSS2_MCS0 && rate <= RTW_DATA_RATE_HE_NSS2_MCS11) {
+			if ((pwr_by_rate + pwr->pwr_by_rate_bw_oft[PW_LMT_BAND_6G]) > he_mcs0_nss2_pwr_6g) {
+				pwr_by_rate = he_mcs0_nss2_pwr_6g;
+				RF_DBG(rf, DBG_RF_POWER, "Reslut > Base he_mcs0_nss2_pwr_6g. pwr_by_rate = he_mcs0_nss2_pwr_6g(%d)\n", pwr_by_rate);
+			} else {
+				pwr_by_rate = pwr_by_rate + pwr->pwr_by_rate_bw_oft[PW_LMT_BAND_6G];
+				RF_DBG(rf, DBG_RF_POWER, "Reslut <= Base he_mcs0_nss2_pwr_6g. pwr_by_rate(%d) =  pwr_by_rate + pwr->pwr_by_rate_bw_oft(%d)\n",
+					pwr_by_rate, pwr->pwr_by_rate_bw_oft[PW_LMT_BAND_6G]);
+			}
+		}
+	}
+	
+	return pwr_by_rate;
 }
 
 #endif	/*RF_8852C_SUPPORT*/

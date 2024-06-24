@@ -28,11 +28,17 @@ struct rtw_phl_regu_dyn_ant_gain {
 
 int rtw_phl_get_pw_lmt_regu_type_from_str(void *phl, const char *str);
 const char *rtw_phl_get_pw_lmt_regu_str_from_type(void *phl, u8 regu);
+int rtw_phl_get_pw_lmt_regu_type_of_band_from_str(void *phl
+	, enum band_type band, const char *str);
+const char *rtw_phl_get_pw_lmt_regu_str_from_type_of_band(void *phl
+	, enum band_type band, u8 regu);
 
 const char *rtw_phl_get_pw_lmt_regu_type_str(void *phl, enum band_type band);
 
 bool rtw_phl_pw_lmt_regu_tbl_exist(void *phl, enum band_type band, u8 regu);
 u8 rtw_phl_ext_reg_codemap_search(void *phl, u16 domain_code, const char *country, const char **reg_name);
+u8 rtw_phl_ext_reg_codemap_of_band_search(void *phl, enum band_type band
+	, u16 domain_code, const char *country, const char **reg_name);
 
 bool rtw_phl_get_pwr_lmt_en(void *phl, u8 band_idx);
 
@@ -49,7 +55,14 @@ enum rtw_phl_status rtw_phl_get_txinfo_pwr(void *phl, s16 *pwr_dbm);
 enum rtw_phl_status phl_cmd_tpe_update_hdl(void *phl, u8 *param);
 #endif
 
+s8 rtw_phl_get_power_by_rate_band(void *phl, u8 hw_band, u16 rate, u8 dcm, u8 offset, u32 band);
 s8 rtw_phl_get_power_limit_option(void *phl, u8 hw_band, u8 rf_path, u16 rate,
 	u8 bandwidth, u8 beamforming, u8 tx_num, u8 channel, u32 band, u8 reg);
+s8 rtw_phl_get_power_limit_ru_option(void *phl,
+	u8 hw_band, u8 rf_path, u16 rate, u8 bandwidth,
+	u8 tx_num, u8 channel, u32 band, u8 reg);
 u8 rtw_phl_get_tx_tbl_to_tx_pwr_times(void *phl);
+s8 rtw_phl_get_power_limit_value_ww(void *phl);
+s8 rtw_phl_get_power_limit_value_na(void *phl);
+u32 rtw_phl_get_regulation_max_num(void *phl, enum band_type band);
 #endif /*_PHL_TXPWR_H_*/

@@ -20,16 +20,9 @@
 #include "../../type.h"
 #if MAC_AX_8852C_SUPPORT
 
-#ifdef CONFIG_NEW_HALMAC_INTERFACE
-struct mac_ax_adapter *get_mac_8852c_adapter(enum mac_ax_intf intf,
-					     u8 chip_cut, void *phl_adapter,
-					     void *drv_adapter,
-					     struct mac_ax_pltfm_cb *pltfm_cb)
-#else
 struct mac_ax_adapter *get_mac_8852c_adapter(enum mac_ax_intf intf,
 					     u8 chip_cut, void *drv_adapter,
 					     struct mac_ax_pltfm_cb *pltfm_cb);
-#endif
 
 u32 dmac_func_en_8852c(struct mac_ax_adapter *adapter);
 

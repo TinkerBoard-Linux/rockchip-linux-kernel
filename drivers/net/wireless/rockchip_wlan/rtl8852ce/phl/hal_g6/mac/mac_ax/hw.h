@@ -60,6 +60,9 @@
 #if MAC_AX_8852D_SUPPORT
 #include "mac_8852d/_usb_8852d.h"
 #endif
+#if MAC_AX_8852BT_SUPPORT
+#include "mac_8852bt/_usb_8852bt.h"
+#endif
 #endif
 /*--------------------Define -------------------------------------------*/
 
@@ -166,12 +169,17 @@
 #define ACK_TO_10M      0x80
 #define ACK_TO_5M       0xFF
 
+/* Watchdog TP*/
+#define TP_10M			10
+
 #define MACID_NONE 0xFF
 
 #define PCIE_5G6G_PER_GEN1GEN2_ANA21_VAL 0x3700
 #define PCIE_5G6G_PER_GEN1GEN2_ANA23_VAL 0xFB66
 #define PCIE_5G6G_PER_GEN1GEN2_ANA2F_VAL 0x3008
 
+/*mac_write_pwr_limit_en_ax*/
+#define PWR_RU_LMT_CTRL_VAL 262144  //0x400 00
 /*--------------------Define Enum---------------------------------------*/
 
 /**
@@ -225,6 +233,7 @@ enum addr_rang_idx {
 #define ADDR_IS_AON_8851B(addr) ((addr) <= 0x4FF ? 1 : 0)
 #define ADDR_IS_AON_8851E(addr) ((addr) <= 0x4FF ? 1 : 0)
 #define ADDR_IS_AON_8852D(addr) ((addr) <= 0x4FF ? 1 : 0)
+#define ADDR_IS_AON_8852BT(addr) ((addr) <= 0x4FF ? 1 : 0)
 
 #define ADDR_IS_HCI_8852A(addr) \
 	((addr) >= 0x1000 && (addr) <= 0x1FFF ? 1 : 0)
@@ -244,6 +253,8 @@ enum addr_rang_idx {
 #define ADDR_IS_HCI_8852D(addr) \
 	(((addr) >= 0x2000 && (addr) <= 0x63FF) || \
 	 ((addr) >= 0x7C00 && (addr) <= 0x7FFF) ? 1 : 0)
+#define ADDR_IS_HCI_8852BT(addr) \
+	((addr) >= 0x1000 && (addr) <= 0x1FFF ? 1 : 0)
 
 #define ADDR_IS_PON_8852A(addr) \
 	(((addr) >= 0x400 && (addr) <= 0xFFF) || \
@@ -282,6 +293,10 @@ enum addr_rang_idx {
 	 ((addr) >= 0x8000 && (addr) <= 0x8407) || \
 	 ((addr) >= 0xC000 && (addr) <= 0xC007) || \
 	 ((addr) >= 0xE000 && (addr) <= 0xE007) ? 1 : 0)
+#define ADDR_IS_PON_8852BT(addr) \
+	(((addr) >= 0x400 && (addr) <= 0xFFF) || \
+	 ((addr) >= 0x8000 && (addr) <= 0x8407) || \
+	 ((addr) >= 0xC000 && (addr) <= 0xC007) ? 1 : 0)
 
 #define ADDR_IS_DMAC_8852A(addr) \
 	((addr) >= 0x8408 && (addr) <= 0xBFFF ? 1 : 0)
@@ -301,6 +316,8 @@ enum addr_rang_idx {
 #define ADDR_IS_DMAC_8852D(addr) \
 	(((addr) >= 0x1000 && (addr) <= 0x1FFF) || \
 	 ((addr) >= 0x8408 && (addr) <= 0xBFFF) ? 1 : 0)
+#define ADDR_IS_DMAC_8852BT(addr) \
+	((addr) >= 0x8408 && (addr) <= 0xBFFF ? 1 : 0)
 
 #define ADDR_IS_CMAC0_8852A(addr) \
 	((addr) >= 0xC008 && (addr) <= 0xDFFF ? 1 : 0)
@@ -315,6 +332,8 @@ enum addr_rang_idx {
 #define ADDR_IS_CMAC0_8851E(addr) \
 	((addr) >= 0xC008 && (addr) <= 0xDFFF ? 1 : 0)
 #define ADDR_IS_CMAC0_8852D(addr) \
+	((addr) >= 0xC008 && (addr) <= 0xDFFF ? 1 : 0)
+#define ADDR_IS_CMAC0_8852BT(addr) \
 	((addr) >= 0xC008 && (addr) <= 0xDFFF ? 1 : 0)
 
 #define ADDR_IS_CMAC1_8852A(addr) \
@@ -331,6 +350,8 @@ enum addr_rang_idx {
 	((addr) >= 0xE008 && (addr) <= 0xFFFF ? 1 : 0)
 #define ADDR_IS_CMAC1_8852D(addr) \
 	((addr) >= 0xE008 && (addr) <= 0xFFFF ? 1 : 0)
+#define ADDR_IS_CMAC1_8852BT(addr) \
+	((addr) >= 0xE008 && (addr) <= 0xFFFF ? 0 : 0)
 
 #define ADDR_IS_BB0_8852A(addr) \
 	(((addr) >= 0x10000 && (addr) <= 0x125FF) || \
@@ -367,6 +388,11 @@ enum addr_rang_idx {
 	 ((addr) >= 0x12E00 && (addr) <= 0x138FF) || \
 	 ((addr) >= 0x13C00 && (addr) <= 0x15FFF) || \
 	 ((addr) >= 0x17000 && (addr) <= 0x17FFF) ? 1 : 0)
+#define ADDR_IS_BB0_8852BT(addr) \
+	(((addr) >= 0x10000 && (addr) <= 0x125FF) || \
+	 ((addr) >= 0x12E00 && (addr) <= 0x138FF) || \
+	 ((addr) >= 0x13C00 && (addr) <= 0x15FFF) || \
+	 ((addr) >= 0x17000 && (addr) <= 0x17FFF) ? 1 : 0)
 
 #define ADDR_IS_BB1_8852A(addr) \
 	(((addr) >= 0x12600 && (addr) <= 0x12DFF) || \
@@ -396,6 +422,10 @@ enum addr_rang_idx {
 	(((addr) >= 0x12600 && (addr) <= 0x12DFF) || \
 	 ((addr) >= 0x13900 && (addr) <= 0x13BFF) || \
 	 ((addr) >= 0x16000 && (addr) <= 0x16FFF) ? 1 : 0)
+#define ADDR_IS_BB1_8852BT(addr) \
+	(((addr) >= 0x12600 && (addr) <= 0x12DFF) || \
+	 ((addr) >= 0x13900 && (addr) <= 0x13BFF) || \
+	 ((addr) >= 0x16000 && (addr) <= 0x16FFF) ? 1 : 0)
 
 #define ADDR_IS_RF_8852A(addr) \
 	((addr) >= 0x18000 && (addr) <= 0x1DFFF ? 1 : 0)
@@ -411,6 +441,8 @@ enum addr_rang_idx {
 	((addr) >= 0x18000 && (addr) <= 0x1FFFF ? 1 : 0)
 #define ADDR_IS_RF_8852D(addr) \
 	((addr) >= 0x18000 && (addr) <= 0x1FFFF ? 1 : 0)
+#define ADDR_IS_RF_8852BT(addr) \
+	((addr) >= 0x18000 && (addr) <= 0x1FFFF ? 1 : 0)
 
 #define ADDR_IS_IND_ACES_8852A(addr) \
 	((addr) >= 0x40000 && (addr) <= 0x7FFFF ? 1 : 0)
@@ -425,6 +457,8 @@ enum addr_rang_idx {
 #define ADDR_IS_IND_ACES_8851E(addr) \
 	((addr) >= 0x40000 && (addr) <= 0x7FFFF ? 1 : 0)
 #define ADDR_IS_IND_ACES_8852D(addr) \
+	((addr) >= 0x40000 && (addr) <= 0x7FFFF ? 1 : 0)
+#define ADDR_IS_IND_ACES_8852BT(addr) \
 	((addr) >= 0x40000 && (addr) <= 0x7FFFF ? 1 : 0)
 
 #define ADDR_IS_RSVD_8852A(addr) \
@@ -455,16 +489,22 @@ enum addr_rang_idx {
 	(((addr) >= 0x6400 && (addr) <= 0x6FFF) || \
 	 ((addr) >= 0x20000 && (addr) <= 0x3FFFF) || \
 	 (addr) >= 0x80000 ? 1 : 0)
+#define ADDR_IS_RSVD_8852BT(addr) \
+	(((addr) >= 0x2000 && (addr) <= 0x7FFF) || \
+	 ((addr) >= 0x20000 && (addr) <= 0x3FFFF) || \
+	 (addr) >= 0x80000 ? 1 : 0)
 
-#if (MAC_AX_8852A_SUPPORT || MAC_AX_8852B_SUPPORT || MAC_AX_8851B_SUPPORT)
+#if MAC_AX_8852A_SUPPORT || MAC_AX_8852B_SUPPORT || MAC_AX_8851B_SUPPORT || MAC_AX_8852BT_SUPPORT
 #define ADDR_NOT_ALLOW_SERL1(addr) \
 	((addr) != R_AX_SER_DBG_INFO && (addr) != R_AX_HCI_FUNC_EN && \
-	 (addr) != R_AX_HD0IMR && (addr) != R_AX_HD0ISR ? 1 : 0)
+	 (addr) != R_AX_HD0IMR && (addr) != R_AX_HD0ISR && \
+	 (addr) != R_AX_DMAC_ERR_ISR ? 1 : 0)
 #define ADDR_NOT_ALLOW_LPS(addr) ((addr) != R_AX_CPWM ? 1 : 0)
 #else // (MAC_AX_8852C_SUPPORT || MAC_AX_8192XB_SUPPORT)
 #define ADDR_NOT_ALLOW_SERL1(addr) \
 	((addr) != R_AX_SER_DBG_INFO && (addr) != R_AX_HCI_FUNC_EN_V1 && \
-	 (addr) != R_AX_HD0IMR_V1 && (addr) != R_AX_HD0ISR_V1 ? 1 : 0)
+	 (addr) != R_AX_HD0IMR_V1 && (addr) != R_AX_HD0ISR_V1 && \
+	 (addr) != R_AX_DMAC_ERR_ISR ? 1 : 0)
 #define ADDR_NOT_ALLOW_LPS(addr) ((addr) != R_AX_CPWM_V1 ? 1 : 0)
 #endif
 
@@ -613,25 +653,6 @@ u32 set_host_rpr(struct mac_ax_adapter *adapter,
  * @}
  * @}
  */
-
-/**
- * @addtogroup Common
- * @{
- * @addtogroup HW_Related
- * @{
- */
-
-/**
- * @brief mac_read_pwr_reg
- *
- * @param *adapter
- * @param band
- * @param offset
- * @param *val
- * @return Please Place Description here.
- * @retval u32
- */
-u32 set_l2_status(struct mac_ax_adapter *adapter);
 u32 mac_read_pwr_reg(struct mac_ax_adapter *adapter, u8 band,
 		     const u32 offset, u32 *val);
 /**
@@ -943,34 +964,6 @@ u32 mac_write_xcap_reg_dav(struct mac_ax_adapter *adapter, u8 sc_xo, u32 val);
  * @{
  */
 
-/**
- * @brief mac_write_bbrst_reg
- *
- * @param *adapter
- * @param val
- * @return Please Place Description here.
- * @retval u32
- */
-
-u32 mac_write_bbrst_reg(struct mac_ax_adapter *adapter, u8 val);
-/**
- * @}
- * @}
- */
-
-/** * @brief set_macid_pause
- *
- * @param *adapter
- * @param *cfg
- * @return Please Place Description here.
- * @retval u32
- */
-u32 set_macid_pause(struct mac_ax_adapter *adapter,
-		    struct mac_ax_macid_pause_cfg *cfg);
-/**
- * @}
- * @}
- */
 
 /**
  * @addtogroup Common
@@ -980,102 +973,12 @@ u32 set_macid_pause(struct mac_ax_adapter *adapter,
  */
 
 /**
- * @brief macid_pause
- *
- * @param *adapter
- * @param *grp
- * @return Please Place Description here.
- * @retval u32
- */
-u32 macid_pause(struct mac_ax_adapter *adapter,
-		struct mac_ax_macid_pause_grp *grp);
-/**
- * @}
- * @}
- */
-
-/**
  * @addtogroup Common
  * @{
  * @addtogroup HW_Related
  * @{
  */
 
-/** * @brief set_macid_pause_sleep
- *
- * @param *adapter
- * @param *cfg
- * @return Please Place Description here.
- * @retval u32
- */
-u32 set_macid_pause_sleep(struct mac_ax_adapter *adapter,
-			  struct mac_ax_macid_pause_sleep_cfg *cfg);
-/**
- * @}
- * @}
- */
-
-/**
- * @addtogroup Common
- * @{
- * @addtogroup HW_Related
- * @{
- */
-
-/**
- * @brief macid_pause_sleep
- *
- * @param *adapter
- * @param *grp
- * @return Please Place Description here.
- * @retval u32
- */
-u32 macid_pause_sleep(struct mac_ax_adapter *adapter,
-		      struct mac_ax_macid_pause_sleep_grp *grp);
-/**
- * @}
- * @}
- */
-
-/**
- * @addtogroup Common
- * @{
- * @addtogroup HW_Related
- * @{
- */
-
-/**
- * @brief get_macid_pause
- *
- * @param *adapter
- * @param *cfg
- * @return Please Place Description here.
- * @retval u32
- */
-u32 get_macid_pause(struct mac_ax_adapter *adapter,
-		    struct mac_ax_macid_pause_cfg *cfg);
-/**
- * @}
- * @}
- */
-
-/**
- * @addtogroup Common
- * @{
- * @addtogroup HW_Related
- * @{
- */
-
-/**
- * @brief get_ss_wmm_tbl
- *
- * @param *adapter
- * @param *ctrl
- * @return Please Place Description here.
- * @retval u32
- */
-u32 get_ss_wmm_tbl(struct mac_ax_adapter *adapter,
-		   struct mac_ax_ss_wmm_tbl_ctrl *ctrl);
 /**
  * @}
  * @}
@@ -1097,28 +1000,6 @@ u32 get_ss_wmm_tbl(struct mac_ax_adapter *adapter,
  * @retval u32
  */
 u32 set_enable_bb_rf(struct mac_ax_adapter *adapter, u8 enable);
-/**
- * @}
- * @}
- */
-
-/**
- * @addtogroup Common
- * @{
- * @addtogroup HW_Related
- * @{
- */
-
-/**
- * @brief set_cctl_rty_limit
- *
- * @param *adapter
- * @param *cfg
- * @return Please Place Description here.
- * @retval u32
- */
-u32 set_cctl_rty_limit(struct mac_ax_adapter *adapter,
-		       struct mac_ax_cctl_rty_lmt_cfg *cfg);
 /**
  * @}
  * @}
@@ -1154,15 +1035,17 @@ u32 cfg_mac_bw(struct mac_ax_adapter *adapter,
  */
 
 /**
- * @brief get_ss_quota_mode
- *
- * @param *adapter
- * @param *ctrl
- * @return Please Place Description here.
- * @retval u32
+ * @}
+ * @}
  */
-u32 get_ss_quota_mode(struct mac_ax_adapter *adapter,
-		      struct mac_ax_ss_quota_mode_ctrl *ctrl);
+
+/**
+ * @addtogroup Common
+ * @{
+ * @addtogroup HW_Related
+ * @{
+ */
+
 /**
  * @}
  * @}
@@ -1176,16 +1059,6 @@ u32 get_ss_quota_mode(struct mac_ax_adapter *adapter,
  */
 
 /**
- * @brief set_ss_quota_mode
- *
- * @param *adapter
- * @param *ctrl
- * @return Please Place Description here.
- * @retval u32
- */
-u32 set_ss_quota_mode(struct mac_ax_adapter *adapter,
-		      struct mac_ax_ss_quota_mode_ctrl *ctrl);
-/**
  * @}
  * @}
  */
@@ -1197,82 +1070,6 @@ u32 set_ss_quota_mode(struct mac_ax_adapter *adapter,
  * @{
  */
 
-/**
- * @brief ss_get_quotasetting
- *
- * @param *adapter
- * @param *para
- * @return Please Place Description here.
- * @retval u32
- */
-u32 ss_get_quotasetting(struct mac_ax_adapter *adapter,
-			struct mac_ax_ss_quota_setting *para);
-/**
- * @}
- * @}
- */
-
-/**
- * @addtogroup Common
- * @{
- * @addtogroup HW_Related
- * @{
- */
-
-/**
- * @brief ss_set_quotasetting
- *
- * @param *adapter
- * @param *para
- * @return Please Place Description here.
- * @retval u32
- */
-u32 ss_set_quotasetting(struct mac_ax_adapter *adapter,
-			struct mac_ax_ss_quota_setting *para);
-/**
- * @}
- * @}
- */
-
-/**
- * @brief scheduler_set_prebkf
- *
- * @param *adapter
- * @param *para
- * @return Please Place Description here.
- * @retval u32
- */
-u32 scheduler_set_prebkf(struct mac_ax_adapter *adapter,
-			 struct mac_ax_prebkf_setting *para);
-/**
- * @}
- * @}
- */
-
-/**
- * @brief set_bacam_mode
- *
- * @param *adapter
- * @param mode_sel
- * @return Set the R_AX_RESPBA_CAM_CTRL bit 4 to be 0 or 1 which decide the
- * option mode in BA CAM.
- * @retval u32
- */
-u32 set_bacam_mode(struct mac_ax_adapter *adapter, u8 mode_sel);
-/**
- * @}
- * @}
- */
-
-/**
- * @brief scheduler_set_prebkf
- *
- * @param *adapter
- * @param *mode_sel
- * @return Get the option mode from R_AX_RESPBA_CAM_CTRL bit 4 in the BA CAM.
- * @retval u32
- */
-u32 get_bacam_mode(struct mac_ax_adapter *adapter, u8 *mode_sel);
 /**
  * @}
  * @}
@@ -1336,6 +1133,22 @@ u32 mac_watchdog(struct mac_ax_adapter *adapter,
  */
 u32 mac_get_freerun(struct mac_ax_adapter *adapter,
 		    struct mac_ax_freerun *freerun);
+
+/**
+ * @}
+ * @}
+ */
+
+/**
+ * @brief mac_reset_freerun
+ *
+ * @param *adapter
+ * @param *band
+ * @return Please Place Description here.
+ * @retval u32
+ */
+u32 mac_reset_freerun(struct mac_ax_adapter *adapter,
+		      u8 *band);
 
 /**
  * @}

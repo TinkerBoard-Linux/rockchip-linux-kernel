@@ -30,7 +30,7 @@ phl_chanctx_free(struct phl_info_t *phl_info, struct hw_band_ctl_t *band_ctl);
 
 enum rtw_phl_status
 phl_set_ch_bw(struct phl_info_t *phl_info, u8 band_idx,
-		 struct rtw_chan_def *chdef, bool do_rfk);
+		 struct rtw_chan_def *chdef, enum rfk_tri_type rt_type);
 
 
 bool rtw_phl_chanctx_add(void *phl,
@@ -49,7 +49,7 @@ struct setch_param {
 	struct rtw_wifi_role_t *wrole;
 	struct rtw_wifi_role_link_t *rlink;
 	struct rtw_chan_def chdef;
-	bool do_rfk;
+	enum rfk_tri_type rt_type;
 };
 
 enum rtw_phl_status
@@ -61,7 +61,7 @@ enum rtw_phl_status
 rtw_phl_cmd_set_ch_bw(struct rtw_wifi_role_t *wifi_role,
                       struct rtw_wifi_role_link_t *rlink,
                       struct rtw_chan_def *chdef,
-                      bool do_rfk,
+                      enum rfk_tri_type rt_type,
                       enum phl_cmd_type cmd_type,
                       u32 cmd_timeout);
 enum rtw_phl_status
@@ -99,4 +99,10 @@ rtw_phl_get_chandef_from_operating_class(
 	u8 operating_class,
 	struct rtw_chan_def *chan_def
 );
+
+#ifdef CONFIG_PHL_CHSWOFLD
+void rtw_phl_set_chsw_ofld_info(struct rtw_phl_com_t *phl_com,
+	bool chsw_ofld_en, bool rf_reload, bool skip_normal_watchdog);
+#endif
+
 #endif /*_PHL_CHANA_H_*/

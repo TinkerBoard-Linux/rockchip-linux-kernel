@@ -24,14 +24,18 @@ typedef struct rtw_phl_com_t HAL_DATA_TYPE; /*, *PHAL_DATA_TYPE;*/
 
 #define GET_PHY_CAP(_dvobj, _band)     (&(GET_PHL_COM(_dvobj))->phy_cap[_band])
 /* Using the macro when band info not ready. */
-#define GET_PHY_TX_NSS_BY_BAND(_adapter, _band) ((GET_PHY_CAP(_adapter->dvobj, _band))->txss)
-#define GET_PHY_RX_NSS_BY_BAND(_adapter, _band) ((GET_PHY_CAP(_adapter->dvobj, _band))->rxss)
+#define GET_PHY_TX_NSS_BY_BAND(_dvobj, _band) ((GET_PHY_CAP(_dvobj, _band))->txss)
+#define GET_PHY_RX_NSS_BY_BAND(_dvobj, _band) ((GET_PHY_CAP(_dvobj, _band))->rxss)
+
+#define GET_TX_PATH_NUM(_dvobj, _band) ((GET_PHY_CAP(_dvobj, _band))->tx_path_num)
+#define GET_RX_PATH_NUM(_dvobj, _band) ((GET_PHY_CAP(_dvobj, _band))->rx_path_num)
 
 #define GET_HAL_RFPATH_NUM(_dvobj) ((GET_PHL_COM(_dvobj))->rf_path_num)
 /* refer to (hal_data->version_id.RFType / registrypriv->rf_path / 8814a from efuse or registrypriv)*/
 #define GET_HAL_RFPATH(_dvobj) ((GET_PHL_COM(_dvobj))->rf_type)
 
 #define GET_WIFI_ROLE_LINK_CURRENT_CH(_adapter_link) (_adapter_link->wrlink->chandef.chan)
+#define GET_WIFI_ROLE_LINK_CURRENT_BAND(_adapter_link) (_adapter_link->wrlink->chandef.band)
 #define WIFI_ROLE_LINK_IS_ON_24G(_adapter_link) (_adapter_link->wrlink->chandef.band == BAND_ON_24G)
 #define WIFI_ROLE_LINK_IS_ON_5G(_adapter_link) (_adapter_link->wrlink->chandef.band == BAND_ON_5G)
 #define WIFI_ROLE_LINK_IS_ON_6G(_adapter_link) (_adapter_link->wrlink->chandef.band == BAND_ON_6G)
@@ -114,7 +118,7 @@ int rtw_hw_del_all_key(struct _ADAPTER *a, struct sta_info *sta,
 
 /* settting */
 int rtw_hw_set_ch_bw(struct _ADAPTER *a, struct _ADAPTER_LINK *alink, enum band_type band,
-		u8 ch, enum channel_width bw, u8 offset, u8 do_rfk);
+		u8 ch, enum channel_width bw, u8 offset, enum rfk_tri_type rt_type);
 int rtw_hw_set_edca(struct _ADAPTER *a, struct _ADAPTER_LINK *alink, u8 ac, u32 param);
 
 /* connect */
@@ -136,7 +140,17 @@ int rtw_hw_connected(struct _ADAPTER *a);
 int rtw_hw_connected_apmode(struct _ADAPTER *a, struct sta_info *sta);
 int rtw_hw_disconnect(struct _ADAPTER *a, struct sta_info *sta);
 
+void rtw_update_roch_chan_def(struct _ADAPTER_LINK *adapter_link,
+				u8 remain_ch, enum channel_width remain_bw,
+				enum chan_offset offset,
+				enum band_type band);
+
 void rtw_hw_update_chan_def(_adapter *adapter, struct _ADAPTER_LINK *adapter_link);
+
+u8 rtw_sta_hal_media_status_rpt_cmd(_adapter *a, struct sta_info *sta, bool connected, u8 flag);
+u8 rtw_sta_hal_ra_mask_update_cmd(_adapter *a, struct sta_info *sta, u8 flag);
+
+u8 rtw_link_hal_core_stop_beacon(struct _ADAPTER_LINK *alink, bool stop, u8 flag);
 
 #ifdef RTW_DETECT_HANG
 void rtw_is_hang_check(struct _ADAPTER *a);
@@ -159,6 +173,10 @@ int rtw_acs_get_report(struct _ADAPTER *a, enum band_type band, u8 ch, struct rt
 
 void rtw_dump_env_rpt(struct _ADAPTER *a, void *sel);
 
+#ifdef DBG_RX_DFRAME_RAW_DATA
+void rtw_dump_rx_dframe_info(struct _ADAPTER *padapter, void *sel);
+#endif
+
 #ifdef CONFIG_WOWLAN
 u8 rtw_hw_wow(struct _ADAPTER *a, u8 wow_en);
 #endif
@@ -170,37 +188,28 @@ u8 rtw_hw_mcc_chk_inprogress(struct _ADAPTER *a, struct _ADAPTER_LINK *adapter_l
 void rtw_edcca_hal_update(struct dvobj_priv *dvobj);
 
 #if CONFIG_TXPWR_LIMIT
-#define TXPWR_LMT_RS_CCK	0
-#define TXPWR_LMT_RS_OFDM	1
-#define TXPWR_LMT_RS_HT		2
-#define TXPWR_LMT_RS_VHT	3
-#define TXPWR_LMT_RS_HE		4
-#define TXPWR_LMT_RS_NUM	5
-#define TXPWR_LMT_MAX_REGULATION_NUM	32
-
-#define TXPWR_LMT_MAX_BANDWIDTH_NUM	4 /* 20MHz ~ 160MHz */
-
-/* TXBF Capabilities */
-#define TXPWR_LMT_NO_TXBF	0
-#define TXPWR_LMT_TXBF		1
-#define TXPWR_LMT_TXBF_NUM	2
-
-extern const char *const _txpwr_lmt_rs_str[];
-#define txpwr_lmt_rs_str(rs) (((rs) >= TXPWR_LMT_RS_NUM) ? _txpwr_lmt_rs_str[TXPWR_LMT_RS_NUM] : _txpwr_lmt_rs_str[(rs)])
-u16 rtw_txpwr_lmt_rs_to_data_rate(int txpwr_lmt_rs);
-
 enum txpwr_lmt_reg_exc_match {
 	TXPWR_LMT_REG_EXC_MATCH_NONE = 0,
 	TXPWR_LMT_REG_EXC_MATCH_COUNTRY,
 	TXPWR_LMT_REG_EXC_MATCH_DOMAIN,
 };
 
-enum txpwr_lmt_reg_exc_match rtw_txpwr_hal_lmt_reg_exc_search(struct dvobj_priv* dvobj, const char *country, u8 domain, const char **reg_name);
+enum txpwr_lmt_reg_exc_match rtw_txpwr_hal_lmt_reg_exc_search(struct dvobj_priv* dvobj
+	, const char *country, u8 domain, const char **reg_name);
+#if CONFIG_IEEE80211_BAND_6GHZ
+enum txpwr_lmt_reg_exc_match rtw_txpwr_hal_lmt_reg_exc_6g_search(struct dvobj_priv* dvobj
+	, const char *country, u8 domain, const char **reg_name);
+#endif
 bool rtw_txpwr_hal_lmt_reg_search(struct dvobj_priv* dvobj, enum band_type band, const char *name);
 void rtw_txpwr_hal_set_current_lmt_regs_by_name(struct dvobj_priv* dvobj, char *names_of_band[], int names_len_of_band[]);
 void rtw_txpwr_hal_get_current_lmt_regs_name(struct dvobj_priv* dvobj, char *names_of_band[], int names_len_of_band[]);
 void dump_txpwr_lmt(void *sel, _adapter *adapter);
+#ifdef CONFIG_80211AX_HE
+void dump_txpwr_lmt_ru(void *sel, _adapter *adapter);
+#endif
 #endif /* CONFIG_TXPWR_LIMIT */
+
+void dump_txpwr_by_rate(void *sel, _adapter *adapter);
 
 #ifdef CONFIG_DFS_MASTER
 void rtw_dfs_hal_radar_detect_disable(struct dvobj_priv *dvobj, u8 band_idx);
@@ -212,6 +221,9 @@ void rtw_dfs_hal_update_region(struct dvobj_priv *dvobj, u8 band_idx, enum rtw_d
 u8 rtw_dfs_hal_radar_detect_polling_int_ms(struct dvobj_priv *dvobj);
 #endif /* CONFIG_DFS_MASTER */
 
+#define SPF_PHL_RF_019_SAR /* for HALRF PW_LMT_REGU_EXT_PWR mechanism */
+
+bool rtw_txpwr_hal_is_txpwr_limit_needed(struct dvobj_priv *dvobj);
 bool rtw_txpwr_hal_get_pwr_lmt_en(struct dvobj_priv *dvobj);
 struct tx_power_ext_info;
 bool rtw_txpwr_hal_get_ext_info(struct dvobj_priv *dvobj, struct tx_power_ext_info *info);
@@ -219,6 +231,28 @@ void rtw_txpwr_hal_update_pwr(struct dvobj_priv *dvobj, enum phl_band_idx band_i
 
 u8 get_phy_tx_nss(_adapter *adapter, struct _ADAPTER_LINK *adapter_link);
 u8 get_phy_rx_nss(_adapter *adapter, struct _ADAPTER_LINK *adapter_link);
+bool phy_is_txpwr_user_mbm_valid(_adapter *adapter, s16 mbm);
 u8 rtw_backup_and_get_final_ss(_adapter *adapter, struct sta_info *sta, u8 chg_ss);
 void rtw_ctrl_and_backup_assoc_cap_rx_nss(_adapter *adapter, struct sta_info *sta, u8 rx_nss);
+#ifdef CONFIG_DBCC_P2P_BG_LISTEN
+bool rtw_dbcc_b0_sta_chan_chk(struct _ADAPTER *a);
+
+enum dbcc_chk_pcd {
+	DBCC_CHK_STA_CON,
+	DBCC_CHK_STA_DIS,
+	DBCC_CHK_AP_START,
+	DBCC_CHK_AP_STOP
+};
+bool rtw_dbcc_chk_enable_hdl(_adapter *adapter,
+				enum phl_cmd_type cmd_type,
+				enum dbcc_chk_pcd chk_pcd);
+bool rtw_dbcc_chk_disable_hdl(_adapter *adapter,
+				struct rtw_chan_def *new_chdef,
+				enum phl_cmd_type cmd_type,
+				enum dbcc_chk_pcd chk_pcd);
+enum rtw_phl_status
+rtw_discon_end_dbcc_en_notify(struct _ADAPTER *a, enum phl_module_id mdl_id);
+
+#endif
+
 #endif /* _RTW_HW_H_ */

@@ -189,6 +189,7 @@ void dump_global_op_class(void *sel);
 RTW_FUNC_2G_5G_ONLY u8 rtw_get_op_class_by_chbw(u8 ch, u8 bw, u8 offset);
 u8 rtw_get_op_class_by_bchbw(enum band_type band, u8 ch, u8 bw, u8 offset);
 u8 rtw_get_bw_offset_by_op_class_ch(u8 gid, u8 ch, u8 *bw, u8 *offset);
+enum band_type rtw_get_band_by_op_class(u8 op_class);
 #ifdef CONFIG_ECSA_PHL
 int alink_get_supported_op_class(struct _ADAPTER_LINK *padapter_link, u8 *op_set, int len);
 int get_supported_op_class(_adapter *padapter, u8 *op_set, int len);
@@ -257,6 +258,9 @@ typedef enum _RF_TX_NUM {
 
 #define RF_TYPE_VALID(rf_type) (rf_type < RF_TYPE_MAX)
 
+extern const u8 _rf_type_to_rf_path[];
+#define rf_type_to_rf_path(rf_type) (RF_TYPE_VALID(rf_type) ? _rf_type_to_rf_path[rf_type] : 1)
+
 extern const u8 _rf_type_to_rf_tx_cnt[];
 #define rf_type_to_rf_tx_cnt(rf_type) (RF_TYPE_VALID(rf_type) ? _rf_type_to_rf_tx_cnt[rf_type] : 0)
 
@@ -282,14 +286,6 @@ bool rtw_bchbw_to_freq_range(enum band_type band, u8 ch, u8 bw, u8 offset, u32 *
 RTW_FUNC_2G_5G_ONLY bool rtw_chbw_to_freq_range(u8 ch, u8 bw, u8 offset, u32 *hi, u32 *lo);
 
 struct rf_ctl_t;
-
-void txpwr_idx_get_dbm_str(s8 idx, u8 txgi_max, s8 txgi_ww, u8 txgi_pdbm, SIZE_T cwidth, char dbm_str[], u8 dbm_str_len);
-
-#define MBM_PDBM 100
-#define UNSPECIFIED_MBM 32767 /* maximum of s16 */
-
-void txpwr_mbm_get_dbm_str(s16 mbm, SIZE_T cwidth, char dbm_str[], u8 dbm_str_len);
-s16 mb_of_ntx(u8 ntx);
 
 #if CONFIG_TXPWR_LIMIT
 void dump_regd_exc_list(void *sel, struct rf_ctl_t *rfctl);

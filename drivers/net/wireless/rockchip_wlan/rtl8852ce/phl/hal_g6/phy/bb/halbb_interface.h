@@ -105,6 +105,8 @@ enum halbb_h2c_ra_cmdid {
 	RA_H2C_RA_D_O_TIMER	= 0x5,
 	RA_H2C_RA_CLS		= 0x6,
 	RA_H2C_RA_SHIFT_DARF_TC	= 0x7,
+	RA_H2C_RA_TX_INFO	= 0x8,
+	RA_H2C_RA_TX_HIST	= 0x9,
 	RA_H2C_MUCFG		= 0x10,
 	RA_MAX_H2CCMD
 };
@@ -119,8 +121,12 @@ enum halbb_h2c_rua_cmdid {
 	RUA_H2C_BBINFO		= 0x6,
 	RUA_H2C_SEN_TBL		= 0x7,
 	RUA_H2C_PWR_TBL		= 0x8,
-	RUA_H2C_DBG 		= 0x9,
-	RUA_H2C_DBG_W 		= 0x10,	
+	RUA_H2C_DBG			= 0x9,
+	RUA_H2C_DBG_W		= 0x10,
+	RUA_H2C_MACID_INIT	= 0x11,
+	RUA_H2C_RA_MASK		= 0x12,
+	RUA_H2C_DLGRPCMD	= 0x13,
+	RUA_H2C_ULGRPCMD	= 0x14,
 	RUA_MAX_H2CCMD
 };
 
@@ -142,6 +148,7 @@ enum halbb_h2c_dm_cmdid {
 	DM_H2C_FW_L6M_WA	= 0x7,
 	DM_H2C_FW_ENV_MNTR	= 0x8,
 	DM_H2C_FW_LPS_INFO	= 0x9,
+	DM_H2C_FW_LPS_CH_INFO	= 0xb,
 	DM_MAX_H2CCMD
 };
 
@@ -156,6 +163,8 @@ enum halbb_c2h_ra_cmdid {
 	HALBB_C2HRA_STS_RPT		= 0x0,
 	HALBB_C2HRA_MU_GPTBL_RPT	= 0x1,
 	HALBB_C2HRA_TXSTS		= 0x2,
+	HALBB_C2HRA_TX_DBG_INFO		= 0x3,
+	HALBB_C2HRA_TX_HIST		= 0x4,
 	HALBB_MAX_C2HRACMD
 };
 
@@ -170,8 +179,10 @@ enum halbb_c2h_dm_cmdid {
 	DM_C2H_FW_TRIG_TX_RPT		= 0x1,
 	DM_C2H_SIGB			= 0x2,
 	DM_C2H_LOWRT_RTY		= 0x3,
-	DM_C2H_MCC_DIG			= 0x4,
+	DM_C2H_MCC			= 0x4,
 	DM_C2H_FW_ENV_MNTR		= 0x5,
+	DM_C2H_DBG		= 0x6,
+	DM_C2H_EHTSIG		=0x7,
 	HALBB_MAX_C2HDMCMD
 };
 
@@ -183,6 +194,48 @@ enum halbb_event_idx_t {
 	BB_EVENT_TIMER_TDMA_CR		= 3,
 	BB_EVENT_TIMER_LA		= 4,
 	BB_EVENT_TIMER_DTR		= 5
+};
+
+enum halbb_watchdog_func_idx_t {
+	//---- WD idx must be between BB_INIT_POSI_START and BB_INIT_POSI_END
+	BB_WD_POSI_START		= 0,
+	BB_WD_START			= 1,
+	BB_WD_CMN_INFO_SELF_UPDATE	= 2,
+	BB_WD_IC_HW_SETTING		= 3,
+	BB_WD_ENV_MNTR			= 4,
+	BB_WD_DIG			= 5,
+	BB_WD_PMAC_STATISTICS		= 6,
+	BB_WD_BASIC_DBG_MSG		= 7,
+	BB_WD_PHYSTS			= 8,
+	BB_WD_EDCCA			= 9,
+	BB_WD_DFS			= 10,
+	BB_WD_CFO			= 11,
+	BB_WD_UL_TB_CTRL		= 12,
+	BB_WD_RA			= 13,
+	BB_WD_PWR_CTRL			= 14,
+	BB_WD_LA_MODE			= 15,
+	BB_WD_ANT_DIV			= 16,
+	BB_WD_PATH_DIV			= 17,
+	BB_WD_MCCDM			= 18,
+	BB_WD_SPATIAL_REUSE		= 19,
+	BB_WD_AUTO_DBG			= 20,
+	BB_WD_RESET			= 21,
+	BB_WD_END			= 22,
+	BB_WD_POSI_END,
+	//---- INIT idx must be between BB_INIT_POSI_START and BB_INIT_POSI_END
+	BB_INIT_POSI_START		= 50,
+	BB_INIT_BUFFER			= 51,
+	BB_INIT_EARLY			= 52,
+	BB_INIT_REG			= 53,
+	BB_INIT_DM			= 54,
+	BB_INIT_POST_INIT		= 55,
+	BB_INIT_POSI_END,
+	//---- API idx must be between BB_API_POSI_START and BB_API_POSI_END
+	BB_API_POSI_START		= 100,
+	BB_API_CH_BW			= 101,
+	BB_API_PATH			= 102,
+	BB_API_BB_RST			= 103,
+	BB_API_POSI_END
 };
 
 enum halbb_timer_state_t {
@@ -204,6 +257,17 @@ struct halbb_pwr_by_rate_tbl {
 	u8 pwr_by_rate[PWR_TBL_NUM*2];
 };
 
+struct halbb_lps_chb {
+	u8 pri_ch;
+	u8 c_ch;
+	u8 bw;
+	u8 band;
+};
+
+struct halbb_lsp_ch_info {
+	struct halbb_lps_chb bw_ch_i[HW_PHY_MAX];
+	u32 mlo_dbcc_mode_lps;
+};
 /*@--------------------------[Prptotype]-------------------------------------*/
 struct bb_info;
 
@@ -211,9 +275,20 @@ void halbb_cfg_timers(struct bb_info *bb, enum bb_timer_cfg_t cfg,
 		      struct halbb_timer_info *timer);
 u32 halbb_get_sys_time(struct bb_info *bb);
 u32 halbb_phy0_to_phy1_ofst(struct bb_info *bb, u32 addr, enum phl_phy_idx phy_idx);
+u32 halbb_get_phy0_phy1_reg(struct bb_info *bb, u32 addr, enum phl_phy_idx phy_idx);
 void halbb_delay_us(struct bb_info *bb, u32 us);
-void halbb_set_cr(struct bb_info *bb, u32 addr, u32 val);
-u32 halbb_get_cr(struct bb_info *bb, u32 addr);
+u32 halbb_set_pwr_reg_cmn(struct bb_info* bb, enum phl_phy_idx bb_phy_idx, u32 addr, u32 val);
+u32 halbb_write_mask_pwr_reg_cmn(struct bb_info* bb, enum phl_phy_idx bb_phy_idx, u32 addr, u32 mask, u32 val);
+#ifdef HALBB_BB_WRAP_SUPPORT
+u32 halbb_write_bb_wrap_cmn(struct bb_info* bb, u32 addr, u32 val);
+u32 halbb_write_mask_bb_wrap_cmn(struct bb_info* bb, u32 addr, u32 mask, u32 val);
+#endif
+void halbb_show_rf_cr_cnt(struct bb_info *bb, u8 module_idx);
+void halbb_show_cr_cnt(struct bb_info *bb, u8 module_idx);
+void halbb_rfio_set_reg_cmn(struct bb_info *bb, u32 addr, u32 mask, u32 val, enum phl_phy_idx phy_idx);
+u32 halbb_rfio_get_reg_cmn(struct bb_info *bb, u32 addr, u32 mask, enum phl_phy_idx phy_idx);
+void halbb_set_cr(struct bb_info *bb, u32 addr, u32 mask, u32 val);
+u32 halbb_get_cr(struct bb_info *bb, u32 addr, u32 mask);
 void halbb_set_reg_curr_phy(struct bb_info *bb, u32 addr, u32 mask, u32 val);
 void halbb_set_reg_phy0_1(struct bb_info *bb, u32 addr, u32 mask, u32 val);
 u32 halbb_get_reg_curr_phy(struct bb_info *bb, u32 addr, u32 mask);

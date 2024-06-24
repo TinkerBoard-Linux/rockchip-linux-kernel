@@ -337,4 +337,8 @@ u32 mac_get_uart_fw_dbg_gpio(struct mac_ax_adapter *adapter, u8 *uart_tx_gpio, u
  * @}
  */
 
+u32 mac_bcn_cnt_gpio(struct mac_ax_adapter *adapter,
+		     struct rtw_hal_mac_bcn_cnt_gpio_info *bcn_cnt_gpio);
+u32 mac_bcn_sync_rpt(struct mac_ax_adapter *adapter,
+		     struct rtw_hal_mac_bcn_sync_rpt *ret_rpt);
 #endif

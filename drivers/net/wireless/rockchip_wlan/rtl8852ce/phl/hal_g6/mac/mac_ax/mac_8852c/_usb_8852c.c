@@ -135,22 +135,22 @@ u32 usb_pre_init_8852c(struct mac_ax_adapter *adapter, void *param)
 
 	val32 = PLTFM_REG_R32(R_AX_USB_ENDPOINT_3_V1);
 	if ((val32 & B_AX_BULKOUT0_V1) == B_AX_BULKOUT0_V1)
-		adapter->usb_info.ep5 = ENABLE;
+		adapter->usb_info.ep5 = MAC_AX_USB_EP_PAUSE;
 	if ((val32 & B_AX_BULKOUT1_V1) == B_AX_BULKOUT1_V1)
-		adapter->usb_info.ep6 = ENABLE;
+		adapter->usb_info.ep6 = MAC_AX_USB_EP_PAUSE;
 	if (((PLTFM_REG_R32(R_AX_USB_ENDPOINT_3_V1) >> B_AX_AC_BULKOUT_V1_SH) &
 		B_AX_AC_BULKOUT_V1_MSK) == 1)
-		adapter->usb_info.ep10 = ENABLE;
+		adapter->usb_info.ep10 = MAC_AX_USB_EP_PAUSE;
 	if (((PLTFM_REG_R32(R_AX_USB_ENDPOINT_3_V1) >> B_AX_AC_BULKOUT_V1_SH) &
 		B_AX_AC_BULKOUT_V1_MSK) == 2) {
-		adapter->usb_info.ep10 = ENABLE;
-		adapter->usb_info.ep11 = ENABLE;
+		adapter->usb_info.ep10 = MAC_AX_USB_EP_PAUSE;
+		adapter->usb_info.ep11 = MAC_AX_USB_EP_PAUSE;
 	}
 	if (((PLTFM_REG_R32(R_AX_USB_ENDPOINT_3_V1) >> B_AX_AC_BULKOUT_V1_SH) &
 		B_AX_AC_BULKOUT_V1_MSK) == 3) {
-		adapter->usb_info.ep10 = ENABLE;
-		adapter->usb_info.ep11 = ENABLE;
-		adapter->usb_info.ep12 = ENABLE;
+		adapter->usb_info.ep10 = MAC_AX_USB_EP_PAUSE;
+		adapter->usb_info.ep11 = MAC_AX_USB_EP_PAUSE;
+		adapter->usb_info.ep12 = MAC_AX_USB_EP_PAUSE;
 	}
 	return MACSUCCESS;
 }
@@ -426,9 +426,13 @@ u32 set_usb_wowlan_8852c(struct mac_ax_adapter *adapter,
 {
 	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
 
-	if (w_c == MAC_AX_WOW_ENTER) {
-		PLTFM_REG_W32(R_AX_USB2_LPM_0_V1, PLTFM_REG_R32(R_AX_USB2_LPM_0_V1) |
-			      B_AX_USB_SUS_WAKEUP_EN_V1);
+	if (w_c == MAC_AX_WOW_ENTER || w_c == MAC_AX_WOW_ENTER_OUTBAND_WAKEUP) {
+		if (w_c == MAC_AX_WOW_ENTER)
+			MAC_REG_W32(R_AX_USB2_LPM_0_V1, MAC_REG_R32(R_AX_USB2_LPM_0_V1) |
+				    B_AX_USB_SUS_WAKEUP_EN_V1);
+		else
+			MAC_REG_W32(R_AX_USB2_LPM_0_V1, MAC_REG_R32(R_AX_USB2_LPM_0_V1) &
+				    ~B_AX_USB_SUS_WAKEUP_EN_V1);
 		MAC_REG_W32(R_AX_RSV_CTRL, MAC_REG_R32(R_AX_RSV_CTRL) |
 			    B_AX_WLOCK_1C_BIT6);
 		MAC_REG_W32(R_AX_RSV_CTRL, MAC_REG_R32(R_AX_RSV_CTRL) |
@@ -452,7 +456,7 @@ u32 set_usb_wowlan_8852c(struct mac_ax_adapter *adapter,
 
 u32 usb_get_txagg_num_8852c(struct mac_ax_adapter *adapter, u8 band)
 {
-	u32 quotanum = band ? adapter->dle_info.c1_tx_min : adapter->dle_info.c0_tx_min;
+	u32 quotanum = band ? adapter->dle_info.c1_tx_max : adapter->dle_info.c0_tx_max;
 
 	return quotanum * PLE_PAGE_SIZE / (PINGPONG * (SINGLE_MSDU_SIZE + SEC_FCS_SIZE));
 }
@@ -483,66 +487,66 @@ u32 usb_ep_cfg_8852c(struct mac_ax_adapter *adapter, struct mac_ax_usb_ep *cfg)
 		return MACNPTR;
 	ep_cfg = MAC_REG_R32(R_AX_USB_ENDPOINT_3_V1);
 	ep_sts = ep_cfg;
-	if (cfg->ep4) {
+	if (cfg->ep4 == MAC_AX_USB_EP_PAUSE) {
 		ep_cfg |= B_AX_EP4_RX_PAUSE_V1;
 		ep_sts |= (B_AX_EP4_RX_PAUSE_V1 | B_AX_EP4_PAUSE_STATE_V1);
-	} else {
+	} else if (cfg->ep4 == MAC_AX_USB_EP_RELEASE) {
 		ep_cfg &= ~B_AX_EP4_RX_PAUSE_V1;
 		ep_sts &= (~B_AX_EP4_RX_PAUSE_V1 & ~B_AX_EP4_PAUSE_STATE_V1);
 	}
-	if (cfg->ep5) {
+	if (cfg->ep5 == MAC_AX_USB_EP_PAUSE) {
 		ep_cfg |= B_AX_EP5_TX_PAUSE_V1;
 		ep_sts |= (B_AX_EP5_TX_PAUSE_V1 | B_AX_EP5_PAUSE_STATE_V1);
-	} else {
+	} else if (cfg->ep5 == MAC_AX_USB_EP_RELEASE) {
 		ep_cfg &= ~B_AX_EP5_TX_PAUSE_V1;
 		ep_sts &= (~B_AX_EP5_TX_PAUSE_V1 & ~B_AX_EP5_PAUSE_STATE_V1);
 	}
-	if (cfg->ep6) {
+	if (cfg->ep6 == MAC_AX_USB_EP_PAUSE) {
 		ep_cfg |= B_AX_EP6_TX_PAUSE_V1;
 		ep_sts |= (B_AX_EP6_TX_PAUSE_V1 | B_AX_EP6_PAUSE_STATE_V1);
-	} else {
+	} else if (cfg->ep6 == MAC_AX_USB_EP_RELEASE) {
 		ep_cfg &= ~B_AX_EP6_TX_PAUSE_V1;
 		ep_sts &= (~B_AX_EP6_TX_PAUSE_V1 & ~B_AX_EP6_PAUSE_STATE_V1);
 	}
-	if (cfg->ep7) {
+	if (cfg->ep7 == MAC_AX_USB_EP_PAUSE) {
 		ep_cfg |= B_AX_EP7_TX_PAUSE_V1;
 		ep_sts |= (B_AX_EP7_TX_PAUSE_V1 | B_AX_EP7_PAUSE_STATE_V1);
-	} else {
+	} else if (cfg->ep7 == MAC_AX_USB_EP_RELEASE) {
 		ep_cfg &= ~B_AX_EP7_TX_PAUSE_V1;
 		ep_sts &= (~B_AX_EP7_TX_PAUSE_V1 & ~B_AX_EP7_PAUSE_STATE_V1);
 	}
-	if (cfg->ep8) {
+	if (cfg->ep8 == MAC_AX_USB_EP_PAUSE) {
 		ep_cfg |= B_AX_EP8_RX_PAUSE_V1;
 		ep_sts |= (B_AX_EP8_RX_PAUSE_V1 | B_AX_EP8_PAUSE_STATE_V1);
-	} else {
+	} else if (cfg->ep8 == MAC_AX_USB_EP_RELEASE) {
 		ep_cfg &= ~B_AX_EP8_RX_PAUSE_V1;
 		ep_sts &= (~B_AX_EP8_RX_PAUSE_V1 & ~B_AX_EP8_PAUSE_STATE_V1);
 	}
-	if (cfg->ep9) {
+	if (cfg->ep9 == MAC_AX_USB_EP_PAUSE) {
 		ep_cfg |= B_AX_EP9_TX_PAUSE_V1;
 		ep_sts |= (B_AX_EP9_TX_PAUSE_V1 | B_AX_EP9_PAUSE_STATE_V1);
-	} else {
+	} else if (cfg->ep9 == MAC_AX_USB_EP_RELEASE) {
 		ep_cfg &= ~B_AX_EP9_TX_PAUSE_V1;
 		ep_sts &= (~B_AX_EP9_TX_PAUSE_V1 & ~B_AX_EP9_PAUSE_STATE_V1);
 	}
-	if (cfg->ep10) {
+	if (cfg->ep10 == MAC_AX_USB_EP_PAUSE) {
 		ep_cfg |= B_AX_EP10_TX_PAUSE_V1;
 		ep_sts |= (B_AX_EP10_TX_PAUSE_V1 | B_AX_EP10_PAUSE_STATE_V1);
-	} else {
+	} else if (cfg->ep10 == MAC_AX_USB_EP_RELEASE) {
 		ep_cfg &= ~B_AX_EP10_TX_PAUSE_V1;
 		ep_sts &= (~B_AX_EP10_TX_PAUSE_V1 & ~B_AX_EP10_PAUSE_STATE_V1);
 	}
-	if (cfg->ep11) {
+	if (cfg->ep11 == MAC_AX_USB_EP_PAUSE) {
 		ep_cfg |= B_AX_EP11_TX_PAUSE_V1;
 		ep_sts |= (B_AX_EP11_TX_PAUSE_V1 | B_AX_EP11_PAUSE_STATE_V1);
-	} else {
+	} else if (cfg->ep11 == MAC_AX_USB_EP_RELEASE) {
 		ep_cfg &= ~B_AX_EP11_TX_PAUSE_V1;
 		ep_sts &= (~B_AX_EP11_TX_PAUSE_V1 & ~B_AX_EP11_PAUSE_STATE_V1);
 	}
-	if (cfg->ep12) {
+	if (cfg->ep12 == MAC_AX_USB_EP_PAUSE) {
 		ep_cfg |= B_AX_EP12_TX_PAUSE_V1;
 		ep_sts |= (B_AX_EP12_TX_PAUSE_V1 | B_AX_EP12_PAUSE_STATE_V1);
-	} else {
+	} else if (cfg->ep12 == MAC_AX_USB_EP_RELEASE) {
 		ep_cfg &= ~B_AX_EP12_TX_PAUSE_V1;
 		ep_sts &= (~B_AX_EP12_TX_PAUSE_V1 & ~B_AX_EP12_PAUSE_STATE_V1);
 	}

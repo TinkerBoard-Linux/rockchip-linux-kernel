@@ -33,6 +33,9 @@
 #ifndef __HALBB_IC_HW_INFO_H__
 #define __HALBB_IC_HW_INFO_H__
 
+#include "halbb_cfg_ic.h"
+
+
 enum bb_ic_t {
 	/*AC IC*/
 	BB_RTL8852A	=	BIT(1), /*8852A > Bcut*/
@@ -42,12 +45,21 @@ enum bb_ic_t {
 	BB_RTL8192XB	=	BIT(5),
 	BB_RTL8851B	=	BIT(6),
 	/*BE IC*/
-	BB_RTL8922A	=	BIT(16) /*1115*/
+	BB_RLE1115	=	BIT(16),
+	BB_RTL8922A	=	BIT(17),
+	BB_RTL8934A	=	BIT(18),
+	BB_RTL8952A	=	BIT(19)
 };
 
 enum bb_ic_sub_t {
 	BB_IC_SUB_TYPE_8852B_8852B	=	20,
 	BB_IC_SUB_TYPE_8852B_8852BP,
+	BB_IC_SUB_TYPE_8852B_8852BT,
+	BB_IC_SUB_TYPE_8852B_8852BPT,
+
+	BB_IC_SUB_TYPE_8852C_8852C	=	30,
+	BB_IC_SUB_TYPE_8852C_8852D,
+	BB_IC_SUB_TYPE_8852C_8842A,
 
 	BB_IC_SUB_TYPE_8192XB_8192XB	=	50,
 	BB_IC_SUB_TYPE_8192XB_8832BR,
@@ -58,7 +70,9 @@ enum bb_cr_t {
 	BB_AP		=	1,
 	BB_AP2		=	2,
 	BB_CLIENT	=	3,
-	BB_BE0		=	4
+	BB_BE0		=	4,
+	BB_BE1		=	5,
+	BB_BE2		=	6
 };
 
 enum bb_80211spec_t {
@@ -83,9 +97,9 @@ enum bb_80211spec_t {
 #define BB_IC_AX_4SS		(BB_RTL8834A)
 
 #define BB_IC_BE_1SS		0
-#define BB_IC_BE_2SS		BB_RTL8922A
+#define BB_IC_BE_2SS		(BB_RLE1115 | BB_RTL8922A)
 #define BB_IC_BE_3SS		0
-#define BB_IC_BE_4SS		0
+#define BB_IC_BE_4SS		(BB_RTL8934A)
 
 /*@====the following macro DO NOT need to update when adding a new IC======= */
 #define BB_IC_1SS		(BB_IC_N_1SS | BB_IC_AC_1SS | BB_IC_AX_1SS | BB_IC_BE_1SS)
@@ -112,7 +126,13 @@ enum bb_80211spec_t {
 #define BB_IC_AX_AP		(BB_RTL8852A | BB_RTL8834A)
 #define BB_IC_AX_AP2		(BB_RTL8852C | BB_RTL8192XB)
 #define BB_IC_AX_CLIENT		(BB_RTL8852B | BB_RTL8851B)
-#define BB_IC_BE_0		(BB_RTL8922A)
+#define BB_IC_BE_0		(BB_RLE1115)
+#define BB_IC_BE_1		(BB_RTL8922A)
+#define BB_IC_BE_2		(BB_RTL8934A)
+
+/*@==========================================================================*/
+
+#define BB_IC_FW_CONTROL_STBC		(BB_RTL8852A | BB_RTL8852B | BB_RTL8851B)
 
 /*@==========================================================================*/
 
@@ -122,14 +142,16 @@ enum bb_80211spec_t {
 /*@==========================================================================*/
 
 #define BB_IC_DBCC_LEGACY	(BB_RTL8852A | BB_RTL8852C)
-#define BB_IC_DBCC_MLO		(BB_RTL8922A)
+#define BB_IC_DBCC_MLO		(BB_RLE1115 | BB_RTL8922A)
+#define BB_IC_DBCC_LITTLE_R	(BB_RTL8934A)
+#define BB_IC_DBCC		(BB_IC_DBCC_LEGACY | BB_IC_DBCC_MLO)
 
 /*@==========================================================================*/
 #if defined(BB_8852A_2_SUPPORT) || defined(BB_8852C_SUPPORT)
 	#define HALBB_COMPILE_IC_DBCC_LEGACY
 #endif
 
-#if defined(BB_8922A_SUPPORT)
+#if defined(BB_8922A_SUPPORT) || defined(BB_1115_SUPPORT)
 	#define HALBB_COMPILE_IC_DBCC_MLO
 #endif
 
@@ -137,7 +159,14 @@ enum bb_80211spec_t {
 	#define HALBB_COMPILE_IC_DBCC
 #endif
 
-#if defined(BB_8852A_2_SUPPORT) || defined(BB_8852B_SUPPORT) || defined(BB_8852C_SUPPORT) || defined(BB_8851B_SUPPORT)
+#if defined(BB_8922A_SUPPORT)
+	#define HALBB_COMPILE_IC_DBCC_LITTLE_R
+#endif
+
+/*@==========================================================================*/
+
+
+#if defined(BB_8852A_2_SUPPORT) || defined(BB_8852B_SUPPORT) || defined(BB_8852C_SUPPORT) || defined(BB_8851B_SUPPORT) || defined(BB_8922A_SUPPORT)
 	/* FW OFFLOAD will be used in non-AP-only ICs*/
 	#define HALBB_COMPILE_IC_FWOFLD
 #endif
@@ -147,7 +176,7 @@ enum bb_80211spec_t {
 #endif
 
 #if (defined(BB_8852A_2_SUPPORT) || defined(BB_8852B_SUPPORT) ||\
-     defined(BB_8852C_SUPPORT) || defined(BB_8192XB_SUPPORT) || defined(BB_8922A_SUPPORT))
+     defined(BB_8852C_SUPPORT) || defined(BB_8192XB_SUPPORT) || defined(BB_1115_SUPPORT) || defined(BB_8922A_SUPPORT))
 	#define HALBB_COMPILE_IC_2SS
 #endif
 
@@ -183,7 +212,7 @@ enum bb_80211spec_t {
 #elif (defined(HALBB_COMPILE_ABOVE_2SS))
 	#define HALBB_MAX_PATH	2
 #else
-	#define HALBB_MAX_PATH	1
+	#define HALBB_MAX_PATH	2
 #endif
 /*@==========================================================================*/
 
@@ -199,25 +228,53 @@ enum bb_80211spec_t {
 	#define HALBB_COMPILE_CLIENT_SERIES
 #endif
 
-#if (defined(BB_8922A_SUPPORT))
+#if (defined(BB_1115_SUPPORT))
 	#define HALBB_COMPILE_BE0_SERIES
 #endif
+
+#if (defined(BB_8922A_SUPPORT))
+	#define HALBB_COMPILE_BE1_SERIES
+#endif
+
+/*@==========================================================================*/
 
 #if (defined(HALBB_COMPILE_AP_SERIES)||defined(HALBB_COMPILE_AP2_SERIES)||defined(HALBB_COMPILE_CLIENT_SERIES))
 	#define HALBB_COMPILE_AX_SERIOUS
 #endif
 
-#if (defined(BB_8922A_SUPPORT))
+#if (defined(HALBB_COMPILE_BE0_SERIES)||defined(HALBB_COMPILE_BE1_SERIES))
 	#define HALBB_COMPILE_BE_SERIES
 #endif
 
 /*@==========================================================================*/
+#if (defined(BB_8852C_SUPPORT) || defined(BB_8842A_SUPPORT))
+	#define HALBB_TW_DFS_SERIES
+#endif
 
-#if (defined(BB_8852C_SUPPORT))
-#define HALBB_TW_DFS_SERIES
+#if (defined(BB_8852D_SUPPORT) || defined(HALBB_COMPILE_BE_SERIES))
+	#define HALBB_DFS_GEN2_SERIES
 #endif
 
 /*@==========================================================================*/
+enum bb_bw_type {
+	BB_BW_05M		= 5,
+	BB_BW_10M		= 10,
+	BB_BW_20M		= 20,
+	BB_BW_40M		= 40,
+	BB_BW_80M		= 80,
+	BB_BW_160M		= 160,
+	BB_BW_80M_80M,
+	BB_BW_320M 		= 320,
+};
+
+enum halbb_cmac_table_bw {
+	BB_CMAC_BW_20M		= 0,
+	BB_CMAC_BW_40M		= 1,
+	BB_CMAC_BW_80M		= 2,
+	BB_CMAC_BW_160M 	= 3,
+	BB_CMAC_BW_320M 	= 4
+};
+
 enum halbb_rate_type {
 	BB_1SS			= 1,	/*HE/VHT/HT 1SS*/
 	BB_2SS			= 2,	/*HE/VHT/HT 2SS*/
@@ -351,6 +408,11 @@ enum halbb_legacy_spec_rate {
 #define BB_BE_EHT_MCS(SS, x)	(BE_BB_EHT_1SS_MCS0 + ((SS - 1) << 5) + x)
 
 /*[Rate Number]*/
+#define	SU_HT_MCS_NUM		8
+#define	SU_VHT_MCS_NUM		10
+#define	SU_HE_MCS_NUM		12
+#define	SU_EHT_MCS_NUM		14
+
 #define	HT_NUM_MCS		8
 #define	HE_VHT_NUM_MCS		12
 #define	EHT_NUM_MCS		16
@@ -398,7 +460,16 @@ enum halbb_legacy_spec_rate {
 	#define	EHT_RATE_NUM	EHT_RATE_NUM_1SS
 #endif
 
-#define	LOW_BW_RATE_NUM		HE_RATE_NUM
+#ifdef HALBB_COMPILE_BE_SERIES
+	#define	LOW_BW_RATE_NUM		EHT_RATE_NUM
+#else
+	#define	LOW_BW_RATE_NUM		HE_RATE_NUM
+#endif
+
+#define OFDM_TX_RATE_IDX	4
+#define XHT_1SS_TX_RATE_IDX	12
+#define XHT_2SS_TX_RATE_IDX	26
+#define MAX_TX_RATE_IDX		40
 
 /*@==========================================================================*/
 
@@ -453,26 +524,61 @@ enum bb_path {
 	BB_PATH_B	= 0x00000002,
 	BB_PATH_C	= 0x00000004,
 	BB_PATH_D	= 0x00000008,
+	BB_PATH_E	= 0x00000010,
 
 	BB_PATH_AB	= (BB_PATH_A | BB_PATH_B),
 	BB_PATH_AC	= (BB_PATH_A | BB_PATH_C),
 	BB_PATH_AD	= (BB_PATH_A | BB_PATH_D),
+	BB_PATH_AE	= (BB_PATH_A | BB_PATH_E),
 	BB_PATH_BC	= (BB_PATH_B | BB_PATH_C),
 	BB_PATH_BD	= (BB_PATH_B | BB_PATH_D),
+	BB_PATH_BE	= (BB_PATH_B | BB_PATH_E),
 	BB_PATH_CD	= (BB_PATH_C | BB_PATH_D),
+	BB_PATH_CE	= (BB_PATH_C | BB_PATH_E),
+	BB_PATH_DE	= (BB_PATH_D | BB_PATH_E),
 
 	BB_PATH_ABC	= (BB_PATH_A | BB_PATH_B | BB_PATH_C),
 	BB_PATH_ABD	= (BB_PATH_A | BB_PATH_B | BB_PATH_D),
+	BB_PATH_ABE	= (BB_PATH_A | BB_PATH_B | BB_PATH_E),
 	BB_PATH_ACD	= (BB_PATH_A | BB_PATH_C | BB_PATH_D),
+	BB_PATH_ACE	= (BB_PATH_A | BB_PATH_C | BB_PATH_E),
+	BB_PATH_ADE	= (BB_PATH_A | BB_PATH_D | BB_PATH_E),
 	BB_PATH_BCD	= (BB_PATH_B | BB_PATH_C | BB_PATH_D),
+	BB_PATH_BCE	= (BB_PATH_B | BB_PATH_C | BB_PATH_E),
+	BB_PATH_BDE	= (BB_PATH_B | BB_PATH_D | BB_PATH_E),
+	BB_PATH_CDE	= (BB_PATH_C | BB_PATH_D | BB_PATH_E),
 
 	BB_PATH_ABCD	= (BB_PATH_A | BB_PATH_B | BB_PATH_C | BB_PATH_D),
+	BB_PATH_ABCE	= (BB_PATH_A | BB_PATH_B | BB_PATH_C | BB_PATH_E),
+	BB_PATH_ABDE	= (BB_PATH_A | BB_PATH_B | BB_PATH_D | BB_PATH_E),
+	BB_PATH_ACDE	= (BB_PATH_A | BB_PATH_C | BB_PATH_D | BB_PATH_E),
+	BB_PATH_BCDE	= (BB_PATH_B | BB_PATH_C | BB_PATH_D | BB_PATH_E),
+
+	BB_PATH_ABCDE	= (BB_PATH_A | BB_PATH_B | BB_PATH_C | BB_PATH_D | BB_PATH_E),
 	BB_PATH_AUTO	= 0xff /*for auto path selection*/
 };
 
 enum rf_syn {
 	RF_SYN0 = 0,
 	RF_SYN1 = 1,
+};
+
+#define CVRT_PATH_NUM 13
+
+static const u8 bb_path_cvrt_t[CVRT_PATH_NUM][2] = {
+	{RF_PATH_A, BB_PATH_A},
+	{RF_PATH_B, BB_PATH_B},
+	{RF_PATH_C, BB_PATH_C},
+	{RF_PATH_D, BB_PATH_D},
+	{RF_PATH_AB, BB_PATH_AB},
+	{RF_PATH_AC, BB_PATH_AC},
+	{RF_PATH_AD, BB_PATH_AD},
+	{RF_PATH_BC, BB_PATH_BC},
+	{RF_PATH_BD, BB_PATH_BD},
+	{RF_PATH_ABC, BB_PATH_ABC},
+	{RF_PATH_ACD, BB_PATH_ACD},
+	{RF_PATH_BCD, BB_PATH_BCD},
+	{RF_PATH_ABCD, BB_PATH_ABCD}
 };
 
 #endif

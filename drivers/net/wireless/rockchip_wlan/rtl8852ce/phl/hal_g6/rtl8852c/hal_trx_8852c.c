@@ -528,6 +528,7 @@ _hal_parsing_rx_drvinfo_8852c(struct rtw_phl_com_t *phl_com,
 	u8 *desc = NULL;
 	u8 *drv_info = NULL;
 	struct rtw_recv_pkt *r = &phl_rx->r;
+	enum band_type band = BAND_ON_24G;
 
 	do {
 		if (NULL == buf)
@@ -550,7 +551,13 @@ _hal_parsing_rx_drvinfo_8852c(struct rtw_phl_com_t *phl_com,
 							hal,
 							GET_RX_AX_DRV_INFO_RX_PWR_DBM_8852C(drv_info),
 							r->mdata.bw);
-		phl_rx->r.phy_info.ch_idx =  GET_RX_AX_DRV_INFO_CENTRAL_CH_8852C(drv_info);
+
+		phl_rx->r.phy_info.ch_idx =
+				rtw_hal_bb_decode_chidx(
+						hal_com,
+						(u8)GET_RX_AX_DRV_INFO_CENTRAL_CH_8852C(drv_info),
+						&band);
+;
 #ifdef RTW_WKARD_PHY_RPT_CCK_CH_IDX
 		if (phl_rx->r.phy_info.ch_idx == 0) {
 			/* CCK rate issue wkard*/
@@ -626,6 +633,10 @@ hal_handle_rx_buffer_8852c(struct rtw_phl_com_t *phl_com,
 	{
 		struct hal_ppdu_sts ppdu_sts = {0};
 		u8 is_su = 1;
+#ifdef RTW_WKARD_MU_PPDU_STS_RX_RATE
+		struct rtw_phl_ppdu_sts_info *ppdu_info = NULL;
+		enum phl_band_idx band = HW_BAND_0;
+#endif
 
 		phl_rx->type = RTW_RX_TYPE_PPDU_STATUS;
 		PHL_TRACE(COMP_PHL_PSTS, _PHL_INFO_,
@@ -635,19 +646,28 @@ hal_handle_rx_buffer_8852c(struct rtw_phl_com_t *phl_com,
 							pkt->vir_addr, mdata->pktlen,
 							(void *)&ppdu_sts,
 							(void *)mdata);
+		/*
 		if (ppdu_sts.rx_cnt_size != 0) {
 			_hal_trx_8852c_dump_rxcnt(&ppdu_sts);
 		}
+		*/
 		if (ppdu_sts.phy_st_size != 0) {
 			if((mdata->ppdu_type == RX_8852C_DESC_PPDU_T_VHT_MU)||
 				(mdata->ppdu_type == RX_8852C_DESC_PPDU_T_HE_MU)||
 				(mdata->ppdu_type == RX_8852C_DESC_PPDU_T_HE_TB)) {
 				is_su = 0;
+#ifdef RTW_WKARD_MU_PPDU_STS_RX_RATE
+				ppdu_info = &phl_com->ppdu_sts_info;
+				band = (mdata->bb_sel > 0) ? HW_BAND_1 : HW_BAND_0;
+				mdata->rx_rate = ppdu_info->sts_ent[band][mdata->ppdu_cnt].rx_rate;
+#endif
 			}
 			if(rtw_hal_bb_parse_phy_sts(hal,
 						(void *)&ppdu_sts,
 						 phl_rx,
-						is_su) != RTW_HAL_STATUS_SUCCESS)
+						is_su,
+						(phl_com->drv_mode == RTW_DRV_MODE_SNIFFER)? true : false
+						) != RTW_HAL_STATUS_SUCCESS)
 				PHL_TRACE(COMP_PHL_PSTS, _PHL_DEBUG_,
 					  "rtw_hal_bb_parse_phy_sts fail\n");
 
@@ -668,30 +688,33 @@ hal_handle_rx_buffer_8852c(struct rtw_phl_com_t *phl_com,
 		struct mac_ax_dfs_rpt dfs_rpt = {0};
 		struct hal_dfs_rpt hal_dfs = {0};
 		struct phl_msg msg = {0};
-
+		enum rtw_hal_status mac_status = RTW_HAL_STATUS_FAILURE;
 		phl_rx->type = RTW_RX_TYPE_DFS_RPT;
 
-		rtw_hal_mac_parse_dfs(hal,pkt->vir_addr, mdata->pktlen, &dfs_rpt);
-		#ifdef DBG_PHL_DFS
-		PHL_INFO("RX DFS RPT, pkt_len:%d\n", mdata->pktlen);
-		PHL_INFO("[DFS] mac-hdr dfs_num:%d\n", dfs_rpt.dfs_num);
-		PHL_INFO("[DFS] mac-hdr drop_num:%d\n", dfs_rpt.drop_num);
-		PHL_INFO("[DFS] mac-hdr max_cont_drop:%d\n", dfs_rpt.max_cont_drop);
-		PHL_INFO("[DFS] mac-hdr total_drop:%d\n", dfs_rpt.total_drop);
-		#endif
-		hal_dfs.dfs_ptr = dfs_rpt.dfs_ptr;
-		hal_dfs.dfs_num = dfs_rpt.dfs_num;
-		hal_dfs.phy_idx = 0;
+		mac_status = rtw_hal_mac_parse_dfs(hal,pkt->vir_addr, mdata->pktlen, &dfs_rpt);
 
-		if (rtw_hal_bb_radar_detect(hal, &hal_dfs)) {
-			SET_MSG_MDL_ID_FIELD(msg.msg_id, PHL_MDL_RX);
-			SET_MSG_EVT_ID_FIELD(msg.msg_id, MSG_EVT_DFS_RD_IS_DETECTING);
-			rtw_phl_msg_hub_hal_send(phl_com, NULL, &msg);
+		if (mac_status == RTW_HAL_STATUS_SUCCESS) {
+			#ifdef DBG_PHL_DFS
+			PHL_INFO("RX DFS RPT, pkt_len:%d\n", mdata->pktlen);
+			PHL_INFO("[DFS] mac-hdr dfs_num:%d\n", dfs_rpt.dfs_num);
+			PHL_INFO("[DFS] mac-hdr drop_num:%d\n", dfs_rpt.drop_num);
+			PHL_INFO("[DFS] mac-hdr max_cont_drop:%d\n", dfs_rpt.max_cont_drop);
+			PHL_INFO("[DFS] mac-hdr total_drop:%d\n", dfs_rpt.total_drop);
+			#endif
+			hal_dfs.dfs_ptr = dfs_rpt.dfs_ptr;
+			hal_dfs.dfs_num = dfs_rpt.dfs_num;
+			hal_dfs.phy_idx = 0;
 
-			phl_com->dfs_info.is_radar_detectd = true;
-			PHL_INFO("[DFS] radar detected\n");
+			if (rtw_hal_bb_radar_detect(hal, &hal_dfs)) {
+				SET_MSG_MDL_ID_FIELD(msg.msg_id, PHL_MDL_RX);
+				SET_MSG_EVT_ID_FIELD(msg.msg_id, MSG_EVT_DFS_RD_IS_DETECTING);
+				rtw_phl_msg_hub_hal_send(phl_com, NULL, &msg);
+
+				phl_com->dfs_info.is_radar_detectd = true;
+				PHL_INFO("[DFS] radar detected\n");
+			}
 		}
-		#endif
+		#endif /*CONFIG_PHL_DFS*/
 	}
 	break;
 	case RX_8852C_DESC_PKT_T_CHANNEL_INFO :

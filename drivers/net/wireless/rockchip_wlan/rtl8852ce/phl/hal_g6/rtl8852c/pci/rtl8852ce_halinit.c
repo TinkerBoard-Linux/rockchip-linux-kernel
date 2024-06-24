@@ -16,6 +16,78 @@
 #include "../rtl8852c_hal.h"
 #include "hal_trx_8852ce.h"
 
+static enum rtw_pcie_bus_func_cap_t
+_trans_func_ctrl(enum mac_ax_pcie_func_ctrl ctrl)
+{
+
+	switch (ctrl) {
+	case MAC_AX_PCIE_DISABLE:
+		return RTW_PCIE_BUS_FUNC_DISABLE;
+	case MAC_AX_PCIE_ENABLE:
+		return RTW_PCIE_BUS_FUNC_ENABLE;
+	case MAC_AX_PCIE_DEFAULT:
+		return RTW_PCIE_BUS_FUNC_DEFAULT;
+	case MAC_AX_PCIE_IGNORE:
+		return RTW_PCIE_BUS_FUNC_IGNORE;
+	default:
+		PHL_ERR("%s : unknown\n", __func__);
+		return RTW_PCIE_BUS_FUNC_IGNORE;
+	}
+}
+
+#define case_mac_ax_pcie_dly(src) \
+	case MAC_AX_PCIE_##src: return RTW_PHL_PCIE_##src
+
+static u8 _trans_l0sdly(enum mac_ax_pcie_l0sdly val)
+{
+	switch (val) {
+	case_mac_ax_pcie_dly(L0SDLY_1US);
+	case_mac_ax_pcie_dly(L0SDLY_2US);
+	case_mac_ax_pcie_dly(L0SDLY_3US);
+	case_mac_ax_pcie_dly(L0SDLY_4US);
+	case_mac_ax_pcie_dly(L0SDLY_5US);
+	case_mac_ax_pcie_dly(L0SDLY_6US);
+	case_mac_ax_pcie_dly(L0SDLY_7US);
+	case_mac_ax_pcie_dly(L0SDLY_R_ERR);
+	case_mac_ax_pcie_dly(L0SDLY_DEF);
+	case_mac_ax_pcie_dly(L0SDLY_IGNORE);
+	default:
+		return val;
+	};
+}
+
+static u8 _trans_l1dly(enum mac_ax_pcie_l1dly val)
+{
+	switch (val) {
+	case_mac_ax_pcie_dly(L1DLY_16US);
+	case_mac_ax_pcie_dly(L1DLY_32US);
+	case_mac_ax_pcie_dly(L1DLY_64US);
+	case_mac_ax_pcie_dly(L1DLY_INFI);
+	case_mac_ax_pcie_dly(L1DLY_R_ERR);
+	case_mac_ax_pcie_dly(L1DLY_DEF);
+	case_mac_ax_pcie_dly(L1DLY_IGNORE);
+	default:
+		return val;
+	};
+};
+
+static u8 _trans_clkdly(enum mac_ax_pcie_clkdly val)
+{
+	switch (val) {
+	case_mac_ax_pcie_dly(CLKDLY_V1_0);
+	case_mac_ax_pcie_dly(CLKDLY_V1_16US);
+	case_mac_ax_pcie_dly(CLKDLY_V1_32US);
+	case_mac_ax_pcie_dly(CLKDLY_V1_64US);
+	case_mac_ax_pcie_dly(CLKDLY_V1_80US);
+	case_mac_ax_pcie_dly(CLKDLY_V1_96US);
+	case_mac_ax_pcie_dly(CLKDLY_R_ERR);
+	case_mac_ax_pcie_dly(CLKDLY_DEF);
+	case_mac_ax_pcie_dly(CLKDLY_IGNORE);
+	default:
+		return val;
+	};
+}
+
 static enum   mac_ax_pcie_func_ctrl
 _hal_set_each_pcicfg(enum rtw_pcie_bus_func_cap_t ctrl)
 {
@@ -30,33 +102,36 @@ _hal_set_each_pcicfg(enum rtw_pcie_bus_func_cap_t ctrl)
 	}
 
 }
-enum rtw_hal_status _hal_set_pcicfg_8852ce(struct hal_info_t *hal_info)
+
+enum rtw_hal_status
+hal_get_pcicfg_8852ce(struct hal_info_t *hal_info,
+		      struct rtw_pcie_cfgspc_param *cfg)
 {
-	struct mac_ax_pcie_cfgspc_param pcicfg;
 	enum rtw_hal_status hsts = RTW_HAL_STATUS_FAILURE;
-	struct rtw_hal_com_t *hal_com = hal_info->hal_com;
+	struct mac_ax_pcie_cfgspc_param pcicfg = {0};
 
 	_os_mem_set(hal_to_drvpriv(hal_info), &pcicfg, 0, sizeof(pcicfg));
-	pcicfg.write = 1;
-	pcicfg.l0s_ctrl = _hal_set_each_pcicfg(hal_com->bus_cap.l0s_ctrl);
-	pcicfg.l1_ctrl = _hal_set_each_pcicfg(hal_com->bus_cap.l1_ctrl);
-	pcicfg.l1ss_ctrl = _hal_set_each_pcicfg(hal_com->bus_cap.l1ss_ctrl);
-	pcicfg.wake_ctrl = _hal_set_each_pcicfg(hal_com->bus_cap.wake_ctrl);
-	pcicfg.crq_ctrl = _hal_set_each_pcicfg(hal_com->bus_cap.crq_ctrl);
-	pcicfg.clkdly_ctrl = hal_com->bus_cap.clkdly_ctrl;
-	pcicfg.l0sdly_ctrl = hal_com->bus_cap.l0sdly_ctrl;
-	pcicfg.l1dly_ctrl = hal_com->bus_cap.l1dly_ctrl;
-
-
-	PHL_TRACE(COMP_PHL_DBG, _PHL_INFO_,
-		"%s : l0s/l1/l1ss/wake/crq/l0sdly/l1dly/clkdly = %#X/%#X/%#X/%#X/%#X/%#X/%#X/%#X \n",
-		__func__, pcicfg.l0s_ctrl, pcicfg.l1_ctrl, pcicfg.l1ss_ctrl, pcicfg.wake_ctrl,
-		pcicfg.crq_ctrl, pcicfg.l0sdly_ctrl, pcicfg.l1dly_ctrl, pcicfg.clkdly_ctrl);
+	pcicfg.read = 1;
 
 	hsts = rtw_hal_mac_set_pcicfg(hal_info, &pcicfg);
 
-	return hsts;
+	if (hsts != RTW_HAL_STATUS_SUCCESS) {
+		PHL_ERR("%s : status %u\n", __func__, hsts);
+		return hsts;
+	}
+
+	cfg->l0s_ctrl = _trans_func_ctrl(pcicfg.l0s_ctrl);
+	cfg->l1_ctrl = _trans_func_ctrl(pcicfg.l1_ctrl);
+	cfg->l1ss_ctrl = _trans_func_ctrl(pcicfg.l1ss_ctrl);
+	cfg->wake_ctrl = _trans_func_ctrl(pcicfg.wake_ctrl);
+	cfg->crq_ctrl = _trans_func_ctrl(pcicfg.crq_ctrl);
+	cfg->l0sdly = _trans_l0sdly(pcicfg.l0sdly_ctrl);
+	cfg->l1dly = _trans_l1dly(pcicfg.l1dly_ctrl);
+	cfg->clkdly = _trans_clkdly(pcicfg.clkdly_ctrl);
+
+	return RTW_HAL_STATUS_SUCCESS;
 }
+
 
 enum rtw_hal_status _hal_ltr_sw_init_state_8852ce(struct hal_info_t *hal_info)
 {
@@ -279,7 +354,7 @@ void init_hal_spec_8852ce(struct rtw_phl_com_t *phl_com,
 	bus_hw_cap->ltr_sw_ctrl = false;
 	bus_hw_cap->ltr_hw_ctrl = true;
 
-	hal_com->dev_hw_cap.ps_cap.lps_pause_tx = false;
+	hal_com->dev_hw_cap.ps_cap.ps_pause_tx = false;
 	hal_spec->ser_cfg_int = true;
 	hal_spec->ps_cfg_int = true;
 }
@@ -292,6 +367,65 @@ enum rtw_hal_status hal_get_efuse_8852ce(struct rtw_phl_com_t *phl_com,
 	_hal_pre_init_8852ce(phl_com, hal_info, &init_52ce);
 
 	return hal_get_efuse_8852c(phl_com, hal_info, &init_52ce);
+}
+
+enum rtw_hal_status hal_set_pcicfg_8852ce(struct hal_info_t *hal_info)
+{
+	struct mac_ax_pcie_cfgspc_param pcicfg;
+	enum rtw_hal_status hsts = RTW_HAL_STATUS_FAILURE;
+	struct rtw_hal_com_t *hal_com = hal_info->hal_com;
+
+	_os_mem_set(hal_to_drvpriv(hal_info), &pcicfg, 0, sizeof(pcicfg));
+	pcicfg.write = 1;
+	pcicfg.l0s_ctrl = _hal_set_each_pcicfg(hal_com->bus_cap.l0s_ctrl);
+	pcicfg.l1_ctrl = _hal_set_each_pcicfg(hal_com->bus_cap.l1_ctrl);
+	pcicfg.l1ss_ctrl = _hal_set_each_pcicfg(hal_com->bus_cap.l1ss_ctrl);
+	pcicfg.wake_ctrl = _hal_set_each_pcicfg(hal_com->bus_cap.wake_ctrl);
+	pcicfg.crq_ctrl = _hal_set_each_pcicfg(hal_com->bus_cap.crq_ctrl);
+	pcicfg.clkdly_ctrl = hal_com->bus_cap.clkdly_ctrl;
+	pcicfg.l0sdly_ctrl = hal_com->bus_cap.l0sdly_ctrl;
+	pcicfg.l1dly_ctrl = hal_com->bus_cap.l1dly_ctrl;
+
+
+	PHL_TRACE(COMP_PHL_DBG, _PHL_INFO_,
+	 "%s : l0s/l1/l1ss/wake/crq/l0sdly/l1dly/clkdly = %#X/%#X/%#X/%#X/%#X/%#X/%#X/%#X \n",
+	 __func__, pcicfg.l0s_ctrl, pcicfg.l1_ctrl, pcicfg.l1ss_ctrl, pcicfg.wake_ctrl,
+	 pcicfg.crq_ctrl, pcicfg.l0sdly_ctrl, pcicfg.l1dly_ctrl, pcicfg.clkdly_ctrl);
+
+	hsts = rtw_hal_mac_set_pcicfg(hal_info, &pcicfg);
+
+	return hsts;
+}
+
+enum rtw_hal_status hal_fast_start_8852ce(struct rtw_phl_com_t *phl_com,
+					 struct hal_info_t *hal_info)
+{
+	struct hal_init_info_t init_52ce;
+	enum rtw_hal_status hal_status = RTW_HAL_STATUS_FAILURE;
+
+	_os_mem_set(hal_to_drvpriv(hal_info), &init_52ce, 0, sizeof(init_52ce));
+	_hal_pre_init_8852ce(phl_com, hal_info, &init_52ce);
+
+	hal_status = hal_fast_start_8852c(phl_com, hal_info, &init_52ce);
+	if (RTW_HAL_STATUS_SUCCESS != hal_status) {
+
+		PHL_ERR("hal_fast_start_8852c: status = %u\n",hal_status);
+		return hal_status;
+	}
+
+	hal_status = hal_set_pcicfg_8852ce(hal_info);
+	if (RTW_HAL_STATUS_SUCCESS != hal_status) {
+		PHL_ERR("hal_set_pcicfg_8852ce: status = %u\n",hal_status);
+		return hal_status;
+	}
+
+	return hal_status;
+}
+
+enum rtw_hal_status hal_fast_stop_8852ce(struct rtw_phl_com_t *phl_com,
+					 struct hal_info_t *hal_info)
+{
+	return hal_fast_stop_8852c(phl_com, hal_info);
 }
 
 enum rtw_hal_status hal_init_8852ce(struct rtw_phl_com_t *phl_com,
@@ -368,7 +502,6 @@ enum rtw_hal_status hal_start_8852ce(struct rtw_phl_com_t *phl_com,
 {
 	struct hal_init_info_t init_52ce;
 	enum rtw_hal_status hal_status = RTW_HAL_STATUS_FAILURE;
-	struct rtw_hal_com_t *hal_com = hal_info->hal_com;
 
 	_os_mem_set(hal_to_drvpriv(hal_info), &init_52ce, 0, sizeof(init_52ce));
 	_hal_pre_init_8852ce(phl_com, hal_info, &init_52ce);
@@ -380,9 +513,9 @@ enum rtw_hal_status hal_start_8852ce(struct rtw_phl_com_t *phl_com,
 		return hal_status;
 	}
 
-	hal_status = _hal_set_pcicfg_8852ce(hal_info);
+	hal_status = hal_set_pcicfg_8852ce(hal_info);
 	if(RTW_HAL_STATUS_SUCCESS != hal_status) {
-		PHL_ERR("_hal_set_pcicfg_8852ce: status = %u\n",hal_status);
+		PHL_ERR("hal_set_pcicfg_8852ce: status = %u\n",hal_status);
 		return hal_status;
 	}
 
@@ -397,14 +530,6 @@ enum rtw_hal_status hal_start_8852ce(struct rtw_phl_com_t *phl_com,
 		PHL_ERR("_hal_ltr_sw_init_state_8852ce: status = %u\n",hal_status);
 		return hal_status;
 	}
-
-#ifdef PHL_DMA_ADDR_64
-	/* init default 64bit WP mapping */
-	hal_write32(hal_com, R_AX_WP_ADDR_H_SEL0_3, 0x03020100);
-	hal_write32(hal_com, R_AX_WP_ADDR_H_SEL4_7, 0x07060504);
-	hal_write32(hal_com, R_AX_WP_ADDR_H_SEL8_11, 0x0B0A0908);
-	hal_write32(hal_com, R_AX_WP_ADDR_H_SEL12_15, 0x0F0E0D0C);
-#endif
 
 	return hal_status;
 }
@@ -481,8 +606,8 @@ hal_wow_deinit_8852ce(struct rtw_phl_com_t *phl_com, struct hal_info_t *hal_info
 		return hal_status;
 	}
 
-	if (RTW_HAL_STATUS_SUCCESS != _hal_set_pcicfg_8852ce(hal_info))
-		PHL_ERR("_hal_set_pcicfg_8852ce: status = %u\n", hal_status);
+	if (RTW_HAL_STATUS_SUCCESS != hal_set_pcicfg_8852ce(hal_info))
+		PHL_ERR("hal_set_pcicfg_8852ce: status = %u\n", hal_status);
 
 
 	FUNCOUT_WSTS(hal_status);
@@ -845,24 +970,24 @@ end:
 
 static u32 hal_rx_handler_8852ce(struct hal_info_t *hal, u32 *handled)
 {
-	u32 ret = 0;
 	struct rtw_hal_com_t *hal_com = hal->hal_com;
-	static const u32 rx_handle_irq = (
-					B_AX_RXDMA_INT_EN |
-					B_AX_RPQDMA_INT_EN|
-					B_AX_RDU_INT_EN |
-					B_AX_RPQBD_FULL_INT_EN);
-	static const u32 rx_handle_irq_lps = (
-					B_AX_GPIO18_INT_EN);
-	u32	handled0 = ((hal_com->_intr[0].val & rx_handle_irq) |
-					(hal_com->_intr[3].val & rx_handle_irq_lps));
+	static const u32 rx_handle_irq = B_AX_RXDMA_INT_EN |
+					 B_AX_RDU_INT_EN;
+	static const u32 rx_handle_irq_lps = B_AX_GPIO18_INT_EN;
+	static const u32 rx_handle_irq_imr = B_AX_RXDMA_INT_EN |
+					 B_AX_RDU_INT_EN | B_AX_RPQDMA_INT_EN |
+					 B_AX_RPQBD_FULL_INT_EN;
+	static const u32 rx_handle_irq_lps_imr = B_AX_GPIO18_INT_EN;
+	u32 handled0 = ((hal_com->_intr[0].val & rx_handle_irq) |
+			(hal_com->_intr[3].val & rx_handle_irq_lps));
+	u32 ret = 0;
 
 	if (handled0 == 0)
 		return ret;
 
 	/* disable rx related IMR, rx thread will restore them */
-	hal_com->_intr[0].mask &= ~rx_handle_irq;
-	hal_com->_intr[3].mask &= ~rx_handle_irq_lps;
+	hal_com->_intr[0].mask &= ~rx_handle_irq_imr;
+	hal_com->_intr[3].mask &= ~rx_handle_irq_lps_imr;
 #ifndef CONFIG_SYNC_INTERRUPT
 	if (hal_com->_intr[0].en)
 		hal_write32(hal_com, R_AX_PCIE_HIMR00, hal_com->_intr[0].mask);
@@ -879,6 +1004,45 @@ static u32 hal_rx_handler_8852ce(struct hal_info_t *hal, u32 *handled)
 		hal_com->trx_stat.rx_rdu_cnt++;
 
 	PHL_TRACE(COMP_PHL_DBG, _PHL_DEBUG_, "%s : rx handle 0x%08X, int_array 0x%08X\n",
+			  __func__, handled0, hal_com->_intr[0].val);
+
+	return ret;
+}
+
+
+static u32 hal_rp_handler_8852ce(struct hal_info_t *hal, u32 *handled)
+{
+	struct rtw_hal_com_t *hal_com = hal->hal_com;
+	static const u32 rp_handle_irq = B_AX_RPQDMA_INT_EN |
+					 B_AX_RPQBD_FULL_INT_EN;
+	static const u32 rx_handle_irq_lps = B_AX_GPIO18_INT_EN;
+	static const u32 rp_handle_irq_imr = B_AX_RXDMA_INT_EN |
+					 B_AX_RDU_INT_EN | B_AX_RPQDMA_INT_EN |
+					 B_AX_RPQBD_FULL_INT_EN;
+	static const u32 rx_handle_irq_lps_imr = B_AX_GPIO18_INT_EN;
+	u32 handled0 = ((hal_com->_intr[0].val & rp_handle_irq) |
+			(hal_com->_intr[3].val & rx_handle_irq_lps));
+	u32 ret = 0;
+
+	if (handled0 == 0)
+		return ret;
+
+	/* disable rx related IMR, rx thread will restore them */
+	hal_com->_intr[0].mask &= ~rp_handle_irq_imr;
+	hal_com->_intr[3].mask &= ~rx_handle_irq_lps_imr;
+#ifndef CONFIG_SYNC_INTERRUPT
+	if (hal_com->_intr[0].en)
+		hal_write32(hal_com, R_AX_PCIE_HIMR00, hal_com->_intr[0].mask);
+	if (hal_com->_intr[3].en)
+		hal_write32(hal_com, R_AX_HIMR1, hal_com->_intr[3].mask);
+#endif /* CONFIG_SYNC_INTERRUPT */
+#ifdef PHL_RXSC_ISR
+	hal_com->rx_int_array = handled0;
+#endif
+	handled[0] |= handled0;
+	ret = 1;
+
+	PHL_TRACE(COMP_PHL_DBG, _PHL_DEBUG_, "%s : rp handle 0x%08X, int_array 0x%08X\n",
 			  __func__, handled0, hal_com->_intr[0].val);
 
 	return ret;
@@ -960,6 +1124,11 @@ u32 hal_int_hdler_8852ce(struct hal_info_t *hal)
 	/* bit 5 : watchdog timeout */
 	int_hdler_msk |= (hal_watchdog_timer_handler_8852ce(hal, handled) << 5);
 
+	/* bit 7 : rsvd for gt3 interrupt*/
+
+	/* bit 8 : rx rp queue related */
+	int_hdler_msk |= (hal_rp_handler_8852ce(hal, handled) << 8);
+
 	PHL_TRACE(COMP_PHL_DBG, _PHL_DEBUG_, "%s : int_hdler_msk = 0x%x\n", __func__, int_hdler_msk);
 
 #if 0
@@ -983,6 +1152,11 @@ u32 hal_int_hdler_8852ce(struct hal_info_t *hal)
 void hal_rx_int_restore_8852ce(struct hal_info_t *hal)
 {
 	struct rtw_hal_com_t *hal_com = hal->hal_com;
+#ifndef CONFIG_SYNC_INTERRUPT
+	_os_spinlockfg sp_flags;
+
+	_os_spinlock(hal->phl_com->drv_priv, &hal->phl_com->imr_lock, _irq, &sp_flags);
+#endif
 
 	hal_com->_intr[0].mask |= (B_AX_RXDMA_INT_EN | B_AX_RPQDMA_INT_EN |
 							 B_AX_RDU_INT_EN | B_AX_RPQBD_FULL_INT_EN);
@@ -994,6 +1168,7 @@ void hal_rx_int_restore_8852ce(struct hal_info_t *hal)
 	if (hal_com->_intr[3].en) {
 		hal_write32(hal_com, R_AX_HIMR1, hal_com->_intr[3].mask);
 	}
+	_os_spinunlock(hal->phl_com->drv_priv, &hal->phl_com->imr_lock, _irq, &sp_flags);
 #endif /* CONFIG_SYNC_INTERRUPT */
 
 }

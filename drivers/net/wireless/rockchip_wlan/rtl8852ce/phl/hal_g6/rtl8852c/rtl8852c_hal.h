@@ -58,11 +58,50 @@ void init_default_value_8852c(struct hal_info_t *hal);
 enum rtw_hal_status hal_get_efuse_8852c(struct rtw_phl_com_t *phl_com,
 					struct hal_info_t *hal,
 					struct hal_init_info_t *init_info);
+enum rtw_hal_status hal_fast_start_8852c(struct rtw_phl_com_t *phl_com,
+					struct hal_info_t *hal,
+					struct hal_init_info_t *init_info);
+enum rtw_hal_status hal_fast_stop_8852c(struct rtw_phl_com_t *phl_com,
+					struct hal_info_t *hal);
 enum rtw_hal_status hal_start_8852c(struct rtw_phl_com_t *phl_com,
 				   struct hal_info_t *hal,
 				   struct hal_init_info_t *init_info);
 enum rtw_hal_status hal_stop_8852c(struct rtw_phl_com_t *phl_com,
 				     struct hal_info_t *hal);
+/* Regulation */
+u8 hal_query_group_cntry_num_8852c(
+	struct rtw_regu_policy *policy, u8 group_id);
+
+u8 hal_get_cntry_idx_8852c(char *cntry);
+
+u8 hal_get_cntry_tbl_size_8852c(void);
+
+u8 hal_get_chnlplan_ver_8852c(void);
+
+u8 hal_get_country_ver_8852c(void);
+
+u8 hal_get_domain_regulation_8852c(
+	u8 domain, u8 band);
+
+u8 hal_get_domain_idx_8852c(u8 domain, bool is_6g);
+
+u8 hal_get_cat6g_by_country_8852c(char *country);
+
+void hal_get_6g_regulatory_info_8852c(u8 domain,
+	u8 *dm_code, u8 *regulation, u8 *ch_idx);
+
+void hal_qry_cntry_chnlplan_8852c(
+	struct rtw_regulation_country_chplan *chplan, char *country);
+
+void hal_get_chplan_update_info_8852c(
+	u8 group, u8 did, void *info, enum band_type band);
+
+void hal_fill_group_cntry_list_8852c(
+	struct rtw_regu_policy *policy,
+	char* list, u32 group_size, u8 group_id);
+
+void hal_get_chdef_6g_8852c(
+	u8 ch_idx, struct chdef_6ghz *chdef);
 
 #ifdef CONFIG_WOWLAN
 enum rtw_hal_status

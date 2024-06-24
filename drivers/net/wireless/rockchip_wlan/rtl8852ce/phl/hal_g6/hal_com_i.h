@@ -19,8 +19,7 @@ enum rtw_hal_status
 rtw_hal_hw_param_init(struct hal_info_t *hal_info, struct rtw_phl_com_t *phl_com,
 				enum phl_band_idx band_idx);
 enum rtw_hal_status rtw_hal_ppdu_sts_cfg(void *hal, u8 band_idx, bool en);
-enum rtw_hal_status rtw_hal_ppdu_sts_init(void *hal, u8 band_idx,
-			bool en, u8 appen_info, u8 filter);
+enum rtw_hal_status rtw_hal_ppdu_sts_init(void *hal, struct hal_ppdu_sts_cfg *cfg);
 
 enum phl_band_idx rtw_hal_phy_idx_to_hw_band(enum phl_phy_idx p_idx);
 

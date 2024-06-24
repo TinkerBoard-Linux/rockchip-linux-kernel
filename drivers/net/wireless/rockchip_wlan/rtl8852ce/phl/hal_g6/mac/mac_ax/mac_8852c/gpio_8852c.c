@@ -19,6 +19,8 @@
 #include "../../mac_ax.h"
 #if MAC_AX_8852C_SUPPORT
 
+#define MAC_AX_GPIO_MAX_8852C (sizeof(PIN_LIST_8852C) / sizeof(struct mac_ax_pin_list *))
+
 /* GPIO0 definition */
 #define GPIO0_BT_GPIO0_8852C	\
 	{MAC_AX_SWGPIO, MAC_AX_GPIO0, MAC_AX_GPIO_IN_OUT, \
@@ -1566,6 +1568,54 @@
 	{RTW_MAC_GPIO_SW_IO, 0x2D7, \
 	 BIT(7) | BIT(6) | BIT(5) | BIT(4), BIT(7) | BIT(6) | BIT(5) | BIT(4)}
 
+/* GPIO16 definition */
+#define PINMUX_GPIO16_BT_GPIO16_8852C \
+	{RTW_MAC_GPIO_BT_GPIO, 0x2D8, \
+	 BIT(3) | BIT(2) | BIT(1) | BIT(0), BIT(0)}
+#define PINMUX_GPIO16_WL_SDIO_INT_8852C	\
+	{RTW_MAC_GPIO_WL_SDIO_INT, 0x2D8,  \
+	 BIT(3) | BIT(2) | BIT(1) | BIT(0), BIT(1)}
+#define PINMUX_GPIO16_WL_RFE_CTRL16_8852C \
+	{RTW_MAC_GPIO_WL_RFE_CTRL, 0x2D8, \
+	 BIT(3) | BIT(2) | BIT(1) | BIT(0), BIT(3)}
+#define PINMUX_GPIO16_DUAL_BT_CLK_REG_PINEN_8852C \
+	{RTW_MAC_GPIO_BT_UART_RQB, 0x2D8, \
+	 BIT(3) | BIT(2) | BIT(1) | BIT(0), BIT(3) | BIT(0)}
+#define PINMUX_GPIO16_DUAL_BT_CLK_REG_FUNCEN_8852C \
+	{RTW_MAC_GPIO_BT_UART_RQB, 0x73, \
+	 BIT(3), BIT(3)}
+#define PINMUX_GPIO16_SW_IO16_8852C \
+	{RTW_MAC_GPIO_SW_IO, 0x2D8, \
+	 BIT(3) | BIT(2) | BIT(1) | BIT(0), BIT(3) | BIT(2) | BIT(1) | BIT(0)}
+
+/* GPIO17 definition */
+#define PINMUX_GPIO17_BT_GPIO17_8852C \
+	{RTW_MAC_GPIO_BT_GPIO, 0x2D8, \
+	 BIT(7) | BIT(6) | BIT(5) | BIT(4), BIT(4)}
+#define PINMUX_GPIO17_WL_RFE_CTRL17_8852C \
+	{RTW_MAC_GPIO_WL_RFE_CTRL, 0x2D8, \
+	 BIT(7) | BIT(6) | BIT(5) | BIT(4), BIT(7)}
+#define PINMUX_GPIO17_DUAL_HOST_WAKE_BT_PINEN_8852C \
+	{RTW_MAC_GPIO_BT_UART_RQB, 0x2D8, \
+	 BIT(7) | BIT(6) | BIT(5) | BIT(4), BIT(7) | BIT(4)}
+#define PINMUX_GPIO17_DUAL_HOST_WAKE_BT_FUNCEN_8852C \
+	{RTW_MAC_GPIO_BT_UART_RQB, 0x73, \
+	 BIT(7), BIT(7)}
+#define PINMUX_GPIO17_SW_IO17_8852C \
+	{RTW_MAC_GPIO_SW_IO, 0x2D8, \
+	 BIT(7) | BIT(6) | BIT(5) | BIT(4), BIT(7) | BIT(6) | BIT(5) | BIT(4)}
+
+/* GPIO18 definition */
+#define PINMUX_GPIO18_BT_GPIO18_8852C \
+	{RTW_MAC_GPIO_BT_GPIO, 0x2D9, \
+	 BIT(3) | BIT(2) | BIT(1) | BIT(0), BIT(0)}
+#define PINMUX_GPIO18_WL_RFE_CTRL18_8852C \
+	{RTW_MAC_GPIO_WL_RFE_CTRL, 0x2D9, \
+	 BIT(3) | BIT(2) | BIT(1) | BIT(0), BIT(3)}
+#define PINMUX_GPIO18_SW_IO18_8852C \
+	{RTW_MAC_GPIO_SW_IO, 0x2D9, \
+	 BIT(3) | BIT(2) | BIT(1) | BIT(0), BIT(3) | BIT(2) | BIT(1) | BIT(0)}
+
 #define PINMUX_GPIO_END_8852C \
 	{RTW_MAC_GPIO_INVALID, 0, 0, 0}
 
@@ -2065,6 +2115,32 @@ static const struct mac_ax_pin_list PIN_LIST_GPIO15_8852C[] = {
 	PINMUX_GPIO_END_8852C,
 };
 
+static const struct mac_ax_pin_list PIN_LIST_GPIO16_8852C[] = {
+	PINMUX_GPIO16_BT_GPIO16_8852C,
+	PINMUX_GPIO16_WL_SDIO_INT_8852C,
+	PINMUX_GPIO16_WL_RFE_CTRL16_8852C,
+	PINMUX_GPIO16_DUAL_BT_CLK_REG_PINEN_8852C,
+	PINMUX_GPIO16_DUAL_BT_CLK_REG_FUNCEN_8852C,
+	PINMUX_GPIO16_SW_IO16_8852C,
+	PINMUX_GPIO_END_8852C,
+};
+
+static const struct mac_ax_pin_list PIN_LIST_GPIO17_8852C[] = {
+	PINMUX_GPIO17_BT_GPIO17_8852C,
+	PINMUX_GPIO17_WL_RFE_CTRL17_8852C,
+	PINMUX_GPIO17_DUAL_HOST_WAKE_BT_PINEN_8852C,
+	PINMUX_GPIO17_DUAL_HOST_WAKE_BT_FUNCEN_8852C,
+	PINMUX_GPIO17_SW_IO17_8852C,
+	PINMUX_GPIO_END_8852C,
+};
+
+static const struct mac_ax_pin_list PIN_LIST_GPIO18_8852C[] = {
+	PINMUX_GPIO18_BT_GPIO18_8852C,
+	PINMUX_GPIO18_WL_RFE_CTRL18_8852C,
+	PINMUX_GPIO18_SW_IO18_8852C,
+	PINMUX_GPIO_END_8852C,
+};
+
 static const struct mac_ax_pin_list PIN_LIST_GPIO0_8852C_ACUT[] = {
 	PINMUX_GPIO0_BT_GPIO0_8852C_ACUT,
 	PINMUX_GPIO0_BT_SDIO_INT_8852C_ACUT,
@@ -2287,8 +2363,9 @@ static const struct mac_ax_pin_list *PIN_LIST_8852C[] = {
 	PIN_LIST_GPIO13_8852C, /* gpio13 */
 	PIN_LIST_GPIO14_8852C, /* gpio14 */
 	PIN_LIST_GPIO15_8852C, /* gpio15 */
-	NULL,
-	NULL,
+	PIN_LIST_GPIO16_8852C, /* gpio16 */
+	PIN_LIST_GPIO17_8852C, /* gpio17 */
+	PIN_LIST_GPIO18_8852C, /* gpio18 */
 };
 
 static u32 mac_get_pinmux_list_8852c(struct mac_ax_adapter *adapter,
@@ -2420,7 +2497,7 @@ u32 mac_gpio_init_8852c(struct mac_ax_adapter *adapter)
 	bool is_fpga = false;
 
 #if MAC_AX_FEATURE_HV
-	if (adapter->env == HV_AX_FPGA)
+	if (adapter->env_info.env == HV_AX_FPGA)
 		is_fpga = true;
 	else
 		is_fpga = false;
@@ -2434,6 +2511,7 @@ u32 mac_gpio_init_8852c(struct mac_ax_adapter *adapter)
 		adapter->gpio_info.uart_tx_gpio = 9;
 		adapter->gpio_info.uart_rx_gpio = 11;
 	}
+	adapter->gpio_info.gpio_max = MAC_AX_GPIO_MAX_8852C;
 	return MACSUCCESS;
 }
 
@@ -2447,7 +2525,7 @@ u32 mac_set_gpio_func_8852c(struct mac_ax_adapter *adapter,
 	enum rtw_mac_gfunc curr_func = RTW_MAC_GPIO_INVALID;
 	struct mac_ax_gpio_info *info = &adapter->gpio_info;
 
-	if (gpio_cfg < MAC_AX_GPIO_MIN || gpio_cfg > RTW_MAC_GPIO_MAX) {
+	if (gpio_cfg < MAC_AX_GPIO_MIN || gpio_cfg >= MAC_AX_GPIO_MAX_8852C) {
 		PLTFM_MSG_ERR("The GPIO number is wrong: %d", gpio_cfg);
 		return MACGPIONUM;
 	}
@@ -2486,7 +2564,7 @@ u32 mac_set_gpio_func_8852c(struct mac_ax_adapter *adapter,
 u32 mac_get_gpio_status_8852c(struct mac_ax_adapter *adapter,
 			      enum rtw_mac_gfunc *func, u8 gpio)
 {
-	if (gpio > RTW_MAC_GPIO_MAX) {
+	if (gpio >= MAC_AX_GPIO_MAX_8852C) {
 		PLTFM_MSG_ERR("The GPIO number is wrong: %d", gpio);
 		return MACGPIONUM;
 	}
@@ -2496,4 +2574,13 @@ u32 mac_get_gpio_status_8852c(struct mac_ax_adapter *adapter,
 	return MACSUCCESS;
 }
 
+u32 mac_cfg_wps_8852c(struct mac_ax_adapter *adapter,
+		      struct mac_ax_cfg_wps *wps)
+{
+	if (wps->gpio >= MAC_AX_GPIO_MAX_8852C) {
+		PLTFM_MSG_ERR("%s: Wrong GPIO num: %d", __func__, wps->gpio);
+		return MACGPIONUM;
+	}
+	return mac_cfg_wps(adapter, wps);
+}
 #endif /* #if MAC_AX_8852C_SUPPORT */

@@ -43,6 +43,12 @@
 /* 0: disable MAC debug messages */
 #define MAC_AX_DBG_MSG_EN	1
 
+#ifdef PHL_FEATURE_NONE
+#define MAC_AX_CONSOLE_EN	0
+#else
+#define MAC_AX_CONSOLE_EN	1
+#endif
+
 /* Set debug message level */
 #define MAC_AX_MSG_LEVEL_TRACE		3
 #define MAC_AX_MSG_LEVEL_WARNING	2
@@ -83,6 +89,9 @@ typedef char		s8;
 typedef int16_t		s16;
 typedef int32_t		s32;
 
+#define _os_va_list va_list
+
+#include "mac_exp_def.h"
 #include "../hal_headers_le.h"
 
 typedef u16 __le16;
@@ -101,6 +110,8 @@ typedef	CRITICAL_SECTION	mac_ax_mutex;
 /* 1: enable MAC debug messages */
 /* 0: disable MAC debug messages */
 #define MAC_AX_DBG_MSG_EN	1
+
+#define MAC_AX_CONSOLE_EN	1
 
 /* Set debug message level */
 #define MAC_AX_MSG_LEVEL_TRACE		3

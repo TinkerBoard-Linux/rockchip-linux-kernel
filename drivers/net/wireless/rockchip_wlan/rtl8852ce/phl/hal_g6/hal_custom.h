@@ -57,6 +57,16 @@ rtw_hal_query_pkt_detect_thold(void *hal,
 
 void
 rtw_hal_set_tx_rate_rty_tbl(void *hal, bool en, u8 *rty_rate_tbl);
+
+enum rtw_hal_status
+rtw_hal_set_spatial_reuse_en(void *hal, bool en);
+
+bool
+rtw_hal_is_spatial_reuse_en(void *hal);
+
+enum rtw_hal_status rtw_hal_set_usr_frame_to_act(
+    void *hal, enum rtw_mac_usr_frame_to_act_mode mode, u32 to_thr,
+    u8 trigger_cnt, u16 sw_def_bmp);
 #endif
 
 #endif /*_HAL_CUSTOM_H_*/

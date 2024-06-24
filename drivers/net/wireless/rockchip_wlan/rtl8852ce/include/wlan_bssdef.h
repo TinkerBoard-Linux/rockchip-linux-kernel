@@ -57,16 +57,11 @@ typedef enum _NDIS_802_11_NETWORK_INFRASTRUCTURE {
 	Ndis802_11_mesh,
 } NDIS_802_11_NETWORK_INFRASTRUCTURE, *PNDIS_802_11_NETWORK_INFRASTRUCTURE;
 
-typedef struct _NDIS_802_11_FIXED_IEs {
-	u8  Timestamp[8];
-	u16  BeaconInterval;
-	u16  Capabilities;
-} NDIS_802_11_FIXED_IEs, *PNDIS_802_11_FIXED_IEs;
 
 typedef struct _NDIS_802_11_VARIABLE_IEs {
 	u8  ElementID;
 	u8  Length;
-	u8  data[1];
+	u8  data[];
 } NDIS_802_11_VARIABLE_IEs, *PNDIS_802_11_VARIABLE_IEs;
 
 typedef enum _NDIS_802_11_AUTHENTICATION_MODE {
@@ -142,16 +137,10 @@ typedef enum _NDIS_802_11_NETWORK_INFRASTRUCTURE {
 	Ndis802_11APMode
 } NDIS_802_11_NETWORK_INFRASTRUCTURE, *PNDIS_802_11_NETWORK_INFRASTRUCTURE;
 
-typedef struct _NDIS_802_11_FIXED_IEs {
-	u8  Timestamp[8];
-	u16  BeaconInterval;
-	u16  Capabilities;
-} NDIS_802_11_FIXED_IEs, *PNDIS_802_11_FIXED_IEs;
-
 typedef struct _NDIS_802_11_VARIABLE_IEs {
 	u8  ElementID;
 	u8  Length;
-	u8  data[1];
+	u8  data[];
 } NDIS_802_11_VARIABLE_IEs, *PNDIS_802_11_VARIABLE_IEs;
 
 typedef enum _NDIS_802_11_AUTHENTICATION_MODE {
@@ -190,9 +179,6 @@ typedef struct _NDIS_802_11_WEP {
 
 #endif /* PLATFORM_FREEBSD */
 
-#ifndef Ndis802_11APMode
-#define Ndis802_11APMode (Ndis802_11InfrastructureMax+1)
-#endif
 
 /*RTW_WKARD_CORE_RSSI_V1 - GEORGIA MUST REFINE*/
 typedef struct _WLAN_PHY_INFO {
@@ -203,7 +189,7 @@ typedef struct _WLAN_PHY_INFO {
 	u8	Optimum_antenna;  /* for Antenna diversity */
 	u8	is_cck_rate;	/* 1:cck_rate */
 	s8	rx_snr[4];
-#ifdef CONFIG_RTW_80211K
+#if defined (CONFIG_RTW_80211K) || defined(CONFIG_RTW_FSM_RRM)
 	u32	free_cnt; 	/* freerun counter */
 	u8	rm_en_cap[5];
 #endif
@@ -270,6 +256,11 @@ __attribute__((packed)) WLAN_BSSID_EX, *PWLAN_BSSID_EX;
 
 #define BSS_EX_OP_CH(bss_ex) ((bss_ex)->Configuration.DSConfig)
 #define BSS_EX_OP_BAND(bss_ex) ((bss_ex)->Configuration.Band)
+#ifdef CONFIG_STA_MULTIPLE_BSSID
+#define BSS_EX_MBSSID_IDX(bss_ex) ((bss_ex)->mbssid_index)
+#else
+#define BSS_EX_MBSSID_IDX(bss_ex) 0
+#endif
 #define BSS_EX_IES(bss_ex) ((bss_ex)->IEs)
 #define BSS_EX_IES_LEN(bss_ex) ((bss_ex)->IELength)
 #define BSS_EX_FIXED_IE_OFFSET(bss_ex) ((bss_ex)->Reserved[0] == BSS_TYPE_PROB_REQ ? 0 : 12)
@@ -284,6 +275,7 @@ __inline  static uint get_WLAN_BSSID_EX_sz(WLAN_BSSID_EX *bss)
 struct beacon_keys {
 	u8 ssid[IW_ESSID_MAX_SIZE];
 	u32 ssid_len;
+	enum band_type band;
 	u8 ch;
 	u8 bw;
 	u8 offset;

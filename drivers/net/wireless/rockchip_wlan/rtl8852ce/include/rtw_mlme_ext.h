@@ -20,7 +20,9 @@
  * in addition to normal scan.
  * ACTIVE_CH_SURVEY_TO: dwell time (ms) for active scan channel in nomal scan.
  */
+#ifndef SURVEY_TO
 #define SURVEY_TO		(100)
+#endif /*SURVEY_TO*/
 #define ACTIVE_CH_SURVEY_TO	(50)
 
 #define REAUTH_TO		(300) /* (50) */
@@ -189,7 +191,7 @@ typedef enum {
 	DISCONNECTION_BY_SYSTEM_DUE_TO_SYSTEM_IN_SUSPEND,
 	DISCONNECTION_BY_DRIVER_DUE_TO_CONNECTION_EXIST,
 	DISCONNECTION_BY_DRIVER_DUE_TO_EACH_IFACE_CHBW_NOT_SYNC,
-	/* DISCONNECTION_BY_DRIVER_DUE_TO_DFS_DETECTION, */
+	DISCONNECTION_BY_DRIVER_DUE_TO_DFS_DETECTION,
 	DISCONNECTION_BY_DRIVER_DUE_TO_IOCTL_DBG_PORT,
 	DISCONNECTION_BY_DRIVER_DUE_TO_AP_BEACON_CHANGED,
 	DISCONNECTION_BY_DRIVER_DUE_TO_KEEPALIVE_TIMEOUT,
@@ -200,14 +202,19 @@ typedef enum {
 	DISCONNECTION_BY_AP_DUE_TO_RECEIVE_DEAUTH_IN_WOW_RESUME,
 	DISCONNECTION_BY_AP_DUE_TO_RECEIVE_DEAUTH,
 	DISCONNECTION_BY_AP_DUE_TO_RECEIVE_DISASSOC,
-	/* DISCONNECTION_BY_DRIVER_DUE_TO_RECEIVE_CSA_NON_DFS, */
-	/* DISCONNECTION_BY_DRIVER_DUE_TO_RECEIVE_CSA_DFS, */
+	DISCONNECTION_BY_DRIVER_DUE_TO_RECEIVE_CSA_NON_DFS,
+	DISCONNECTION_BY_DRIVER_DUE_TO_RECEIVE_CSA_DFS,
 	DISCONNECTION_BY_DRIVER_DUE_TO_RECEIVE_INVALID_CSA,
 	DISCONNECTION_BY_DRIVER_DUE_TO_JOIN_WRONG_CHANNEL,
 	DISCONNECTION_BY_DRIVER_DUE_TO_FT,
 	DISCONNECTION_BY_DRIVER_DUE_TO_ROAMING,
 	DISCONNECTION_BY_DRIVER_DUE_TO_SA_QUERY_TIMEOUT,
 } Disconnect_type;
+
+struct disconnect_data {
+	struct rtw_chan_def *buddy_chdef;
+	Disconnect_type disc_code;
+};
 
 #define SSID_CHANGED BIT0
 #define SSID_LENGTH_CHANGED BIT1
@@ -239,8 +246,13 @@ typedef enum {
 	#define RTW_SCAN_NUM_OF_CH 2
 	#define RTW_BACK_OP_CH_MS 200
 #else
+	#ifndef RTW_SCAN_NUM_OF_CH
 	#define RTW_SCAN_NUM_OF_CH 3
+	#endif /*RTW_SCAN_NUM_OF_CH*/
+
+	#ifndef RTW_BACK_OP_CH_MS
 	#define RTW_BACK_OP_CH_MS 400
+	#endif /*RTW_BACK_OP_CH_MS*/
 #endif
 
 #define RTW_IP_ADDR_LEN 4
@@ -361,6 +373,12 @@ struct p2p_oper_class_map {
 	enum { BW20, BW40PLUS, BW40MINUS } bw;
 };
 
+struct channel_info_triplet {
+	u8 first_ch;
+	u8 num_of_ch;
+	s8 power_level;
+};
+
 struct link_mlme_ext_priv {
 	struct rtw_chan_def chandef;
 	unsigned char	cur_wireless_mode;	/* NETWORK_TYPE */
@@ -386,6 +404,12 @@ struct link_mlme_ext_priv {
 #ifdef CONFIG_AP_MODE
 	unsigned char bstart_bss;
 #endif
+	/* Below record country element*/
+	char country[3];
+	struct channel_info_triplet ch_info[MAX_CHANNEL_NUM];
+	/* Below record channel rpt element */
+	u8 op_class;
+	u8 channel_list[MAX_CHANNEL_NUM];
 };
 
 struct mlme_ext_priv {
@@ -480,7 +504,6 @@ static inline u8 check_mlmeinfo_state(struct mlme_ext_priv *plmeext, sint state)
 #define mlmeext_msr(mlmeext) ((mlmeext)->mlmext_info.state & 0x03)
 
 int init_mlme_ext_priv(_adapter *padapter);
-int init_hw_mlme_ext(_adapter *padapter);
 void free_mlme_ext_priv(struct mlme_ext_priv *pmlmeext);
 int rtw_init_link_mlme_ext_priv(struct _ADAPTER_LINK *padapter_link);
 extern struct xmit_frame *alloc_mgtxmitframe(struct xmit_priv *pxmitpriv);
@@ -515,7 +538,7 @@ RTW_FUNC_2G_5G_ONLY void set_channel_bwmode(_adapter *padapter,
 		unsigned char channel,
 		unsigned char channel_offset,
 		unsigned short bwmode,
-		u8 do_rfk);
+		enum rfk_tri_type rt_type);
 
 void set_bch_bwmode(_adapter *padapter,
 		struct _ADAPTER_LINK *padapter_link,
@@ -523,7 +546,7 @@ void set_bch_bwmode(_adapter *padapter,
 		unsigned char channel,
 		unsigned char channel_offset,
 		unsigned short bwmode,
-		u8 do_rfk);
+		enum rfk_tri_type rt_type);
 
 unsigned int decide_wait_for_beacon_timeout(unsigned int bcn_interval);
 
@@ -607,8 +630,11 @@ void process_csa_ie(_adapter *padapter, u8 *ies, uint ies_len);
 void update_capinfo(_adapter *adapter, struct _ADAPTER_LINK *adapter_link, u16 updateCap);
 void update_wireless_mode(_adapter *padapter, struct _ADAPTER_LINK *padapter_link);
 void update_tx_basic_rate(_adapter *padapter, struct _ADAPTER_LINK *padapter_link, u8 modulation);
+#if 0
 void update_sta_basic_rate(struct sta_info *psta, u8 wireless_mode);
+#endif
 int rtw_ies_get_supported_rate(u8 *ies, uint ies_len, u8 *rate_set, u8 *rate_num);
+int rtw_elems_get_supported_rate(struct rtw_ieee802_11_elems *elems, u8 *rate_set, u8 *rate_num);
 
 /* for sta/adhoc mode */
 void update_sta_info(_adapter *padapter, struct sta_info *psta);
@@ -624,10 +650,12 @@ unsigned int update_supported_rate(unsigned char *ptn, unsigned int ptn_sz);
 unsigned int receive_disconnect(_adapter *padapter, unsigned char *MacAddr, unsigned short reason, u8 locally_generated);
 
 unsigned char get_highest_rate_idx(u64 mask);
+
+#if 0
 unsigned char get_lowest_rate_idx_ex(u64 mask, int start_bit);
 #define get_lowest_rate_idx(mask) get_lowest_rate_idx_ex(mask, 0)
-
 u8 get_highest_bw_cap(u8 bwmode);
+#endif
 
 int support_short_GI(_adapter *padapter, struct _ADAPTER_LINK *padapter_link,
 			struct HT_caps_element *pHT_caps, u8 bwmode);
@@ -673,6 +701,11 @@ s32 dump_mgntframe_and_wait(_adapter *padapter, struct xmit_frame *pmgntframe, i
 s32 dump_mgntframe_and_wait_ack(_adapter *padapter, struct xmit_frame *pmgntframe);
 s32 dump_mgntframe_and_wait_ack_timeout(_adapter *padapter, struct xmit_frame *pmgntframe, int timeout_ms);
 
+#ifdef CONFIG_GO_APPEND_COUNTRY_IE
+u8 *rtw_set_channel_triplet(struct rtw_chset *chset, u8 *triplet, u8 *trip_len, char alpha2[2]);
+u8 rtw_set_ie_country(_adapter *adapter, u8 *pframe, u32 *pkt_len);
+#endif
+
 #ifdef CONFIG_P2P
 void issue_probersp_p2p(_adapter *padapter, unsigned char *da);
 void issue_probereq_p2p(_adapter *padapter, u8 *da);
@@ -701,20 +734,18 @@ int rtw_match_bssid(_adapter *padapter, const u8 *mac_addr);
 int rtw_match_bssid_ext(_adapter *padapter, const u8 *mac_addr);
 int issue_nulldata(_adapter *padapter, struct _ADAPTER_LINK *padapter_link,
 			unsigned char *da, unsigned int power_mode, int try_cnt, int wait_ms);
-bool rtw_core_issu_null_data(void *priv, u8 ridx, u8 link_idx, bool ps);
+bool rtw_core_issu_null_data(void *priv, u8 ridx, u8 link_idx, bool ps, u8 module_id);
 
 int issue_qos_nulldata(_adapter *padapter, struct _ADAPTER_LINK *padapter_link,
 		unsigned char *da, u16 tid, u8 ps, int try_cnt, int wait_ms, u8 need_om);
+int issue_disasoc(_adapter *padapter, unsigned char *da, unsigned short reason);
 int issue_deauth(_adapter *padapter, unsigned char *da, unsigned short reason);
 int issue_deauth_ex(_adapter *padapter, u8 *da, unsigned short reason, int try_cnt, int wait_ms);
-int issue_disassoc(_adapter *padapter, unsigned char *da, unsigned short reason);
-void issue_action_spct_ch_switch(_adapter *padapter, struct _ADAPTER_LINK *adapter_link,
-			u8 *ra, u8 new_ch, u8 ch_offset);
 void issue_addba_req(_adapter *adapter, unsigned char *ra, u8 tid);
 void issue_addba_rsp(_adapter *adapter, unsigned char *ra, u8 tid, u16 status,
-	             u8 size, struct ADDBA_request *paddba_req);
+	             u16 size, struct ADDBA_request *paddba_req);
 u8 issue_addba_rsp_wait_ack(_adapter *adapter, unsigned char *ra, u8 tid,
-	                    u16 status, u8 size, struct ADDBA_request *paddba_req,
+	                    u16 status, u16 size, struct ADDBA_request *paddba_req,
 	                    int try_cnt, int wait_ms);
 void issue_del_ba(_adapter *adapter, unsigned char *ra, u8 tid, u16 reason, u8 initiator);
 int issue_del_ba_ex(_adapter *adapter, unsigned char *ra, u8 tid, u16 reason, u8 initiator, int try_cnt, int wait_ms);
@@ -727,6 +758,8 @@ int issue_deauth_11w(_adapter *padapter, unsigned char *da, unsigned short reaso
 #endif /* CONFIG_IEEE80211W */
 int issue_action_SM_PS(_adapter *padapter ,  unsigned char *raddr , u8 NewMimoPsMode);
 int issue_action_SM_PS_wait_ack(_adapter *padapter, unsigned char *raddr, u8 NewMimoPsMode, int try_cnt, int wait_ms);
+void issue_action_spct_ch_switch(_adapter *padapter,
+		struct _ADAPTER_LINK *adapter_link, u8 *ra);
 #ifdef PRIVATE_R
 int issue_action_find_remote(_adapter *padapter);
 #endif
@@ -741,7 +774,7 @@ void start_clnt_assoc(_adapter *padapterf);
 void start_clnt_auth(_adapter *padapter);
 void start_clnt_join(_adapter *padapter);
 void start_create_ibss(_adapter *padapter);
-#if defined(CONFIG_LAYER2_ROAMING) && defined(CONFIG_RTW_80211K)
+#if defined(CONFIG_LAYER2_ROAMING) && (defined(CONFIG_RTW_80211K) || defined(CONFIG_RTW_FSM_RRM))
 void rtw_roam_nb_discover(_adapter *padapter, u8 bfroce);
 #endif
 void rtw_ie_handler(struct _ADAPTER *padapter, struct _ADAPTER_LINK *padapter_link, u8 *ie, u32 ie_len);
@@ -765,21 +798,21 @@ unsigned int OnAction_dls(_adapter *padapter, union recv_frame *precv_frame);
 unsigned int on_action_wnm(_adapter *adapter, union recv_frame *rframe);
 #endif
 
-#define RX_AMPDU_ACCEPT_INVALID 0xFF
-#define RX_AMPDU_SIZE_INVALID 0xFF
+#define RX_AMPDU_ACCEPT_INVALID (0xFF)
+#define RX_AMPDU_SIZE_INVALID (0xFFFF)
 
 enum rx_ampdu_reason {
 	RX_AMPDU_DRV_FIXED = 1,
 	RX_AMPDU_BTCOEX = 2, /* not used, because BTCOEX has its own variable management */
 	RX_AMPDU_DRV_SCAN = 3,
 };
-u8 rtw_rx_ampdu_size(_adapter *adapter);
+u16 rtw_rx_ampdu_size(_adapter *adapter);
 bool rtw_rx_ampdu_is_accept(_adapter *adapter);
-bool rtw_rx_ampdu_set_size(_adapter *adapter, u8 size, u8 reason);
+bool rtw_rx_ampdu_set_size(_adapter *adapter, u16 size, u8 reason);
 bool rtw_rx_ampdu_set_accept(_adapter *adapter, u8 accept, u8 reason);
-u8 rx_ampdu_apply_sta_tid(_adapter *adapter, struct sta_info *sta, u8 tid, u8 accept, u8 size);
-u8 rx_ampdu_size_sta_limit(_adapter *adapter, struct sta_info *sta);
-u8 rx_ampdu_apply_sta(_adapter *adapter, struct sta_info *sta, u8 accept, u8 size);
+u8 rx_ampdu_apply_sta_tid(_adapter *adapter, struct sta_info *sta, u8 tid, u8 accept, u16 size);
+u16 rx_ampdu_size_sta_limit(_adapter *adapter, struct sta_info *sta);
+u8 rx_ampdu_apply_sta(_adapter *adapter, struct sta_info *sta, u8 accept, u16 size);
 u16 rtw_rx_ampdu_apply(_adapter *adapter);
 
 unsigned int OnAction_back(_adapter *padapter, union recv_frame *precv_frame);
@@ -804,14 +837,20 @@ void rtw_issue_action_token_req(_adapter *padapter, struct sta_info *pstat);
 void rtw_issue_action_token_rel(_adapter *padapter);
 #endif
 
+unsigned int on_action_s1g(_adapter *padapter, union recv_frame *precv_frame);
+
 void rtw_mlmeext_disconnect(_adapter *padapter);
 int rtw_set_hw_after_join(struct _ADAPTER *a, int join_res);
 void mlmeext_sta_del_event_callback(_adapter *padapter);
 void mlmeext_sta_add_event_callback(_adapter *padapter, struct sta_info *psta);
 
+#ifdef CONFIG_POST_CORE_KEEP_ALIVE
+void rtw_core_keep_alive_post_hdlr(void *drv_priv, struct rtw_keep_alive_param *klive);
+#endif
 int rtw_get_rx_chk_limit(_adapter *adapter);
 void rtw_set_rx_chk_limit(_adapter *adapter, int limit);
-void linked_status_chk(_adapter *padapter, u8 from_timer);
+void linked_status_post_chk(_adapter *padapter, u8 if_sta_chk_rx_bmp, u8 if_sta_chk_tx_bmp);
+void linked_status_chk(_adapter *padapter, u8 *if_sta_chk_rx_bmp, u8 *if_sta_chk_tx_bmp);
 void dynamic_update_bcn_check(_adapter *padapter);
 
 #define rtw_get_bcn_cnt(adapter_link)	(adapter_link->mlmeextpriv.cur_bcn_cnt)
@@ -877,7 +916,7 @@ extern void update_TSF(struct link_mlme_ext_priv *pmlmeext, u8 *pframe, uint len
 #ifdef CONFIG_BCN_RECV_TIME
 void rtw_rx_bcn_time_update(_adapter *adapter, struct _ADAPTER_LINK *adapter_link, uint bcn_len, u8 data_rate);
 #endif
-extern u8 traffic_status_watchdog(_adapter *padapter, u8 from_timer);
+extern u8 traffic_status_watchdog(_adapter *padapter);
 
 void rtw_process_bar_frame(_adapter *padapter, union recv_frame *precv_frame);
 void rtw_join_done_chk_ch(_adapter *padapter, int join_res);
@@ -911,6 +950,9 @@ u8 rtw_join_cmd_hdl(_adapter *padapter, u8 *pbuf);
 u8 disconnect_hdl(_adapter *padapter, u8 *pbuf);
 u8 createbss_hdl(_adapter *padapter, u8 *pbuf);
 void rtw_disconnect_ch_switch(_adapter *adapter);
+#ifdef CONFIG_APPEND_VENDOR_IE_ENABLE
+u32 rtw_build_vendor_ie(_adapter *padapter , unsigned char **pframe , u8 mgmt_frame_tyte);
+#endif
 #ifdef CONFIG_AP_MODE
 u8 stop_ap_hdl(_adapter *adapter);
 #endif
@@ -979,7 +1021,7 @@ u8 rtw_get_ch_utilization(_adapter *adapter);
 void rtw_ch_util_rpt(_adapter *adapter);
 #endif
 
-void rtw_set_mac_addr_hw(_adapter *adapter, u8 *mac_addr);
+void rtw_set_mac_addr_hw(_adapter *adapter, const u8 *mac_addr);
 
 #define GEN_MLME_EXT_HANDLER(name, cmd, callback)	{name, cmd, callback},
 
@@ -989,6 +1031,10 @@ struct rtw_cmd {
 	void (*callback)(_adapter  *padapter, struct cmd_obj *cmd);
 };
 
+
+#ifdef CONFIG_RTW_FSM_RRM
+u8 fsm_post_event_hdl(_adapter *padapter, u8 *pbuf);
+#endif
 #ifdef _RTW_CMD_C_
 struct rtw_cmd wlancmds[] = {
 	GEN_MLME_EXT_HANDLER("CMD_JOINBSS", rtw_join_cmd_hdl, NULL) /*CMD_JOINBSS*/
@@ -1014,10 +1060,20 @@ struct rtw_cmd wlancmds[] = {
 	GEN_MLME_EXT_HANDLER("CMD_CHK_BMCSLEEPQ", chk_bmc_sleepq_hdl, NULL) /*CMD_CHK_BMCSLEEPQ*/
 	GEN_MLME_EXT_HANDLER("CMD_RUN_INTHREAD", run_in_thread_hdl, NULL) /*CMD_RUN_INTHREAD*/
 	GEN_MLME_EXT_HANDLER("CMD_ADD_BARSP", add_ba_rsp_hdl, NULL) /*CMD_ADD_BARSP*/
+#ifdef CONFIG_RTW_80211K
 	GEN_MLME_EXT_HANDLER("CMD_RM_POST_EVENT", rm_post_event_hdl, NULL) /*CMD_RM_POST_EVENT*/
+#endif
+#ifdef CONFIG_RTW_FSM_RRM
+	GEN_MLME_EXT_HANDLER("CMD_RM_POST_EVENT", fsm_post_event_hdl, NULL) /*CMD_RM_POST_EVENT*/
+#endif
 	GEN_MLME_EXT_HANDLER("CMD_SET_MESH_PLINK_STATE", rtw_mesh_set_plink_state_cmd_hdl, NULL) /*CMD_SET_MESH_PLINK_STATE*/
 	GEN_MLME_EXT_HANDLER("CMD_DELBA", delba_hdl, NULL) /*CMD_DELBA*/
-	GEN_MLME_EXT_HANDLER("CMD_GET_CHANPLAN", rtw_get_chplan_hdl, NULL) /* CMD_GET_CHANPLAN */
+	GEN_MLME_EXT_HANDLER("CMD_GET_CHANPLAN", rtw_get_chplan_hdl, rtw_get_chplan_callback) /* CMD_GET_CHANPLAN */
+#ifdef CONFIG_80211AX_HE
+#ifdef CONFIG_TWT
+	GEN_MLME_EXT_HANDLER("CMD_TWT", rtw_core_twt_hdl, NULL) /* CMD_TWT */
+#endif
+#endif
 };
 #endif /*_RTW_CMD_C_*/
 char *rtw_cmd_name(struct cmd_obj *pcmd);

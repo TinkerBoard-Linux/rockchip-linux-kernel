@@ -47,24 +47,6 @@ u8 rm_get_ch_set(u8 op_class, struct rtw_ieee80211_channel *pch_set, u8 pch_num)
 	return i;
 }
 
-enum band_type rm_get_band_by_op_class(u8 op_class)
-{
-	int array_idx;
-	const struct op_class_t *opc = get_global_op_class_by_id(op_class);
-
-	if (opc < global_op_class
-		|| (((u8 *)opc) - ((u8 *)global_op_class)) % sizeof(struct op_class_t)
-	) {
-		RTW_ERR("Invalid opc pointer:%p (global_op_class:%p, sizeof(struct op_class_t):%zu, %zu)\n"
-			, opc, global_op_class, sizeof(struct op_class_t),
-			(((u8 *)opc) - ((u8 *)global_op_class)) % sizeof(struct op_class_t));
-		return BAND_ON_24G;
-	}
-
-	array_idx = (((u8 *)opc) - ((u8 *)global_op_class)) / sizeof(struct op_class_t);
-
-	return  global_op_class[array_idx].band;
-}
 
 u8 rm_get_ch_set_from_bcn_req_opt(struct bcn_req_opt *opt,
 	struct rtw_ieee80211_channel *pch_set, u8 pch_num)
@@ -80,7 +62,10 @@ u8 rm_get_ch_set_from_bcn_req_opt(struct bcn_req_opt *opt,
 			break;
 
 		ap_ch_rpt = opt->ap_ch_rpt[i];
-		band = rm_get_band_by_op_class(ap_ch_rpt->global_op_class);
+		band = rtw_get_band_by_op_class(ap_ch_rpt->global_op_class);
+		/* error handling */
+		if (band == BAND_MAX)
+			band = BAND_ON_24G;
 
 		if ((k + ap_ch_rpt->Len) > pch_num) {
 			RTW_ERR("RM: ch num exceed %d > %d\n", (k + ap_ch_rpt->Len), pch_num);
@@ -179,35 +164,14 @@ u8 rm_get_bcn_rsni(struct rm_obj *prm, struct wlan_network *pnetwork)
 }
 
 /* output: pwr (unit dBm) */
-int rm_get_tx_power(_adapter *adapter, enum rf_path path, enum MGN_RATE rate, s8 *pwr)
+int rm_get_tx_power(_adapter *adapter, enum band_type band, enum MGN_RATE rate, s8 *pwr)
 {
-#if 0 /*GEORGIA_TODO_FIXIT*/
+	struct dvobj_priv *devob = adapter_to_dvobj(adapter);
+	u8 rs = mgn_rate_to_rs(rate);
 
-	struct dvobj_priv *dvobj = adapter_to_dvobj(adapter);
-	struct hal_spec_t *hal_spec = GET_HAL_SPEC(dvobj);
-	HAL_DATA_TYPE *hal_data = GET_PHL_COM(dvobj);
-	int tx_num, band, bw, ch, n, rs;
-	u8 base;
-	s8 limt_offset = 127; /* max value of s8 */
-	s8 rate_offset;
-	s8 powr_offset;
-	int rate_pos;
+	*pwr = rtw_phl_get_power_by_rate_band(GET_PHL_INFO(devob), HW_BAND_0, _rate_mrate2phl(rate),
+					       IS_DCM_RATE_SECTION(rs) ? 1 : 0, 0, band);
 
-
-	band = hal_data->current_band_type;
-	bw = hal_data->current_channel_bw;
-	ch = hal_data->current_channel;
-
-	if (!HAL_SPEC_CHK_RF_PATH(hal_spec, band, path))
-		return -1;
-
-	if (HAL_IsLegalChannel(adapter, ch) == _FALSE) {
-		RTW_INFO("Illegal channel!!\n");
-		return -2;
-	}
-
-	*pwr = phy_get_tx_power_final_absolute_value(adapter, path, rate, bw, ch);
-#endif
 	return 0;
 }
 

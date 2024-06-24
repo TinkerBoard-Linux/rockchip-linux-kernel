@@ -26,9 +26,9 @@
 #define __HALRF_8852C_H__
 #ifdef RF_8852C_SUPPORT
 
-#define RXDCK_VER_8852C 0xb
-#define RCK_VER_8852C 0x1
-#define LCK_VER_8852C 0x1
+#define RXDCK_VER_8852C 0xe
+#define RCK_VER_8852C 0x3
+#define LCK_VER_8852C 0x2
 #define NCTL_FINAL_LINE_8852C 0x8000
 #define LCK_TH_8852C 8
 
@@ -38,6 +38,7 @@ void halrf_rx_dck_toggle_8852c(struct rf_info *rf, enum rf_path path);
 void halrf_set_rx_dck_8852c(struct rf_info *rf, enum phl_phy_idx phy, enum rf_path path, bool is_afe);
 void halrf_rx_dck_8852c(struct rf_info *rf, enum phl_phy_idx phy, bool is_afe);
 void halrf_thermal_rx_dck_8852c(struct rf_info *rf, enum phl_phy_idx phy, bool is_afe);
+void halrf_scan_rx_dck_8852c(struct rf_info *rf, enum phl_phy_idx phy, enum rfk_tri_type tri_type);
 void halrf_rx_dck_onoff_8852c(struct rf_info *rf, bool is_enable);
 void halrf_rck_8852c(struct rf_info *rf, enum rf_path path);
 void halrf_rxdck_track_8852c(struct rf_info *rf);
@@ -45,10 +46,8 @@ void halrf_rf_direct_cntrl_8852c(struct rf_info *rf, enum rf_path path, bool is_
 void halrf_drf_direct_cntrl_8852c(struct rf_info *rf, enum rf_path path, bool is_bybb);
 void halrf_bf_config_rf_8852c(struct rf_info *rf);
 extern struct rfk_iqk_info rf_iqk_hwspec_8852c;
-bool halrf_ctrl_ch_8852c(struct rf_info *rf,  enum phl_phy_idx phy, u8 central_ch, enum band_type band);
-bool halrf_ctrl_bw_8852c(struct rf_info *rf, enum phl_phy_idx phy, enum channel_width bw);
 void halrf_rxbb_bw_8852c(struct rf_info *rf, enum phl_phy_idx phy, enum channel_width bw);
-
+bool halrf_ctl_band_ch_bw_8852c(struct rf_info *rf, enum phl_phy_idx phy, enum band_type band, u8 central_ch, enum channel_width bw);
 void halrf_before_one_shot_enable_8852c(struct rf_info *rf);
 bool halrf_one_shot_nctl_done_check_8852c(struct rf_info *rf, enum rf_path path);
 bool halrf_do_one_shot_8852c(struct rf_info *rf, enum rf_path path, u32 nctl_addr, u32 mask, u32 process_id);

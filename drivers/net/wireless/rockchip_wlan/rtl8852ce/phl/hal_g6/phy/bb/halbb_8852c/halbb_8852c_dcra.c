@@ -115,22 +115,24 @@ void halbb_rate_decision(struct bb_info *bb, struct bb_category_info *category, 
 			//Rate down
 			BB_DBG(bb, DBG_RA, "[RD]Rate down!\n");
 			halbb_rate_down(bb, category, mcs_table, idx);
-		} else if (category[idx].rate_up_cnt == RATE_UP_TH) {
-			//Rate up
-			BB_DBG(bb, DBG_RA, "[RU]Rate up, RU cnt: %d, RU th: %d\n",
-				   category[idx].rate_up_cnt, RATE_UP_TH);
-			halbb_rate_up(bb, category, mcs_table, idx);
 		} else {
-			//Rate stay
 			if (category[idx].rate_down_flag)
 				continue;
-			if ((category[idx].total == 0 && category[idx].rate_up_cnt)
-				|| (category[idx].initial_rate <= category[idx].report_highest_success_mcs))
+			if ((category[idx].total > 0) &&
+				(category[idx].initial_rate <= category[idx].report_highest_success_mcs))
 				category[idx].rate_up_cnt++;
-			BB_DBG(bb, DBG_RA, "[RS]Cat: %d, Rate: 0x%x, RU cnt: %d\n",
-				   idx, category[idx].initial_rate, category[idx].rate_up_cnt);
+	
+			if (category[idx].rate_up_cnt == RATE_UP_TH) {
+				//Rate up
+				BB_DBG(bb, DBG_RA, "[RU]Rate up, RU cnt: %d, RU th: %d\n", category[idx].rate_up_cnt, RATE_UP_TH);
+				halbb_rate_up(bb, category, mcs_table, idx);
+			} else {
+				//Rate stay
+				BB_DBG(bb, DBG_RA, "[RS]Cat: %d, Rate: 0x%x, RU cnt: %d\n", idx, category[idx].initial_rate, category[idx].rate_up_cnt);
+			}
 		}
 	}
+			
 	return;
 }
 
@@ -185,8 +187,7 @@ void halbb_rate_up(struct bb_info *bb, struct bb_category_info *category, struct
 	u8 i = 0;
 	category[cur_idx].rate_up_cnt = 0;
 
-	if (category[cur_idx].initial_rate <= category[cur_idx].report_highest_success_mcs
-		|| category[cur_idx].total == 0) {
+	if (category[cur_idx].initial_rate <= category[cur_idx].report_highest_success_mcs) {
 		if (mcs_table->policy[cur_idx].rate < category[cur_idx].absolute_highest_mcs) {
 			mcs_table->policy[cur_idx].rate++;
 			BB_DBG(bb, DBG_RA, "[Normal_RU]Cat: %d, Rate: 0x%x, Pwr: %d\n",

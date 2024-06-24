@@ -17,6 +17,7 @@
 #include "autoconf.h"
 
 #define CONFIG_RSSI_PRIORITY
+#define CONFIG_POST_CORE_KEEP_ALIVE
 
 /*temporary defination,this flag will be removed later*/
 #define CONFIG_PHL_WACHDOG_REFINE
@@ -32,12 +33,6 @@
 #if defined(CONFIG_MCC_MODE) && (!defined(CONFIG_CONCURRENT_MODE))
 
 	#error "Enable CONCURRENT_MODE before enable MCC MODE\n"
-
-#endif
-
-#if defined(CONFIG_MCC_MODE) && defined(CONFIG_BTC)
-
-	#error "Disable BT COEXIST before enable MCC MODE\n"
 
 #endif
 
@@ -154,6 +149,12 @@
 
 #endif // CONFIG_RTW_ANDROID
 
+#define RTW_PER_ADAPTER_WIPHY 0
+
+#if defined(CONFIG_REGD_SRC_FROM_OS) && RTW_PER_ADAPTER_WIPHY
+#error "CONFIG_REGD_SRC_FROM_OS is not supported when enable RTW_PER_ADAPTER_WIPHY"
+#endif
+
 /*
 #if defined(CONFIG_HAS_EARLYSUSPEND) && defined(CONFIG_RESUME_IN_WORKQUEUE)
 	#warning "You have CONFIG_HAS_EARLYSUSPEND enabled in your system, we disable CONFIG_RESUME_IN_WORKQUEUE automatically"
@@ -204,6 +205,10 @@
 	#define CONFIG_LIMITED_AP_NUM 1
 	#define BMC_ON_HIQ
 
+	#ifndef CONFIG_RTW_MAX_AP_ASSOC_STA
+	#define CONFIG_RTW_MAX_AP_ASSOC_STA 0 /* 0: not specified */
+	#endif
+
 	#ifndef CONFIG_RTW_AP_DATA_BMC_TO_UC
 	#define CONFIG_RTW_AP_DATA_BMC_TO_UC 1
 	#endif
@@ -235,7 +240,7 @@
 	#ifndef CONFIG_RTW_WNM
 	#define CONFIG_RTW_WNM
 	#endif
-	#ifndef CONFIG_RTW_80211K
+	#ifndef CONFIG_RTW_FSM_RRM
 	#define CONFIG_RTW_80211K
 	#endif
 #endif
@@ -295,20 +300,16 @@
 	#define CONFIG_RTW_HIQ_FILTER 1
 #endif
 
+#ifndef CONFIG_RTW_EDCCA_MODE_SEL
+#define CONFIG_RTW_EDCCA_MODE_SEL 0 /* 0:RTW_EDCCA_NORM, 0xFF:RTW_EDCCA_AUTO */
+#endif
+
 #ifndef CONFIG_RTW_ADAPTIVITY_EN
-	#define CONFIG_RTW_ADAPTIVITY_EN 0
+#define CONFIG_RTW_ADAPTIVITY_EN 0
 #endif
 
 #ifndef CONFIG_RTW_ADAPTIVITY_MODE
-	#define CONFIG_RTW_ADAPTIVITY_MODE 0
-#endif
-
-#ifndef CONFIG_RTW_ADAPTIVITY_TH_L2H_INI
-	#define CONFIG_RTW_ADAPTIVITY_TH_L2H_INI 0
-#endif
-
-#ifndef CONFIG_RTW_ADAPTIVITY_TH_EDCCA_HL_DIFF
-	#define CONFIG_RTW_ADAPTIVITY_TH_EDCCA_HL_DIFF 0
+#define CONFIG_RTW_ADAPTIVITY_MODE 0
 #endif
 
 #ifndef CONFIG_RTW_EXCL_CHS
@@ -327,12 +328,16 @@
 #define CONFIG_RTW_BCN_HINT_VALID_MS (60 * 1000)
 #endif
 
+#ifndef CONFIG_RTW_ENV
+#define CONFIG_RTW_ENV 0 /* 0:ANY */
+#endif
+
 #ifndef CONFIG_RTW_COUNTRY_IE_SLAVE_EN_MODE
 #define CONFIG_RTW_COUNTRY_IE_SLAVE_EN_MODE 0 /* 0: disable */
 #endif
 
 #ifndef CONFIG_RTW_COUNTRY_IE_SLAVE_FLAGS
-#define CONFIG_RTW_COUNTRY_IE_SLAVE_FLAGS 0x01 /* BIT0: take intersection when having multiple received IEs */
+#define CONFIG_RTW_COUNTRY_IE_SLAVE_FLAGS 0x00
 #endif
 
 #ifndef CONFIG_RTW_COUNTRY_IE_SLAVE_EN_ROLE
@@ -383,6 +388,14 @@
 	#define CONFIG_DFS_SLAVE_WITH_RADAR_DETECT 0
 #endif
 
+#ifndef CONFIG_AP_REGU_FORBID
+	#if CONFIG_IEEE80211_BAND_6GHZ && defined(CONFIG_AP_MODE)
+	#define CONFIG_AP_REGU_FORBID 1
+	#else
+	#define CONFIG_AP_REGU_FORBID 0
+	#endif
+#endif
+
 #ifndef CONFIG_TXPWR_BY_RATE_EN
 #define CONFIG_TXPWR_BY_RATE_EN 2 /* by efuse */
 #endif
@@ -423,6 +436,10 @@
 	#define CONFIG_TXPWR_LIMIT_EN 0
 #endif
 
+#ifndef CONFIG_COUNTRY_CHPLAN_EDCCA_OVERRIDE
+#define CONFIG_COUNTRY_CHPLAN_EDCCA_OVERRIDE 0
+#endif
+
 #ifndef RTW_DEF_MODULE_REGULATORY_CERT
 	#define RTW_DEF_MODULE_REGULATORY_CERT 0
 #endif
@@ -443,8 +460,18 @@
 	#define CONFIG_TXPWR_LIMIT 1
 #endif
 
+#if CONFIG_TXPWR_LIMIT || CONFIG_AP_REGU_FORBID
+#ifndef CONFIG_80211D
+#define CONFIG_80211D /* define 802.11d for regulatory check */
+#endif
+#endif
+
 #ifndef CONFIG_RTW_REGD_SRC
 #define CONFIG_RTW_REGD_SRC 1 /* 0:RTK_PRIV, 1:OS */
+#endif
+
+#ifndef CONFIG_RTW_REGD_SRC_OS_11D
+#define CONFIG_RTW_REGD_SRC_OS_11D 1 /* 0:disable, 1:enable */
 #endif
 
 #ifdef CONFIG_RTW_IPCAM_APPLICATION
@@ -469,16 +496,16 @@
 /*#define CONFIG_EXTEND_LOWRATE_TXOP			*/
 
 #ifndef CONFIG_RTW_RX_AMPDU_SZ_LIMIT_1SS
-	#define CONFIG_RTW_RX_AMPDU_SZ_LIMIT_1SS {0xFF, 0xFF, 0xFF, 0xFF}
+	#define CONFIG_RTW_RX_AMPDU_SZ_LIMIT_1SS {0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF}
 #endif
 #ifndef CONFIG_RTW_RX_AMPDU_SZ_LIMIT_2SS
-	#define CONFIG_RTW_RX_AMPDU_SZ_LIMIT_2SS {0xFF, 0xFF, 0xFF, 0xFF}
+	#define CONFIG_RTW_RX_AMPDU_SZ_LIMIT_2SS {0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF}
 #endif
 #ifndef CONFIG_RTW_RX_AMPDU_SZ_LIMIT_3SS
-	#define CONFIG_RTW_RX_AMPDU_SZ_LIMIT_3SS {0xFF, 0xFF, 0xFF, 0xFF}
+	#define CONFIG_RTW_RX_AMPDU_SZ_LIMIT_3SS {0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF}
 #endif
 #ifndef CONFIG_RTW_RX_AMPDU_SZ_LIMIT_4SS
-	#define CONFIG_RTW_RX_AMPDU_SZ_LIMIT_4SS {0xFF, 0xFF, 0xFF, 0xFF}
+	#define CONFIG_RTW_RX_AMPDU_SZ_LIMIT_4SS {0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF}
 #endif
 
 #ifndef CONFIG_RTW_TARGET_TX_PWR_2G_A
@@ -573,7 +600,6 @@
 #endif/*(CONFIG_IFACE_NUMBER > 2)*/
 
 #define MACID_NUM_SW_LIMIT 32
-#define SEC_CAM_ENT_NUM_SW_LIMIT 32
 
 
 /*
@@ -601,6 +627,69 @@ power down etc.) in last time, we can unmark this flag to avoid some unpredictab
 	#endif
 #endif
 
+#ifdef CONFIG_POWER_SAVE
+#ifdef CONFIG_RTW_IPS
+#ifdef RTW_IPS_MODE
+	#if (RTW_IPS_MODE > 4 || RTW_IPS_MODE < 0)
+		#error "The CONFIG_IPS_MODE value is wrong. Please follow HowTo_enable_the_power_saving_functionality.pdf.\n"
+	#endif
+	#ifndef CONFIG_FWIPS
+		#if (RTW_IPS_MODE > 1)
+			#undef RTW_IPS_MODE
+			#define RTW_IPS_MODE PS_PWR_OFF
+		#endif /* CONFIG_FWIPS */
+	#endif
+#else /* RTW_IPS_MODE */
+	#ifdef CONFIG_FWIPS
+		#define RTW_IPS_MODE PS_IPS_PWR_GATED
+	#else
+		#define RTW_IPS_MODE PS_PWR_OFF
+	#endif /* CONFIG_FWIPS */
+#endif /* RTW_IPS_MODE */
+#endif /* CONFIG_RTW_IPS */
+
+#ifdef CONFIG_RTW_LPS
+#ifdef RTW_LPS_MODE
+	#if (RTW_LPS_MODE > 3 || RTW_LPS_MODE < 0)
+		#error "The CONFIG_LPS_MODE value is wrong. Please follow HowTo_enable_the_power_saving_functionality.pdf.\n"
+	#endif
+#else
+	#define RTW_LPS_MODE PS_LPS_PWR_GATED
+#endif /* RTW_LPS_MODE */
+#endif /* CONFIG_RTW_LPS */
+
+#ifdef CONFIG_WOWLAN
+#ifdef CONFIG_RTW_IPS_WOW
+#ifdef RTW_WOW_IPS_MODE
+	#if (RTW_WOW_IPS_MODE > 4 || RTW_WOW_IPS_MODE < 0 || RTW_WOW_IPS_MODE == 1)
+		#error "The CONFIG_WOW_IPS_MODE value is wrong. Please follow HowTo_enable_the_power_saving_functionality.pdf.\n"
+	#endif
+	#ifndef CONFIG_FWIPS_WOW
+		#undef RTW_WOW_IPS_MODE
+		#define RTW_WOW_IPS_MODE PS_IPS_NONE
+	#endif
+#else
+	#ifdef CONFIG_FWIPS_WOW
+		#define RTW_WOW_IPS_MODE PS_IPS_PWR_GATED
+	#else
+		#define RTW_WOW_IPS_MODE PS_IPS_NONE
+	#endif
+#endif /* RTW_WOW_IPS_MODE */
+#endif /* CONFIG_RTW_IPS_WOW */
+
+#ifdef CONFIG_RTW_LPS_WOW
+#ifdef RTW_WOW_LPS_MODE
+	#if (RTW_WOW_LPS_MODE > 3 || RTW_WOW_LPS_MODE < 0)
+		#error "The CONFIG_WOW_LPS_MODE value is wrong. Please follow HowTo_enable_the_power_saving_functionality.pdf.\n"
+	#endif
+#else
+	#define RTW_WOW_LPS_MODE PS_LPS_PWR_GATED
+#endif /* RTW_WOW_LPS_MODE */
+#endif /* CONFIG_RTW_LPS_WOW */
+#endif /* CONFIG_WOWLAN */
+#endif /* CONFIG_POWER_SAVE */
+
+
 #ifdef RTW_REDUCE_SCAN_SWITCH_CH_TIME
 #ifndef CONFIG_RTL8822B
 	#error "Only 8822B support RTW_REDUCE_SCAN_SWITCH_CH_TIME"
@@ -616,11 +705,6 @@ power down etc.) in last time, we can unmark this flag to avoid some unpredictab
 
 #if !defined (CONFIG_PCI_MSI) || defined (CONFIG_RTW_FORCE_PCI_MSI_DISABLE)
 #define CONFIG_RTW_PCI_MSI_DISABLE
-#endif
-
-#if defined(CONFIG_PCI_DYNAMIC_ASPM_L1_LATENCY) ||	\
-    defined(CONFIG_PCI_DYNAMIC_ASPM_LINK_CTRL)
-#define CONFIG_PCI_DYNAMIC_ASPM
 #endif
 
 #if 0
@@ -676,8 +760,14 @@ power down etc.) in last time, we can unmark this flag to avoid some unpredictab
 		#define CONFIG_ARP_KEEP_ALIVE
 	#endif
 	/* #define CONFIG_WRC_WOW_MAGIC */
+	#define CONFIG_WOW_PERIODIC_WAKE
+	#ifndef CONFIG_PNO_SECURITY_OFFLOAD
+		#define CONFIG_PNO_SECURITY_OFFLOAD
+	#endif
 	#define DBG_RX_DFRAME_RAW_DATA
-	#define DBG_RX_SIGNAL_DISPLAY_RAW_DATA 
+	#define DBG_RX_SIGNAL_DISPLAY_RAW_DATA
+	#define CONFIG_GO_APPEND_COUNTRY_IE
+	#define RTW_IOT_ID 0x112;
 #endif
 
 #ifdef CONFIG_80211AX_HE
@@ -692,6 +782,27 @@ power down etc.) in last time, we can unmark this flag to avoid some unpredictab
 #define RTW_FUNC_2G_5G_ONLY __attribute__ ((deprecated("ch utility consider only 2G/5G is not allowed")))
 #else
 #define RTW_FUNC_2G_5G_ONLY /* tag for channel functions/macros consider only 2G/5G, place at the same line with symbol name */
+#endif
+
+#ifndef RTW_IOT_ID
+	#define  RTW_IOT_ID 0x0
+#endif
+
+#ifdef CONFIG_TDLS_CH_SW
+	#ifndef CONFIG_CHSW_OFLD
+	#define CONFIG_CHSW_OFLD
+	#endif
+#endif
+
+/*
+ * Channel switch FW offload config:
+ * drv needs to call function rtw_phl_set_chsw_ofld_info
+ * to effectively enable channel switch fw offload
+*/
+#ifdef CONFIG_CHSW_OFLD
+	#ifndef CONFIG_PHL_CHSWOFLD
+	#define CONFIG_PHL_CHSWOFLD
+	#endif
 #endif
 
 /*

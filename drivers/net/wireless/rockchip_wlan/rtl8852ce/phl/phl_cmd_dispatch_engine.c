@@ -16,6 +16,11 @@
 #include "phl_headers.h"
 #ifdef CONFIG_CMD_DISP
 
+enum disp_eng_status {
+	DISPR_ENG_INIT = BIT0,
+	DISPR_ENG_STARTED = BIT1,
+};
+
 enum rtw_phl_status phl_disp_eng_bk_module_deinit(struct phl_info_t *phl);
 enum rtw_phl_status _disp_eng_get_dispr_by_idx(struct phl_info_t *phl,
                                                u8 band_idx,
@@ -65,7 +70,6 @@ phl_disp_eng_init(struct phl_info_t *phl, u8 phy_num)
 	}
 
 	disp_eng->phl_info = phl;
-	disp_eng->phy_num = phy_num;
 #ifdef CONFIG_CMD_DISP_SOLO_MODE
 	disp_eng->thread_mode = SOLO_THREAD_MODE;
 #else
@@ -85,12 +89,23 @@ phl_disp_eng_init(struct phl_info_t *phl, u8 phy_num)
 		status = dispr_init(phl, &(disp_eng->dispatcher[i]), i);
 		if(status != RTW_PHL_STATUS_SUCCESS)
 			break;
+		disp_eng->phy_num++;
 	}
 
-	if (status != RTW_PHL_STATUS_SUCCESS)
-		phl_disp_eng_deinit(phl);
+	if (status != RTW_PHL_STATUS_SUCCESS) {
+		for (i = 0 ; i < disp_eng->phy_num; i++)
+			dispr_deinit(phl, disp_eng->dispatcher[i]);
+#ifdef CONFIG_CMD_DISP_SOLO_MODE
+		_os_sema_free(d, &(disp_eng->dispr_ctrl_sema));
+#endif
+		_os_mem_free(d, disp_eng->dispatcher, sizeof(void *) * phy_num);
+		disp_eng->dispatcher = NULL;
+		disp_eng->phy_num = 0;
+	}
+	else
+		SET_STATUS_FLAG(disp_eng->status, DISPR_ENG_INIT);
 
-	return RTW_PHL_STATUS_SUCCESS;
+	return status;
 }
 
 enum rtw_phl_status
@@ -102,6 +117,11 @@ phl_disp_eng_deinit(struct phl_info_t *phl)
 
 	if (disp_eng->dispatcher == NULL)
 		return RTW_PHL_STATUS_FAILURE;
+
+	if (!TEST_STATUS_FLAG(disp_eng->status, DISPR_ENG_INIT))
+		return RTW_PHL_STATUS_SUCCESS;
+
+	CLEAR_STATUS_FLAG(disp_eng->status, DISPR_ENG_INIT);
 
 	phl_disp_eng_bk_module_deinit(phl);
 
@@ -146,11 +166,17 @@ phl_disp_eng_start(struct phl_info_t *phl)
 	struct phl_cmd_dispatch_engine *disp_eng = &(phl->disp_eng);
 	void *d = phl_to_drvpriv(phl);
 
+	if (TEST_STATUS_FLAG(disp_eng->status, DISPR_ENG_STARTED))
+		return RTW_PHL_STATUS_UNEXPECTED_ERROR;
+
 	#if !defined(CONFIG_CMD_DISP_SOLO_MODE)
 	_os_sema_init(d, &(disp_eng->msg_q_sema), 0);
 	if (!disp_eng_is_solo_thread_mode(phl)) {
-		_os_thread_init(d, &(disp_eng->share_thread), share_thread_hdl, phl,
-				"disp_eng_share_thread");
+		if (RTW_PHL_STATUS_SUCCESS != _os_thread_init(d, &(disp_eng->share_thread), share_thread_hdl, phl,
+				"disp_eng_share_thread")) {
+			PHL_ERR("thread init disp_eng_share_thread fail. \n");
+			return RTW_PHL_STATUS_FAILURE;
+		}
 		_os_thread_schedule(d, &(disp_eng->share_thread));
 	}
 	#endif
@@ -160,6 +186,8 @@ phl_disp_eng_start(struct phl_info_t *phl)
 		dispr_start(disp_eng->dispatcher[i]);
 		dispr_module_start(disp_eng->dispatcher[i]);
 	}
+	SET_STATUS_FLAG(disp_eng->status, DISPR_ENG_STARTED);
+
 	if(disp_eng->phy_num == 1)
 		dispr_exclusive_ready(disp_eng->dispatcher[0], false);
 
@@ -179,6 +207,10 @@ phl_disp_eng_stop(struct phl_info_t *phl)
 		return RTW_PHL_STATUS_SUCCESS;
 	}
 
+	if (!TEST_STATUS_FLAG(disp_eng->status, DISPR_ENG_STARTED))
+		return RTW_PHL_STATUS_UNEXPECTED_ERROR;
+
+	CLEAR_STATUS_FLAG(disp_eng->status, DISPR_ENG_STARTED);
 	for (i = 0 ; i < disp_eng->phy_num; i++) {
 		if(disp_eng->dispatcher[i] == NULL)
 			continue;
@@ -409,6 +441,16 @@ static const char *_get_evt_str(u32 evt)
 		return "MSG_EVT_DBG_RX_DUMP";
 	case MSG_EVT_DBG_TX_DUMP:
 		return "MSG_EVT_DBG_TX_DUMP";
+#ifdef CONFIG_DBCC_P2P_BG_LISTEN
+	case MSG_EVT_CONNECT_END_DBCC_EN:
+		return "MSG_EVT_CONNECT_END_DBCC_EN";
+	case MSG_EVT_DISCONNECT_END_DBCC_EN:
+		return "MSG_EVT_DISCONNECT_END_DBCC_EN";
+	case MSG_EVT_CONNECT_CMD_DBCC_DIS:
+		return "MSG_EVT_CONNECT_CMD_DBCC_DIS";
+	case MSG_EVT_DISCONNECT_CMD_DBCC_EN:
+		return "MSG_EVT_DISCONNECT_CMD_DBCC_EN";
+#endif
 	default:
 		return "Unknown";
 	}
@@ -641,7 +683,11 @@ phl_disp_eng_send_msg(struct phl_info_t *phl,
 	if (RTW_PHL_STATUS_SUCCESS != status)
 		return status;
 
-	return dispr_send_msg(dispr, msg, attr, msg_hdl);
+	status = dispr_send_msg(dispr, msg, attr, msg_hdl);
+	if (RTW_PHL_STATUS_SUCCESS != status)
+		PHL_ERR("%s: send msg fail! status %u\n", __func__, status);
+
+	return status;
 }
 
 enum rtw_phl_status
@@ -773,14 +819,14 @@ phl_disp_eng_notify_dev_io_status(struct phl_info_t *phl,
 	return RTW_PHL_STATUS_SUCCESS;
 }
 
-void phl_disp_eng_notify_shall_stop(struct phl_info_t *phl)
+void phl_disp_eng_notify_shall_stop(struct phl_info_t *phl, bool surprise)
 {
 	struct phl_cmd_dispatch_engine *disp_eng = &(phl->disp_eng);
 	u8 i = 0;
 
 	for (i = 0; i < disp_eng->phy_num; i++) {
 		if (is_dispr_started(disp_eng->dispatcher[i]))
-			dispr_notify_shall_stop(disp_eng->dispatcher[i]);
+			dispr_notify_shall_stop(disp_eng->dispatcher[i], surprise);
 	}
 }
 

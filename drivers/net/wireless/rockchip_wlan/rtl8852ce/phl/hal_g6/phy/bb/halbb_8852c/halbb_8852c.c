@@ -26,6 +26,17 @@
 
 #ifdef BB_8852C_SUPPORT
 
+void halbb_bfee_en_8852c(struct bb_info *bb, bool csi_en)
+{
+	if (csi_en) {
+		rtw_hal_mac_ax_init_bf_role(bb->hal_com, 0, HW_PHY_0);
+		rtw_hal_mac_ax_init_bf_role(bb->hal_com, 0, HW_PHY_1);
+	} else {
+		rtw_hal_mac_ax_deinit_bfee(bb->hal_com, HW_PHY_0);
+		rtw_hal_mac_ax_deinit_bfee(bb->hal_com, HW_PHY_1);
+	}
+}
+
 bool halbb_chk_pkg_valid_8852c(struct bb_info *bb, u8 bb_ver, u8 rf_ver)
 {
 	bool valid = true;
@@ -226,6 +237,15 @@ void halbb_ic_hw_setting_init_8852c(struct bb_info *bb)
 	//Set dbcc_80p80_sel_evm_rpt_en
 	halbb_set_reg(bb, 0xa10, BIT(0), 1);
 	halbb_set_reg(bb, 0x2a10, BIT(0), 1);
+
+	if (bb->hal_com->cv != CAV) {
+		//set minimum UL txpwr requirement to -10dBm
+		halbb_write_mask_pwr_reg_cmn(bb, HW_PHY_0, 0xd240, 0x3fe00, 0x1d8);
+		halbb_write_mask_pwr_reg_cmn(bb, HW_PHY_1, 0xd240, 0x3fe00, 0x1d8);
+		//set UL txpwr compensation to 0dB
+		halbb_write_mask_pwr_reg_cmn(bb, HW_PHY_0, 0xd290, 0xff, 0);
+		halbb_write_mask_pwr_reg_cmn(bb, HW_PHY_1, 0xd290, 0xff, 0);
+	}
 }
 
 void halbb_ic_hw_setting_8852c(struct bb_info *bb)
@@ -274,7 +294,7 @@ bool halbb_set_pd_lower_bound_8852c(struct bb_info *bb, u8 bound,
 
 	bb->bb_cmn_backup_i.cur_pd_lower_bound = bound;
 
-	if (bw == CHANNEL_WIDTH_20) {
+	if ((bw == CHANNEL_WIDTH_20) || (bw == CHANNEL_WIDTH_10) || (bw == CHANNEL_WIDTH_5)) {
 		bw_attenuation = 0;
 	} else if (bw == CHANNEL_WIDTH_40) {
 		bw_attenuation = 3;
@@ -284,7 +304,7 @@ bool halbb_set_pd_lower_bound_8852c(struct bb_info *bb, u8 bound,
 		bw_attenuation = 9;
 	} else {
 		BB_DBG(bb, DBG_PHY_CONFIG,
-		       "[PD Bound] Only support BW20/40/80/160 !\n");
+		       "[PD Bound] Only support BW5/10/20/40/80/160 !\n");
 		return false;
 	}
 
@@ -332,8 +352,7 @@ bool halbb_set_pd_lower_bound_cck_8852c(struct bb_info *bb, u8 bound,
 			"[PD Bound] Set Boundary to default!\n");
 		return true;
 	}
-
-	if (bw == CHANNEL_WIDTH_20) {
+	if ((bw == CHANNEL_WIDTH_20) || (bw == CHANNEL_WIDTH_10) || (bw == CHANNEL_WIDTH_5)) {
 		bw_attenuation = 0;
 	} else if (bw == CHANNEL_WIDTH_40) {
 		bw_attenuation = 3;
@@ -343,7 +362,7 @@ bool halbb_set_pd_lower_bound_cck_8852c(struct bb_info *bb, u8 bound,
 		bw_attenuation = 9;
 	} else {
 		BB_DBG(bb, DBG_PHY_CONFIG,
-			"[PD Bound] Only support BW20/40/80/160 !\n");
+		       "[PD Bound] Only support BW5/10/20/40/80/160 !\n");
 		return false;
 	}
 

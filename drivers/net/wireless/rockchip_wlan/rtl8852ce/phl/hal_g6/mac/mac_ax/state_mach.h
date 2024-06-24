@@ -17,6 +17,54 @@
 #ifndef _MAC_AX_STATE_MACH_H_
 #define _MAC_AX_STATE_MACH_H_
 
+enum mac_ax_mcc_status {
+	MAC_AX_MCC_ADD_ROLE_OK = 0,
+	MAC_AX_MCC_START_GROUP_OK = 1,
+	MAC_AX_MCC_STOP_GROUP_OK = 2,
+	MAC_AX_MCC_DEL_GROUP_OK = 3,
+	MAC_AX_MCC_RESET_GROUP_OK = 4,
+
+	//fail status
+	MAC_AX_MCC_EMPTY_GRP_FAIL = 16,
+	MAC_AX_MCC_ROLE_NOT_EXIST_FAIL = 17,
+	MAC_AX_MCC_DATA_NOT_FOUND_FAIL = 18,
+	MAC_AX_MCC_ACT_INVALID_FAIL = 19,
+	MAC_AX_MCC_BANDTYPE_INVALID_FAIL = 20,
+	MAC_AX_MCC_ADD_PSTIMER_FAIL = 21,
+	MAC_AX_MCC_MALLOC_FAIL = 22,
+	MAC_AX_MCC_SWITCH_CH_FAIL = 23,
+	MAC_AX_MCC_TXNULL0_FAIL = 24,
+	MAC_AX_MCC_PORT_FUNC_EN_FAIL = 25,
+};
+
+enum mac_ax_mcc_req_status {
+	MAC_AX_MCC_REQ_OK = 0,
+
+	//fail status
+	MAC_AX_MCC_REQ_ROLE_NOT_EXIST_FAIL = 17,
+	MAC_AX_MCC_REQ_DATA_NOT_FOUND_FAIL = 18,
+	MAC_AX_MCC_REQ_ADD_PSTIMER_FAIL = 21,
+	MAC_AX_MCC_REQ_MALLOC_FAIL = 22,
+};
+
+enum mac_ax_mcc_stm_state {
+	MAC_AX_MCC_EMPTY = 0,
+	MAC_AX_MCC_STATE_H2C_SENT = 1,
+	MAC_AX_MCC_STATE_H2C_RCVD = 2,
+	MAC_AX_MCC_ADD_DONE = 3,
+	MAC_AX_MCC_START_DONE = 4,
+	MAC_AX_MCC_STOP_DONE = 5,
+	MAC_AX_MCC_STATE_ERROR = 6,
+};
+
+enum mac_ax_mcc_req_state {
+	MAC_AX_MCC_REQ_IDLE = 0,
+	MAC_AX_MCC_REQ_H2C_SENT = 1,
+	MAC_AX_MCC_REQ_H2C_RCVD = 2,
+	MAC_AX_MCC_REQ_DONE = 3,
+	MAC_AX_MCC_REQ_FAIL = 4,
+};
+
 /**
  * @struct mac_ax_state_mach
  * @brief mac_ax_state_mach
@@ -139,23 +187,10 @@ struct mac_ax_state_mach {
 	u8 macid_pause;
 	u8 disable_rf;
 	u8 sch_tx_en_ofld;
-	u8 macid_pause_sleep;
-#define MAC_AX_MCC_EMPTY 0
-#define MAC_AX_MCC_STATE_H2C_SENT 1
-#define MAC_AX_MCC_STATE_H2C_RCVD 2
-#define MAC_AX_MCC_ADD_DONE 3
-#define MAC_AX_MCC_START_DONE 4
-#define MAC_AX_MCC_STOP_DONE 5
-#define MAC_AX_MCC_STATE_ERROR 6
-	u8 mcc_group[4];
-	u8 mcc_group_state[4];
-#define MAC_AX_MCC_REQ_IDLE 0
-#define MAC_AX_MCC_REQ_H2C_SENT 1
-#define MAC_AX_MCC_REQ_H2C_RCVD 2
-#define MAC_AX_MCC_REQ_DONE 3
-#define MAC_AX_MCC_REQ_FAIL 4
-	u8 mcc_request[4];
-	u8 mcc_request_state[4];
+	enum mac_ax_mcc_stm_state mcc_group[4];
+	enum mac_ax_mcc_status mcc_group_state[4];
+	enum mac_ax_mcc_req_state mcc_request[4];
+	enum mac_ax_mcc_req_status mcc_request_state[4];
 #define MAC_AX_FW_RESET_IDLE 0
 #define MAC_AX_FW_RESET_RECV 1
 #define MAC_AX_FW_RESET_RECV_DONE 2
@@ -224,6 +259,14 @@ struct mac_ax_state_mach {
 #define MAX_AX_NAN_ACT_H2C_FAIL 1
 #define MAX_AX_NAN_ACT_H2C_DONE 2
 	u8 nan_stat;
+#define MAC_AX_STA_CSA_IDLE 0
+#define MAC_AX_STA_CSA_SENDING 1
+#define MAC_AX_STA_CSA_BUSY 2
+	u8 sta_csa_st;
+	u8 sta_csa_ret;
+#define MAC_AX_H2C_C2H_MON_OFF 0
+#define MAC_AX_H2C_C2H_MON_ON 1
+	u8 h2c_c2h_mon;
 };
 
 #define MAC_AX_DFLT_SM \
@@ -232,12 +275,12 @@ struct mac_ax_state_mach {
 	MAC_AX_CMD_OFLD_IDLE, MAC_AX_OFLD_H2C_IDLE, MAC_AX_OFLD_H2C_IDLE, \
 	MAC_AX_OFLD_H2C_IDLE, MAC_AX_OFLD_H2C_IDLE, MAC_AX_OFLD_H2C_IDLE, \
 	MAC_AX_OFLD_H2C_IDLE, MAC_AX_OFLD_H2C_IDLE, MAC_AX_OFLD_H2C_IDLE, \
-	MAC_AX_OFLD_H2C_IDLE, \
-	{MAC_AX_MCC_EMPTY}, {MAC_AX_MCC_EMPTY}, {MAC_AX_MCC_REQ_IDLE}, \
-	{MAC_AX_MCC_REQ_IDLE}, MAC_AX_FW_RESET_IDLE, MAC_AX_AOAC_RPT_IDLE, \
+	{MAC_AX_MCC_EMPTY}, {MAC_AX_MCC_ADD_ROLE_OK}, {MAC_AX_MCC_REQ_IDLE}, \
+	{MAC_AX_MCC_REQ_OK}, MAC_AX_FW_RESET_IDLE, MAC_AX_AOAC_RPT_IDLE, \
 	MAC_AX_P2P_ACT_IDLE, MAC_AX_FUNC_OFF, MAC_AX_FUNC_OFF, \
 	MAC_AX_FUNC_OFF, MAC_AX_FUNC_OFF, MAC_AX_FUNC_OFF, \
 	MAC_AX_WOW_STOPTRX_IDLE, MAC_AX_MAC_NOT_RDY, MAC_AX_ROLE_ALOC_SUCC, \
 	MAC_AX_PLAT_OFF, MAC_AX_IO_ST_NORM, MAC_AX_L2_EN, MAC_AX_SER_CTRL_SRT,\
-	MAC_AX_OFLD_H2C_IDLE, MAC_AX_PROXY_IDLE, MAC_AX_PROXY_IDLE, MAC_AX_NAN_IDLE}
+	MAC_AX_OFLD_H2C_IDLE, MAC_AX_PROXY_IDLE, MAC_AX_PROXY_IDLE, MAC_AX_SENSING_CSI_IDLE,\
+	MAC_AX_NAN_IDLE, MAC_AX_STA_CSA_IDLE, MAC_AX_STA_CSA_IDLE, MAC_AX_H2C_C2H_MON_OFF}
 #endif

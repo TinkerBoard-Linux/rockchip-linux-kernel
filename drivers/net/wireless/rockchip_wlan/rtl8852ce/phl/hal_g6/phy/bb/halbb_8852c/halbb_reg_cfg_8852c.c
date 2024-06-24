@@ -118,7 +118,7 @@ void halbb_cfg_bb_gain_8852c(struct bb_info *bb, u32 addr, u32 data)
 	} else if (addr == 0xf9) {
 		halbb_delay_us(bb, 1);
 		BB_DBG(bb, DBG_INIT, "Delay 1 us\n");
-	} else if (cfg_type ==0) { /*GAIN ERROR*/
+	} else if (cfg_type == 0) { /*GAIN ERROR*/
 		type = (u8)(addr & 0xff);
 		if (type == 0) {
 			for (i = 0; i < 4; i++)
@@ -130,9 +130,24 @@ void halbb_cfg_bb_gain_8852c(struct bb_info *bb, u32 addr, u32 data)
 			for (i = 0; i < 2; i++)
 				gain->tia_gain[band_idx][path][i] = (data >> (8 * i)) & 0xff;
 		}
+
+		if ((band_idx >= 4) && (band_idx <= 7)) { /*Avoid phy_reg_gain does not support band_idx 8~11*/
+			if (type == 0) {
+				for (i = 0; i < 4; i++)
+					gain->lna_gain[band_idx + 4][path][i] = (data >> (8 * i)) & 0xff;
+			} else if (type == 1) {
+				for (i = 0; i < 3; i++)
+					gain->lna_gain[band_idx + 4][path][4 + i] = (data >> (8 * i)) & 0xff;
+			} else if (type == 2) {
+				for (i = 0; i < 2; i++)
+					gain->tia_gain[band_idx + 4][path][i] = (data >> (8 * i)) & 0xff;
+			}
+		}
 	} else if (cfg_type == 1) { /*RPL Offset*/
 		halbb_cfg_bb_rpl_ofst(bb, band_idx, path, addr, data);
-	} else if (cfg_type ==2) { /*Bypass Mode GAIN ERROR*/
+		if ((band_idx >= 4) && (band_idx <= 7)) /*Avoid phy_reg_gain does not support band_idx 8~11*/
+			halbb_cfg_bb_rpl_ofst(bb, band_idx + 4, path, addr, data);
+	} else if (cfg_type == 2) { /*Bypass Mode GAIN ERROR*/
 		type = (u8)(addr & 0xff);
 		if (type == 0) {
 			for (i = 0; i < 4; i++)
@@ -140,6 +155,16 @@ void halbb_cfg_bb_gain_8852c(struct bb_info *bb, u32 addr, u32 data)
 		} else if (type == 1) {
 			for (i = 0; i < 3; i++)
 				gain->lna_gain_bypass[band_idx][path][4 + i] = (data >> (8 * i)) & 0xff;
+		}
+
+		if ((band_idx >= 4) && (band_idx <= 7)) { /*Avoid phy_reg_gain does not support band_idx 8~11*/
+			if (type == 0) {
+				for (i = 0; i < 4; i++)
+					gain->lna_gain_bypass[band_idx + 4][path][i] = (data >> (8 * i)) & 0xff;
+			} else if (type == 1) {
+				for (i = 0; i < 3; i++)
+					gain->lna_gain_bypass[band_idx + 4][path][4 + i] = (data >> (8 * i)) & 0xff;
+			}
 		}
 	} else if (cfg_type == 3) { /*op1dB values*/
 		type = (u8)(addr & 0xff);
@@ -155,6 +180,22 @@ void halbb_cfg_bb_gain_8852c(struct bb_info *bb, u32 addr, u32 data)
 		} else if (type == 3) {
 			for (i = 0; i < 4; i++)
 				gain->tia_lna_op1db[band_idx][path][4 + i] = (data >> (8 * i)) & 0xff;
+		}
+
+		if ((band_idx >= 4) && (band_idx <= 7)) { /*Avoid phy_reg_gain does not support band_idx 8~11*/
+			if (type == 0) {
+				for (i = 0; i < 4; i++)
+					gain->lna_op1db[band_idx + 4][path][i] = (data >> (8 * i)) & 0xff;
+			} else if (type == 1) {
+				for (i = 0; i < 3; i++)
+					gain->lna_op1db[band_idx + 4][path][4 + i] = (data >> (8 * i)) & 0xff;
+			} else if (type == 2) {
+				for (i = 0; i < 4; i++)
+					gain->tia_lna_op1db[band_idx + 4][path][i] = (data >> (8 * i)) & 0xff;
+			} else if (type == 3) {
+				for (i = 0; i < 4; i++)
+					gain->tia_lna_op1db[band_idx + 4][path][4 + i] = (data >> (8 * i)) & 0xff;
+			}
 		}
 	} else if (cfg_type == 4) { /*WB_GIDX & GS IDX*/
 		type = (u8)(addr & 0xff);
@@ -173,6 +214,24 @@ void halbb_cfg_bb_gain_8852c(struct bb_info *bb, u32 addr, u32 data)
 		else if (type == 5)
 			for (i = 0; i < 2; i++)
 				gain->g_elna[band_idx][path][i] = (data >> (8 * i)) & 0xff;
+
+		if ((band_idx >= 4) && (band_idx <= 7)) { /*Avoid phy_reg_gain does not support band_idx 8~11*/
+			if (type == 0)
+				gain->wb_gidx_elna[band_idx + 4][path] = data;
+			else if (type == 1)
+				for (i = 0; i < 8; i++)
+					gain->wb_gidx_lna_tia[band_idx + 4][path][i] = (data >> (4 * i)) & 0x7;
+			else if (type == 2)
+				for (i = 0; i < 8; i++)
+					gain->wb_gidx_lna_tia[band_idx + 4][path][i + 8] = (data >> (4 * i)) & 0x7;
+			else if (type == 3)
+				gain->gs_idx[band_idx + 4][path][0] = data;
+			else if (type == 4)
+				gain->gs_idx[band_idx + 4][path][1] = data;
+			else if (type == 5)
+				for (i = 0; i < 2; i++)
+					gain->g_elna[band_idx + 4][path][i] = (data >> (8 * i)) & 0xff;
+		}
 	} else {
 		BB_WARNING("cfg_type=%d\n", cfg_type);
 	}

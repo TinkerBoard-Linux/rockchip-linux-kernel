@@ -60,6 +60,8 @@ u32 mac_hdr_conv_rx_en_driv_info_hdr_8852c(struct mac_ax_adapter *adapter,
 	u32 val, b1_en;
 
 	b1_en = check_mac_en(adapter, 1, MAC_AX_CMAC_SEL);
+	if (b1_en != MACSUCCESS)
+		return b1_en;
 
 	switch (*ori_cmac_0_size) {
 	case MAC_AX_DRV_INFO_NONE:

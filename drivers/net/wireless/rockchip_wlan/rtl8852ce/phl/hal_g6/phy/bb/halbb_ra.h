@@ -15,12 +15,15 @@
 #ifndef _HALBB_RA_H_
 #define _HALBB_RA_H_
 
+const static u16 bb_phy_rate_table_he_eht[SU_EHT_MCS_NUM] = {
+	/*HE/EHT-1ss 0.8GI U(16,2)*/
+	34, 69, 103, 138, 206, 275, 310, 344, 413, 459, 516, 574, 619, 688
+};
+
 /*@--------------------------[extern] ---------------------------------------*/
 extern const u16 bb_phy_rate_table[LEGACY_RATE_NUM + HE_RATE_NUM_4SS];
 /*@--------------------------[Define] ---------------------------------------*/
-#define VHT_2_HE32_RATE(X) ((((X) << 3) + (X) + 4) >> 3) /*= Round(X * 1.125)*/
-#define HE32_2_HE16_RATE(X) ((((X) << 3) + (X) + 4) >> 3) /*= Round(X * 1.125)*/
-#define HE32_2_HE08_RATE(X) ((((X) << 4) + ((X) << 1) + (X) + 8) >> 4) /*= Round(X * 1.1875)*/
+#define HALBB_GET_HE_EHT_PHY_RATE(ss_idx, mcs_idx, bw) ((((ss_idx) * (bb_phy_rate_table_he_eht[(mcs_idx)])) << (bw)) >> 2)
 
 #define RAMASK_B	0x000000000000000f
 #define RAMASK_AG	0x0000000000000ff0
@@ -244,6 +247,12 @@ union bb_h2c_ra_cmn_info {
     struct bb_h2c_ra_cfg_info_wifi7 bb_h2c_ra_info_wifi7;
 };
 
+struct bb_ra_drv_info {
+	bool is_fw_fix_rate[PHL_MAX_STA_NUM];
+	u16 last_fw_fix_rate_macid;
+	u16 drv_fw_fix_rate_macid; /*user can select certain macid to fix rate in simple mode*/
+};
+
 struct bb_ra_info {
 	/* Config move to phl_sta_info*/
 	union bb_h2c_ra_cmn_info ra_cfg;
@@ -269,7 +278,13 @@ struct bb_ra_info {
 	u8 rpt_ratio;
 
 	u8 tmp;
-	
+	bool is_low_latency;
+};
+
+struct bb_ra_dbg_info {
+    /* For RA tx histogram cmd option */
+    u16 macid; // Rpt for spacific macid (0xFFFF for all MAC id cnt)
+	u8 per_ppdu; // Tx cnt per ppdu or mpdu
 };
 
 union bb_h2c_ra_rssi_info {
@@ -286,7 +301,7 @@ bool halbb_is_ofdm_rate(struct bb_info *bb, u16 rate);
 bool halbb_is_ht_rate(struct bb_info *bb, u16 rate);
 bool halbb_is_vht_rate(struct bb_info *bb, u16 rate);
 bool halbb_is_he_rate(struct bb_info *bb, u16 rate);
-#ifdef BB_8922A_DVLP_SPF
+#ifdef BB_1115_DVLP_SPF
 bool halbb_is_eht_rate_wifi7(struct bb_info *bb, u16 rate);
 bool halbb_is_he_rate_wifi7(struct bb_info *bb, u16 rate);
 bool halbb_is_vht_rate_wifi7(struct bb_info *bb, u16 rate);
@@ -308,6 +323,8 @@ void halbb_ra_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 			 char *output, u32 *_out_len);
 void halbb_rate_idx_parsor(struct bb_info *bb, u16 rate_idx, enum rtw_gi_ltf gi_ltf, struct bb_rate_info *ra_i);
 u32 halbb_get_fw_ra_rpt(struct bb_info *bb, u16 len, u8 *c2h);
+void halbb_get_fw_c2h_tx_hist(struct bb_info *bb, u16 len, u8 *c2h);
+u32 halbb_get_fw_ra_dbgrpt_wifi7(struct bb_info *bb, u16 len, u8 *c2h);
 u32 halbb_get_txsts_rpt(struct bb_info *bb, u16 len, u8 *c2h);
 void halbb_get_ra_dbgreg(struct bb_info *bb);
 #endif

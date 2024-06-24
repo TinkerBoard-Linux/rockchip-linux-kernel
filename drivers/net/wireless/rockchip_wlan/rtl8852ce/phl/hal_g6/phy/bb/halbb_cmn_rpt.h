@@ -66,7 +66,8 @@ struct bb_pkt_cnt_cap_info {
 	u32 pkt_cnt_bcc;
 	u32 pkt_cnt_stbc;
 	u32 pkt_cnt_subf;
-	u32 pkt_cnt_mubf;
+	u32 pkt_cnt_su_non_bf;
+	u32 pkt_cnt_mu;
 };
 
 struct bb_physts_hist_info {
@@ -92,6 +93,7 @@ struct bb_physts_acc_info {
 	u32 snr_per_path_acc[HALBB_MAX_PATH]; /*U(6,0)*/
 	u32 cn_avg_acc;  /*U(7,1)*/
 	s32 cfo_avg_acc; /*U(8,2)*/
+	u16 pkt_cnt_cn_valid;
 };
 
 struct bb_physts_pop_info {
@@ -132,7 +134,9 @@ u16 halbb_get_plurality_rx_rate_su(struct bb_info *bb);
 void halbb_basic_dbg_07_hist_su(struct bb_info *bb);
 void halbb_show_rssi_and_rate_distribution_mu(struct bb_info *bb);
 void halbb_show_rssi_and_rate_distribution_su(struct bb_info *bb);
+void halbb_cmn_rpt_get_avg_val(struct bb_info *bb);
 void halbb_rx_pkt_cnt_rpt_reset(struct bb_info *bb);
+void halbb_cmn_rpt_watchdog(struct bb_info *bb);
 void halbb_cmn_rpt(struct bb_info *bb, struct physts_rxd *desc, u32 physts_bitmap);
 void halbb_cmn_info_rpt_store_data(struct bb_info *bb);
 void halbb_cmn_info_rpt_reset(struct bb_info *bb);

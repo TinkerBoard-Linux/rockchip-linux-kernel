@@ -18,14 +18,14 @@
 #ifdef MAC_FW_8852C_U1
 #ifdef MAC_FW_CATEGORY_AP
 extern u32 array_length_8852c_u1_ap;
-extern u8 array_8852c_u1_ap[406448];
+extern u8 array_8852c_u1_ap[409488];
 #endif /* MAC_FW_CATEGORY_AP */
 
 #endif /* MAC_FW_8852C_U1 */
 #ifdef MAC_FW_8852C_U2
 #ifdef MAC_FW_CATEGORY_AP
 extern u32 array_length_8852c_u2_ap;
-extern u8 array_8852c_u2_ap[364848];
+extern u8 array_8852c_u2_ap[377360];
 #endif /* MAC_FW_CATEGORY_AP */
 
 #endif /* MAC_FW_8852C_U2 */
@@ -37,24 +37,24 @@ extern u8 array_8852c_u2_ap[364848];
 #ifdef MAC_FW_8852C_U1
 #ifdef MAC_FW_CATEGORY_NIC
 extern u32 array_length_8852c_u1_nic;
-extern u8 array_8852c_u1_nic[328216];
+extern u8 array_8852c_u1_nic[396504];
 #endif /* MAC_FW_CATEGORY_NIC */
 
 #ifdef MAC_FW_CATEGORY_WOWLAN
 extern u32 array_length_8852c_u1_wowlan;
-extern u8 array_8852c_u1_wowlan[258680];
+extern u8 array_8852c_u1_wowlan[297848];
 #endif /* MAC_FW_CATEGORY_WOWLAN */
 
 #endif /* MAC_FW_8852C_U1 */
 #ifdef MAC_FW_8852C_U2
 #ifdef MAC_FW_CATEGORY_NIC
 extern u32 array_length_8852c_u2_nic;
-extern u8 array_8852c_u2_nic[290784];
+extern u8 array_8852c_u2_nic[367752];
 #endif /* MAC_FW_CATEGORY_NIC */
 
 #ifdef MAC_FW_CATEGORY_WOWLAN
 extern u32 array_length_8852c_u2_wowlan;
-extern u8 array_8852c_u2_wowlan[218104];
+extern u8 array_8852c_u2_wowlan[265536];
 #endif /* MAC_FW_CATEGORY_WOWLAN */
 
 #endif /* MAC_FW_8852C_U2 */

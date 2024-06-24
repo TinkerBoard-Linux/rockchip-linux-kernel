@@ -27,6 +27,97 @@
 #include "halrf_hwimg_nctl_raw_data_8852c.h"
 #include "halrf_hwimg_raw_data_w_bt_8852c.h"
 
+#ifdef RF_8852C_SUPPORT
+u32 _halrf_power_limit_table_size_8852c(struct rf_info *rf, u8 ru, u8 band)
+{
+	u8 rfe_type = rf->phl_com->dev_cap.rfe_type;
+
+	if (rfe_type == 5) {
+		if (ru == PW_LMT_TBL_NONE_RU) {
+			if (band == PW_LMT_TBL)
+				return sizeof(array_mp_8852c_txpwr_lmt_type5);
+			else
+				return sizeof(array_mp_8852c_txpwr_lmt_6g_type5);
+		} else {
+			if (band == PW_LMT_TBL)
+				return sizeof(array_mp_8852c_txpwr_lmt_ru_type5);
+			else
+				return sizeof(array_mp_8852c_txpwr_lmt_ru_6g_type5);
+		}
+	} else {
+		if (ru == PW_LMT_TBL_NONE_RU) {
+			if (rf->phl_com->hci_type == RTW_HCI_USB) {
+				if (band == PW_LMT_TBL)
+					return sizeof(array_mp_8852c_txpwr_lmt);
+				else
+					return sizeof(array_mp_8852c_txpwr_lmt_6g_usb);
+			} else {
+				if (band == PW_LMT_TBL)
+					return sizeof(array_mp_8852c_txpwr_lmt);
+				else
+					return sizeof(array_mp_8852c_txpwr_lmt_6g);
+			}
+		} else {
+			if (rf->phl_com->hci_type == RTW_HCI_USB) {
+				if (band == PW_LMT_TBL)
+					return sizeof(array_mp_8852c_txpwr_lmt_ru);
+				else
+					return sizeof(array_mp_8852c_txpwr_lmt_ru_6g_usb);
+			} else {
+				if (band == PW_LMT_TBL)
+					return sizeof(array_mp_8852c_txpwr_lmt_ru);
+				else
+					return sizeof(array_mp_8852c_txpwr_lmt_ru_6g);
+			}
+		}
+	}
+}
+
+void *_halrf_power_limit_table_addr_8852c(struct rf_info *rf, u8 ru, u8 band)
+{
+	u8 rfe_type = rf->phl_com->dev_cap.rfe_type;
+
+	if (rfe_type == 5) {
+		if (ru == PW_LMT_TBL_NONE_RU) {
+			if (band == PW_LMT_TBL)
+				return (void *) array_mp_8852c_txpwr_lmt_type5;
+			else
+				return (void *) array_mp_8852c_txpwr_lmt_6g_type5;
+		} else {
+			if (band == PW_LMT_TBL)
+				return (void *) array_mp_8852c_txpwr_lmt_ru_type5;
+			else
+				return (void *) array_mp_8852c_txpwr_lmt_ru_6g_type5;
+		}
+	} else {
+		if (ru == PW_LMT_TBL_NONE_RU) {
+			if (rf->phl_com->hci_type == RTW_HCI_USB) {
+				if (band == PW_LMT_TBL)
+					return (void *) array_mp_8852c_txpwr_lmt;
+				else 
+					return (void *) array_mp_8852c_txpwr_lmt_6g_usb;
+			} else {
+				if (band == PW_LMT_TBL)
+					return (void *) array_mp_8852c_txpwr_lmt;
+				else
+					return (void *) array_mp_8852c_txpwr_lmt_6g;
+			}
+		} else {
+			if (rf->phl_com->hci_type == RTW_HCI_USB) {
+				if (band == PW_LMT_TBL)
+					return (void *) array_mp_8852c_txpwr_lmt_ru;
+				else 
+					return (void *) array_mp_8852c_txpwr_lmt_ru_6g_usb;
+			} else {
+				if (band == PW_LMT_TBL)
+					return (void *) array_mp_8852c_txpwr_lmt_ru;
+				else
+					return (void *) array_mp_8852c_txpwr_lmt_ru_6g;
+			}
+		}
+	}
+}
+
 bool halrf_check_cond_8852c(struct rf_info *rf, u32 para_opt)
 {
 	struct rtw_hal_com_t *hal = rf->hal_com;
@@ -211,7 +302,8 @@ void halrf_config_8852c_nctl_reg(struct rf_info *rf)
 			break;		
 	}
 #ifdef HALRF_CONFIG_FW_IO_OFLD_SUPPORT
-	halrf_write_fwofld_start(rf);
+	if (rf->phl_com->dev_cap.io_ofld)
+		halrf_write_fwofld_start(rf);
 #endif
 	while ((i + 1) < array_len) {
 		v1 = array[i];
@@ -220,7 +312,8 @@ void halrf_config_8852c_nctl_reg(struct rf_info *rf)
 		i += 2;
 	}
 #ifdef HALRF_CONFIG_FW_IO_OFLD_SUPPORT
-	halrf_write_fwofld_end(rf);
+	if (rf->phl_com->dev_cap.io_ofld)
+		halrf_write_fwofld_end(rf);
 #endif
 #endif
 
@@ -682,8 +775,8 @@ halrf_config_8852c_store_power_limit(struct rf_info *rf,
 					rate, tx_num, beamforming, chnl, val);
 		}
 	} else {
-		array_len = sizeof(array_mp_8852c_txpwr_lmt) / sizeof(struct halrf_tx_pw_lmt);
-		array = array_mp_8852c_txpwr_lmt;
+		array_len = _halrf_power_limit_table_size_8852c(rf, PW_LMT_TBL_NONE_RU, PW_LMT_TBL) / sizeof(struct halrf_tx_pw_lmt);
+		array = (struct halrf_tx_pw_lmt *) _halrf_power_limit_table_addr_8852c(rf, PW_LMT_TBL_NONE_RU, PW_LMT_TBL);
 
 		for (i = 0; i < array_len; i++) {
 			band = array[i].band;
@@ -726,7 +819,6 @@ halrf_config_8852c_store_power_limit_6g(struct rf_info *rf,
 	struct halrf_tx_pw_lmt *parray = NULL;
 	struct halrf_pwr_info *pwr = &rf->pwr_info;
 	struct rtw_para_pwrlmt_info_t *pwrlmt_info = NULL;
-	struct rtw_regulation_info rg_info = {0};
 	u32 i;
 	u32 array_len = 0;
 	u8 band, bandwidth, tx_num, rate, beamforming, regulation, chnl;
@@ -771,23 +863,8 @@ halrf_config_8852c_store_power_limit_6g(struct rf_info *rf,
 					rate, tx_num, beamforming, chnl, val);
 		}
 	} else {
-		halrf_query_regulation_info(rf, &rg_info);
-
-#if 0
-		if (rg_info.category_6g == PWR_LMT_6G_LPI) {
-			array_len = sizeof(array_mp_8852c_txpwr_lmt_6g_lpi) / sizeof(struct halrf_tx_pw_lmt);
-			array = array_mp_8852c_txpwr_lmt_6g_lpi;
-		} else if (rg_info.category_6g == PWR_LMT_6G_STD) {
-			array_len = sizeof(array_mp_8852c_txpwr_lmt_6g_std) / sizeof(struct halrf_tx_pw_lmt);
-			array = array_mp_8852c_txpwr_lmt_6g_std;
-		} else {
-			array_len = sizeof(array_mp_8852c_txpwr_lmt_6g_vlp) / sizeof(struct halrf_tx_pw_lmt);
-			array = array_mp_8852c_txpwr_lmt_6g_vlp;
-		}
-#else
-		array_len = sizeof(array_mp_8852c_txpwr_lmt_6g_lpi) / sizeof(struct halrf_tx_pw_lmt);
-		array = array_mp_8852c_txpwr_lmt_6g_lpi;
-#endif
+		array_len = _halrf_power_limit_table_size_8852c(rf, PW_LMT_TBL_NONE_RU, PW_LMT_TBL_6G) / sizeof(struct halrf_tx_pw_lmt);
+		array = (struct halrf_tx_pw_lmt *) _halrf_power_limit_table_addr_8852c(rf, PW_LMT_TBL_NONE_RU, PW_LMT_TBL_6G);
 
 		for (i = 0; i < array_len; i++) {
 			band = array[i].band;
@@ -871,8 +948,8 @@ halrf_config_8852c_store_power_limit_ru(struct rf_info *rf,
 						rate, regulation, chnl, val);
 		}
 	} else {
-		array_len = sizeof(array_mp_8852c_txpwr_lmt_ru) / sizeof(struct halrf_tx_pw_lmt_ru);
-		array = array_mp_8852c_txpwr_lmt_ru;
+		array_len = _halrf_power_limit_table_size_8852c(rf, PW_LMT_TBL_RU, PW_LMT_TBL) / sizeof(struct halrf_tx_pw_lmt_ru);
+		array = (struct halrf_tx_pw_lmt_ru *) _halrf_power_limit_table_addr_8852c(rf, PW_LMT_TBL_RU, PW_LMT_TBL);
 
 		for (i = 0; i < array_len; i++) {
 			band = array[i].band;
@@ -912,7 +989,6 @@ halrf_config_8852c_store_power_limit_ru_6g(struct rf_info *rf,
 	struct halrf_tx_pw_lmt_ru *parray = NULL;
 	struct halrf_pwr_info *pwr = &rf->pwr_info;
 	struct rtw_para_pwrlmt_info_t *pwrlmt_info = NULL;
-	struct rtw_regulation_info rg_info = {0};
 	u32 i;
 	u32 array_len = 0;
 	u8 band, bandwidth, tx_num, rate, regulation, chnl;
@@ -954,22 +1030,8 @@ halrf_config_8852c_store_power_limit_ru_6g(struct rf_info *rf,
 						rate, regulation, chnl, val);
 		}
 	} else {
-		halrf_query_regulation_info(rf, &rg_info);
-#if 0
-		if (rg_info.category_6g == PWR_LMT_6G_LPI) {
-			array_len = sizeof(array_mp_8852c_txpwr_lmt_ru_6g_lpi) / sizeof(struct halrf_tx_pw_lmt_ru);
-			array = array_mp_8852c_txpwr_lmt_ru_6g_lpi;
-		} else if (rg_info.category_6g == PWR_LMT_6G_STD) {
-			array_len = sizeof(array_mp_8852c_txpwr_lmt_ru_6g_std) / sizeof(struct halrf_tx_pw_lmt_ru);
-			array = array_mp_8852c_txpwr_lmt_ru_6g_std;
-		} else {
-			array_len = sizeof(array_mp_8852c_txpwr_lmt_ru_6g_vlp) / sizeof(struct halrf_tx_pw_lmt_ru);
-			array = array_mp_8852c_txpwr_lmt_ru_6g_vlp;
-		}
-#else
-		array_len = sizeof(array_mp_8852c_txpwr_lmt_ru_6g_lpi) / sizeof(struct halrf_tx_pw_lmt_ru);
-		array = array_mp_8852c_txpwr_lmt_ru_6g_lpi;
-#endif
+		array_len = _halrf_power_limit_table_size_8852c(rf, PW_LMT_TBL_RU, PW_LMT_TBL_6G) / sizeof(struct halrf_tx_pw_lmt_ru);
+		array = (struct halrf_tx_pw_lmt_ru *) _halrf_power_limit_table_addr_8852c(rf, PW_LMT_TBL_RU, PW_LMT_TBL_6G);
 
 		for (i = 0; i < array_len; i++) {
 			band = array[i].band;
@@ -1060,16 +1122,16 @@ halrf_config_8852c_store_pwr_track(struct rf_info *rf,
 
 		hal_mem_cpy(hal, pwr_trk->delta_swing_table_idx_6ga_p,
 			tmp_info->delta_swing_table_idx_6ga_p,
-			DELTA_SWINGIDX_SIZE * 3);
+			sizeof(pwr_trk->delta_swing_table_idx_6ga_p));
 		hal_mem_cpy(hal, pwr_trk->delta_swing_table_idx_6ga_n,
 			tmp_info->delta_swing_table_idx_6ga_n,
-			DELTA_SWINGIDX_SIZE * 3);
+			sizeof(pwr_trk->delta_swing_table_idx_6ga_n));
 		hal_mem_cpy(hal, pwr_trk->delta_swing_table_idx_6gb_p,
 			tmp_info->delta_swing_table_idx_6gb_p,
-			DELTA_SWINGIDX_SIZE * 3);
+			sizeof(pwr_trk->delta_swing_table_idx_6gb_p));
 		hal_mem_cpy(hal, pwr_trk->delta_swing_table_idx_6gb_n,
 			tmp_info->delta_swing_table_idx_6gb_n,
-			DELTA_SWINGIDX_SIZE * 3);
+			sizeof(pwr_trk->delta_swing_table_idx_6gb_n));
 
 	} else {
 		hal_mem_cpy(hal, pwr_trk->delta_swing_table_idx_2ga_p,
@@ -1113,16 +1175,16 @@ halrf_config_8852c_store_pwr_track(struct rf_info *rf,
 
 		hal_mem_cpy(hal, pwr_trk->delta_swing_table_idx_6ga_p,
 			(void *)delta_swingidx_mp_6ga_p_txpwrtrkssi_8852c,
-			DELTA_SWINGIDX_SIZE * 3);
+			sizeof(pwr_trk->delta_swing_table_idx_6ga_p));
 		hal_mem_cpy(hal, pwr_trk->delta_swing_table_idx_6ga_n,
 			(void *)delta_swingidx_mp_6ga_n_txpwrtrkssi_8852c,
-			DELTA_SWINGIDX_SIZE * 3);
+			sizeof(pwr_trk->delta_swing_table_idx_6ga_n));
 		hal_mem_cpy(hal, pwr_trk->delta_swing_table_idx_6gb_p,
 			(void *)delta_swingidx_mp_6gb_p_txpwrtrkssi_8852c,
-			DELTA_SWINGIDX_SIZE * 3);
+			sizeof(pwr_trk->delta_swing_table_idx_6gb_p));
 		hal_mem_cpy(hal, pwr_trk->delta_swing_table_idx_6gb_n,
 			(void *)delta_swingidx_mp_6gb_n_txpwrtrkssi_8852c,
-			DELTA_SWINGIDX_SIZE * 3);
+			sizeof(pwr_trk->delta_swing_table_idx_6gb_n));
 	}
 }
 
@@ -1194,3 +1256,5 @@ void halrf_cfg_8852c_radio_b_w_bt_status(struct rf_info *rf, bool bt_connect)
 	}
 
 }	
+
+#endif

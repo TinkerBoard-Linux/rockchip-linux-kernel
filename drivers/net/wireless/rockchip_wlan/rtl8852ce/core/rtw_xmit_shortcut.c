@@ -16,88 +16,6 @@
 #include <drv_types.h>
 
 #ifdef CONFIG_CORE_TXSC
-u8 DBG_PRINT_MDATA_ONCE;
-void _print_txreq_mdata(struct rtw_t_meta_data *mdata, const char *func)
-{
-	if (DBG_PRINT_MDATA_ONCE == 1) {
-		RTW_PRINT("[%s]\n", func);
-
-		RTW_PRINT("da: %02x%02x%02x%02x%02x%02x\n",
-			mdata->da[0], mdata->da[1], mdata->da[2], mdata->da[3], mdata->da[4], mdata->da[5]);
-		RTW_PRINT("sa: %02x%02x%02x%02x%02x%02x\n",
-			mdata->sa[0], mdata->sa[1], mdata->sa[2], mdata->sa[3], mdata->sa[4], mdata->sa[5]);
-		RTW_PRINT("to_ds: %d\n", mdata->to_ds);
-		RTW_PRINT("from_ds: %d\n", mdata->from_ds);
-		RTW_PRINT("band: %d\n", mdata->band);
-		RTW_PRINT("type: %d\n", mdata->type);
-
-		RTW_PRINT("hw_seq_mode: %d\n", mdata->hw_seq_mode);
-		RTW_PRINT("hw_ssn_sel: %d\n", mdata->hw_ssn_sel);
-		RTW_PRINT("smh_en: %d\n", mdata->smh_en);
-		RTW_PRINT("hw_amsdu: %d\n", mdata->hw_amsdu);
-		RTW_PRINT("hw_sec_iv: %d\n", mdata->hw_sec_iv);
-		RTW_PRINT("wd_page_size: %d\n", mdata->wd_page_size);
-		RTW_PRINT("hdr_len: %d\n", mdata->hdr_len);
-		RTW_PRINT("dma_ch: %d\n", mdata->dma_ch);
-		RTW_PRINT("usb_pkt_ofst: %d\n", mdata->usb_pkt_ofst);
-		RTW_PRINT("wdinfo_en: %d\n", mdata->wdinfo_en);
-		RTW_PRINT("wp_offset: %d\n", mdata->wp_offset);
-		RTW_PRINT("shcut_camid: %d\n", mdata->shcut_camid);
-		RTW_PRINT("usb_txagg_num: %d\n", mdata->usb_txagg_num);
-		RTW_PRINT("pktlen: %d\n", mdata->pktlen);
-		RTW_PRINT("tid: %d\n", mdata->tid);
-		RTW_PRINT("cat: %d\n", mdata->cat);
-		RTW_PRINT("macid: %d\n", mdata->macid);
-		RTW_PRINT("sw_seq: %d\n", mdata->sw_seq);
-		RTW_PRINT("ampdu_en: %d\n", mdata->ampdu_en);
-		RTW_PRINT("bk: %d\n", mdata->bk);
-		RTW_PRINT("mbssid: %d\n", mdata->mbssid);
-		RTW_PRINT("hal_port: %d\n", mdata->hal_port);
-		RTW_PRINT("data_bw_er: %d\n", mdata->data_bw_er);
-		RTW_PRINT("dis_rts_rate_fb: %d\n", mdata->dis_rts_rate_fb);
-		RTW_PRINT("dis_data_rate_fb: %d\n", mdata->dis_data_rate_fb);
-		RTW_PRINT("f_ldpc: %d\n", mdata->f_ldpc);
-		RTW_PRINT("f_stbc: %d\n", mdata->f_stbc);
-		RTW_PRINT("f_dcm: %d\n", mdata->f_dcm);
-		RTW_PRINT("f_er: %d\n", mdata->f_er);
-		RTW_PRINT("f_rate: %d\n", mdata->f_rate);
-		RTW_PRINT("f_gi_ltf: %d\n", mdata->f_gi_ltf);
-		RTW_PRINT("f_bw: %d\n", mdata->f_bw);
-		RTW_PRINT("userate_sel: %d\n", mdata->userate_sel);
-		RTW_PRINT("ack_ch_info: %d\n", mdata->ack_ch_info);
-		RTW_PRINT("max_agg_num: %d\n", mdata->max_agg_num);
-		RTW_PRINT("nav_use_hdr: %d\n", mdata->nav_use_hdr);
-		RTW_PRINT("bc: %d\n", mdata->bc);
-		RTW_PRINT("mc: %d\n", mdata->mc);
-		RTW_PRINT("a_ctrl_bqr: %d\n", mdata->a_ctrl_bqr);
-		RTW_PRINT("a_ctrl_uph: %d\n", mdata->a_ctrl_uph);
-		RTW_PRINT("a_ctrl_bsr: %d\n", mdata->a_ctrl_bsr);
-		RTW_PRINT("a_ctrl_cas: %d\n", mdata->a_ctrl_cas);
-		RTW_PRINT("data_rty_lowest_rate: %d\n", mdata->data_rty_lowest_rate);
-		RTW_PRINT("data_tx_cnt_lmt: %d\n", mdata->data_tx_cnt_lmt);
-		RTW_PRINT("data_tx_cnt_lmt_en: %d\n", mdata->data_tx_cnt_lmt_en);
-		RTW_PRINT("sec_cam_idx: %d\n", mdata->sec_cam_idx);
-		RTW_PRINT("sec_hw_enc: %d\n", mdata->sec_hw_enc);
-		RTW_PRINT("sec_type: %d\n", mdata->sec_type);
-		RTW_PRINT("life_time_sel: %d\n", mdata->life_time_sel);
-		RTW_PRINT("ampdu_density: %d\n", mdata->ampdu_density);
-		RTW_PRINT("no_ack: %d\n", mdata->no_ack);
-		RTW_PRINT("ndpa: %d\n", mdata->ndpa);
-		RTW_PRINT("snd_pkt_sel: %d\n", mdata->snd_pkt_sel);
-		RTW_PRINT("sifs_tx: %d\n", mdata->sifs_tx);
-		RTW_PRINT("rtt_en: %d\n", mdata->rtt_en);
-		RTW_PRINT("spe_rpt: %d\n", mdata->spe_rpt);
-		RTW_PRINT("raw: %d\n", mdata->raw);
-		RTW_PRINT("sw_define: %d\n", mdata->sw_define);
-		RTW_PRINT("rts_en: %d\n", mdata->rts_en);
-		RTW_PRINT("cts2self: %d\n", mdata->cts2self);
-		RTW_PRINT("rts_cca_mode: %d\n", mdata->rts_cca_mode);
-		RTW_PRINT("hw_rts_en: %d\n", mdata->hw_rts_en);
-
-		DBG_PRINT_MDATA_ONCE = 0;
-	}
-}
-
 u8 DBG_PRINT_TXREQ_ONCE;
 void _print_txreq_pklist(struct xmit_frame *pxframe, struct rtw_xmit_req *ptxreq, struct sk_buff *pskb, const char *func)
 {
@@ -132,13 +50,425 @@ void _print_txreq_pklist(struct xmit_frame *pxframe, struct rtw_xmit_req *ptxreq
 	}
 }
 
+#ifdef CONFIG_TXSC_AMSDU
+static void txsc_amsdu_vo_timeout_handler(void *func_ontext)
+{
+	struct sta_info *psta = (struct sta_info *)func_ontext;
+	u8 ac = 0;
+
+	psta->txsc_amsdu_vo_timeout_sts = TXSC_AMSDU_TIMER_TIMEOUT;
+
+	/* do amsdu tx */
+	txsc_amsdu_timeout_tx(psta, ac);
+}
+
+static void txsc_amsdu_vi_timeout_handler(void *func_ontext)
+{
+	struct sta_info *psta = (struct sta_info *)func_ontext;
+	u8 ac = 1;
+
+	psta->txsc_amsdu_vi_timeout_sts = TXSC_AMSDU_TIMER_TIMEOUT;
+
+	/* do amsdu tx */
+	txsc_amsdu_timeout_tx(psta, ac);
+}
+
+static void txsc_amsdu_be_timeout_handler(void *func_ontext)
+{
+	struct sta_info *psta = (struct sta_info *)func_ontext;
+	u8 ac = 2;
+
+	psta->txsc_amsdu_be_timeout_sts = TXSC_AMSDU_TIMER_TIMEOUT;
+
+	/* do amsdu tx */
+	txsc_amsdu_timeout_tx(psta, ac);
+}
+
+static void txsc_amsdu_bk_timeout_handler(void *func_ontext)
+{
+	struct sta_info *psta = (struct sta_info *)func_ontext;
+	u8 ac = 3;
+
+	psta->txsc_amsdu_bk_timeout_sts = TXSC_AMSDU_TIMER_TIMEOUT;
+
+	/* do amsdu tx */
+	txsc_amsdu_timeout_tx(psta, ac);
+}
+
+void txsc_amsdu_queue_init(_adapter *padapter, struct sta_info *psta)
+{
+	u32 i, j;
+
+	for (i = 0; i < 4; i++) {
+		psta->amsdu_txq[i].cnt = 0;
+		psta->amsdu_txq[i].wptr = 0;
+		psta->amsdu_txq[i].rptr = 0;
+		for (j = 0; j < MAX_AMSDU_ENQ_NUM; j++)
+			psta->amsdu_txq[i].skb_q[j] = NULL;
+
+		/* init lock */
+		_rtw_spinlock_init(&psta->amsdu_txq[i].txsc_amsdu_lock);
+	}
+
+	/* init timer */
+	rtw_init_timer(&(psta->txsc_amsdu_vo_timer), txsc_amsdu_vo_timeout_handler, psta);
+	psta->txsc_amsdu_vo_timeout_sts = TXSC_AMSDU_TIMER_UNSET;
+
+	rtw_init_timer(&(psta->txsc_amsdu_vi_timer), txsc_amsdu_vi_timeout_handler, psta);
+	psta->txsc_amsdu_vi_timeout_sts = TXSC_AMSDU_TIMER_UNSET;
+
+	rtw_init_timer(&(psta->txsc_amsdu_be_timer), txsc_amsdu_be_timeout_handler, psta);
+	psta->txsc_amsdu_be_timeout_sts = TXSC_AMSDU_TIMER_UNSET;
+
+	rtw_init_timer(&(psta->txsc_amsdu_bk_timer), txsc_amsdu_bk_timeout_handler, psta);
+	psta->txsc_amsdu_bk_timeout_sts = TXSC_AMSDU_TIMER_UNSET;
+
+	psta->txsc_amsdu_num = padapter->tx_amsdu;
+}
+
+void txsc_amsdu_queue_free(_adapter *padapter, struct sta_info *psta)
+{
+	struct sk_buff *pskb = NULL;
+	struct txsc_amsdu_swq *txq = NULL;
+	u32 i, j;
+
+	for (i = 0; i < 4; i++) {
+		txq = &psta->amsdu_txq[i];
+
+		_rtw_spinlock_bh(&txq->txsc_amsdu_lock);
+		for (j = 0; j < MAX_AMSDU_ENQ_NUM; j++) {
+			pskb = txq->skb_q[j];
+			if (pskb != NULL)
+				rtw_os_pkt_complete(padapter, pskb);
+		}
+		_rtw_spinunlock_bh(&txq->txsc_amsdu_lock);
+
+		_rtw_spinlock_free(&txq->txsc_amsdu_lock);
+	}
+
+	/* cancel timer */
+	_cancel_timer_ex(&psta->txsc_amsdu_vo_timer);
+	_cancel_timer_ex(&psta->txsc_amsdu_vi_timer);
+	_cancel_timer_ex(&psta->txsc_amsdu_be_timer);
+	_cancel_timer_ex(&psta->txsc_amsdu_bk_timer);
+}
+
+static void txsc_amsdu_set_timer(struct sta_info *psta, u8 ac)
+{
+	_timer *txsc_amsdu_timer = NULL;
+
+	switch (ac) {
+	case 0:
+		txsc_amsdu_timer = &psta->txsc_amsdu_vo_timer;
+		break;
+
+	case 1:
+		txsc_amsdu_timer = &psta->txsc_amsdu_vi_timer;
+		break;
+
+	case 2:
+		txsc_amsdu_timer = &psta->txsc_amsdu_be_timer;
+		break;
+
+	case 3:
+		txsc_amsdu_timer = &psta->txsc_amsdu_bk_timer;
+		break;
+
+	default:
+		txsc_amsdu_timer = &psta->txsc_amsdu_be_timer;
+		break;
+	}
+
+	_set_timer(txsc_amsdu_timer, 1);
+}
+
+static u8 txsc_amsdu_get_timer_status(struct sta_info *psta, u8 ac)
+{
+	u8 status = TXSC_AMSDU_TIMER_UNSET;
+
+	switch (ac) {
+	case 0:
+		status = psta->txsc_amsdu_vo_timeout_sts;
+		break;
+
+	case 1:
+		status = psta->txsc_amsdu_vi_timeout_sts;
+		break;
+
+	case 2:
+		status = psta->txsc_amsdu_be_timeout_sts;
+		break;
+
+	case 3:
+		status = psta->txsc_amsdu_bk_timeout_sts;
+		break;
+
+	default:
+		status = psta->txsc_amsdu_be_timeout_sts;
+		break;
+	}
+
+	return status;
+}
+
+static void txsc_amsdu_set_timer_status(struct sta_info *psta, u8 ac, u8 status)
+{
+	switch (ac) {
+	case 0:
+		psta->txsc_amsdu_vo_timeout_sts = status;
+		break;
+
+	case 1:
+		psta->txsc_amsdu_vi_timeout_sts = status;
+		break;
+
+	case 2:
+		psta->txsc_amsdu_be_timeout_sts = status;
+		break;
+
+	case 3:
+		psta->txsc_amsdu_bk_timeout_sts = status;
+		break;
+
+	default:
+		psta->txsc_amsdu_be_timeout_sts = status;
+		break;
+	}
+}
+
+static u8 _up_to_qid(u8 up)
+{
+	u8 ac = 0;
+
+	switch (up) {
+
+	case 1:
+	case 2:
+		ac = 3;/* bk */
+		break;
+
+	case 4:
+	case 5:
+		ac = 1;/* vi */
+		break;
+
+	case 6:
+	case 7:
+		ac = 0;/* vo */
+		break;
+
+	case 0:
+	case 3:
+	default:
+		ac = 2;/* be */
+		break;
+	}
+
+	return ac;
+}
+
+static u8 txsc_amsdu_dequeue(_adapter *padapter, struct txsc_pkt_entry *txsc_pkt)
+{
+	struct xmit_priv *pxmitpriv = &padapter->xmitpriv;
+	struct sta_info *psta = txsc_pkt->psta;
+	struct txsc_amsdu_swq *txq = NULL;
+	u8 deq_cnt = 0, i, timer_sts, priority = 0;
+	u8 ac = txsc_pkt->ac;
+	u8 amsdu_num = 0;
+
+	txq = &psta->amsdu_txq[ac];
+
+	_rtw_spinlock_bh(&txq->txsc_amsdu_lock);
+
+	if (psta->state & WIFI_SLEEP_STATE) {
+		pxmitpriv->cnt_txsc_amsdu_deq_ps++;
+		goto abort_deq;
+	}
+
+	amsdu_num = psta->txsc_amsdu_num;
+	if (amsdu_num == 0)
+		amsdu_num = padapter->tx_amsdu;
+
+	/* for amsdu timout */
+	if (txsc_pkt->is_amsdu_timeout && txq->cnt < amsdu_num)
+		amsdu_num = txq->cnt;
+
+	for (i = 0; i < amsdu_num; i++) {
+		if (txq->skb_q[txq->rptr] == NULL) {
+			/* RTW_ERR("txsc_amsdu_dequeue: deq but skb = NULL\n"); */
+			break;
+		}
+
+			txsc_pkt->xmit_skb[i] = txq->skb_q[txq->rptr];
+			txq->skb_q[txq->rptr] = NULL;
+			txq->rptr = (txq->rptr + 1) % MAX_AMSDU_ENQ_NUM;
+			txq->cnt--;
+
+			deq_cnt++;
+		}
+
+	/* update priority when timeout */
+	if (txsc_pkt->is_amsdu_timeout && deq_cnt > 0) {
+			priority = *(txsc_pkt->xmit_skb[0]->data + ETH_HLEN + 1);
+			txsc_pkt->priority = tos_to_up(priority);
+		}
+
+abort_deq:
+
+	timer_sts = txsc_amsdu_get_timer_status(psta, ac);
+	if (txq->cnt > 0 && timer_sts != TXSC_AMSDU_TIMER_SETTING) {
+		txsc_amsdu_set_timer(psta, ac);
+		txsc_amsdu_set_timer_status(psta, ac, TXSC_AMSDU_TIMER_SETTING);
+	}
+
+	pxmitpriv->cnt_txsc_amsdu_deq[ac] += deq_cnt;
+
+	txsc_pkt->skb_cnt = deq_cnt;
+
+	_rtw_spinunlock_bh(&txq->txsc_amsdu_lock);
+
+	return deq_cnt;
+}
+
+u8 txsc_amsdu_enqueue(_adapter *padapter, struct txsc_pkt_entry *txsc_pkt, u8 *status)
+{
+	struct xmit_priv *pxmitpriv = &padapter->xmitpriv;
+	struct sta_info *psta = txsc_pkt->psta;
+	struct sk_buff *pskb = txsc_pkt->xmit_skb[0];
+	struct txsc_amsdu_swq *txq = NULL;
+	u8 i, ac = 0, res = _SUCCESS, timer_sts;
+	u8 amsdu_num = 0;
+
+	if (!pxmitpriv->txsc_amsdu_enable || !pskb || !psta)
+		return _FAIL;
+
+	if (txsc_pkt->step != TXSC_AMSDU_APPLY)
+		return _FAIL;
+
+	/* get tx amsdu swq */
+	ac = _up_to_qid(txsc_pkt->priority);
+	txq = &psta->amsdu_txq[ac];
+	txsc_pkt->ac = ac;
+
+	amsdu_num = psta->txsc_amsdu_num;
+	if (amsdu_num == 0)
+		amsdu_num = padapter->tx_amsdu;
+
+	_rtw_spinlock_bh(&txq->txsc_amsdu_lock);
+
+	if (txq->cnt < MAX_AMSDU_ENQ_NUM) {
+		txq->skb_q[txq->wptr] = pskb;
+		txq->wptr = (txq->wptr + 1) % MAX_AMSDU_ENQ_NUM;
+		txq->cnt++;
+
+		pxmitpriv->cnt_txsc_amsdu_enq[ac]++;
+
+		txsc_pkt->xmit_skb[0] = NULL;
+
+		/* if sta in ps mode, keep queuing and nit deq */
+		if (txq->cnt < amsdu_num || (psta->state & WIFI_SLEEP_STATE)){
+			*status = TXSC_AMSDU_ENQ_SUCCESS;
+			if (psta->state & WIFI_SLEEP_STATE)
+				pxmitpriv->cnt_txsc_amsdu_enq_ps++;
+		}
+	} else {
+		pxmitpriv->cnt_txsc_amsdu_enq_abort[ac]++;
+		*status = TXSC_AMSDU_ENQ_ABORT;
+		txsc_pkt->amsdu = false;
+	}
+
+	/* set amsdu timer */
+	timer_sts = txsc_amsdu_get_timer_status(psta, ac);
+	if (txq->cnt > 0 && timer_sts != TXSC_AMSDU_TIMER_SETTING) {
+		txsc_amsdu_set_timer(psta, ac);
+		txsc_amsdu_set_timer_status(psta, ac, TXSC_AMSDU_TIMER_SETTING);
+	}
+
+	_rtw_spinunlock_bh(&txq->txsc_amsdu_lock);
+
+abort:
+	return _SUCCESS;
+}
+
+static void txsc_amsdu_timeout_init_pkt_entry(_adapter *padapter, struct txsc_pkt_entry *txsc_pkt, struct sta_info *psta, u8 ac)
+{
+	u8 i = 0;
+
+	txsc_pkt->step = TXSC_NONE;
+	txsc_pkt->txsc_id = 0xff;
+	txsc_pkt->ptxreq = NULL;
+
+	for (i = 0; i < MAX_TXSC_SKB_NUM; i++)
+		txsc_pkt->xmit_skb[i] = NULL;
+
+	txsc_pkt->psta = psta;
+	txsc_pkt->skb_cnt = 0;/* this is for amsdu timeout */
+
+	txsc_pkt->amsdu = false;
+	txsc_pkt->ac = ac;
+	txsc_pkt->is_amsdu_timeout = true;
+}
+
+static void ieee8023_header_to_rfc1042(struct sk_buff *skb, bool add_pad)
+{
+	void *data;
+	int pad;
+	__be16 len;
+	const int headroom = SNAP_SIZE + 2;
+
+	if (!skb)
+		return;
+
+	if (skb_headroom(skb) < headroom) {
+		RTW_WARN("%s: headroom=%d isn't enough\n", __func__, skb_headroom(skb));
+		if (pskb_expand_head(skb, headroom, 0, GFP_ATOMIC)) {
+			RTW_ERR("%s: no headroom=%d for skb\n",
+				__func__, headroom);
+			return;
+		}
+	}
+
+	data = skb_push(skb, SNAP_SIZE + 2);
+	memmove(data, data + SNAP_SIZE + 2, 2 * ETH_ALEN);
+
+	data += 2 * ETH_ALEN;
+	len = cpu_to_be16(skb->len - 2 * ETH_ALEN - 2);
+	memcpy(data, &len, 2);
+	memcpy(data + 2, rtw_rfc1042_header, SNAP_SIZE);
+
+	if (add_pad && (skb->len & (4 - 1))) {
+		pad = 4 - (skb->len & (4 - 1));
+		if (skb_tailroom(skb) < pad) {
+			RTW_ERR("%s: no tailroom=%d for skb\n",
+				__func__, pad);
+			return;
+		}
+		rtw_skb_put_zero(skb, pad);
+	}
+}
+
+void txsc_amsdu_sta_init(_adapter *padapter, struct sta_info* psta)
+{
+	if (psta->hepriv.he_option == _TRUE || psta->vhtpriv.vht_option == _TRUE)
+		psta->txsc_amsdu_max = psta->txsc_amsdu_num = padapter->tx_amsdu;
+	else if (psta->htpriv.ht_option == _TRUE)
+		psta->txsc_amsdu_max = psta->txsc_amsdu_num = 2; /* Max amsdu num in N mode is 2 */
+	else
+		psta->txsc_amsdu_max = 0; /* disable tx amsdu */
+}
+#endif /* CONFIG_TXSC_AMSDU */
+
 void txsc_init(_adapter *padapter)
 {
 	struct xmit_priv *pxmitpriv = &padapter->xmitpriv;
 
 	pxmitpriv->txsc_enable = 1; /* default TXSC on */
-	pxmitpriv->txsc_debug_mode = 0;
-	pxmitpriv->txsc_debug_mask = 0x3;
+
+#ifdef CONFIG_TXSC_AMSDU
+	pxmitpriv->txsc_amsdu_enable = 1; /* default SW amsdu on */
+	//pxmitpriv->txsc_amsdu_force_num = padapter->tx_amsdu; /* default force to max amsdu num */
+	padapter->tx_amsdu = 2;
+#endif
 }
 
 void txsc_clear(_adapter *padapter)
@@ -146,8 +476,8 @@ void txsc_clear(_adapter *padapter)
 	struct sta_priv	*pstapriv = &padapter->stapriv;
 	struct xmit_priv *pxmitpriv = &padapter->xmitpriv;
 	struct sta_info *psta = NULL;
-	int i;
-	u8 tmp = 0;
+	int i, tmp = 0;
+	_list	*plist, *phead;
 
 	RTW_PRINT("[TXSC] clear txsc entry\n");
 
@@ -160,20 +490,27 @@ void txsc_clear(_adapter *padapter)
 
 	pxmitpriv->ptxsc_sta_cached = NULL;
 
-	for (i = 0; i < pstapriv->max_num_sta; i++) {
-		psta = pstapriv->sta_aid[i];
+	for (i = 0; i < NUM_STA; i++) {
+		phead = &(pstapriv->sta_hash[i]);
+		plist = get_next(phead);
 
-		if (!psta)
-			continue;
+		while ((rtw_end_of_queue_search(phead, plist)) == _FALSE) {
+			psta = LIST_CONTAINOR(plist, struct sta_info, hash_list);
 
-		psta->txsc_cache_num = 0;
-		psta->txsc_cur_idx = 0;
-		psta->txsc_cache_idx = 0;
-		psta->txsc_cache_hit = 0;
-		psta->txsc_cache_miss = 0;
-		psta->txsc_path_slow = 0;
-		_rtw_memset(psta->txsc_entry_cache, 0x0, sizeof(struct txsc_entry) * CORE_TXSC_ENTRY_NUM);
+			plist = get_next(plist);
 
+			psta->txsc_cache_num = 0;
+			psta->txsc_cur_idx = 0;
+			psta->txsc_cache_idx = 0;
+			psta->txsc_cache_hit = 0;
+			#ifdef CONFIG_TXSC_AMSDU
+			psta->txsc_amsdu_hit = 0;
+			#endif
+			psta->txsc_cache_miss = 0;
+			psta->txsc_path_slow = 0;
+			_rtw_memset(psta->txsc_entry_cache, 0x0, sizeof(struct txsc_entry) * CORE_TXSC_ENTRY_NUM);
+
+		}
 	}
 
 	pxmitpriv->txsc_enable = tmp;
@@ -181,42 +518,50 @@ void txsc_clear(_adapter *padapter)
 	_rtw_spinunlock_bh(&pxmitpriv->txsc_lock);
 }
 
-void txsc_dump(_adapter *padapter)
+void txsc_dump(_adapter *padapter, void *m)
 {
 	struct sta_priv	*pstapriv = &padapter->stapriv;
 	struct xmit_priv *pxmitpriv = &padapter->xmitpriv;
 	struct sta_info *psta = NULL;
 	int i, j;
+	_list	*plist, *phead;
 
-	RTW_PRINT("[txsc][core] (txsc,enable) txsc_enable:%x\n", pxmitpriv->txsc_enable);
-	RTW_PRINT("[txsc][core] (txsc,debug) txsc_debug_mode:%x\n", pxmitpriv->txsc_debug_mode);
+	RTW_PRINT_SEL(m, "[txsc][core] (txsc,enable) txsc_enable:%d\n", pxmitpriv->txsc_enable);
 
-	RTW_PRINT("[txsc][core] txsc_phl_err_cnt1:%d\n", pxmitpriv->txsc_phl_err_cnt1);
-	RTW_PRINT("[txsc][core] txsc_phl_err_cnt2:%d\n", pxmitpriv->txsc_phl_err_cnt2);
-	RTW_PRINT("\n");
-	for (i = 0; i < pstapriv->max_num_sta; i++) {
-		psta = pstapriv->sta_aid[i];
-		if (!psta)
-			continue;
+	RTW_PRINT_SEL(m, "\n");
+	for (i = 0; i < NUM_STA; i++) {
+		phead = &(pstapriv->sta_hash[i]);
+		plist = get_next(phead);
 
-		RTW_PRINT("[%d] STA[%02x:%02x:%02x:%02x:%02x:%02x]\n", i,
-			psta->phl_sta->mac_addr[0], psta->phl_sta->mac_addr[1], psta->phl_sta->mac_addr[2],
-			psta->phl_sta->mac_addr[3], psta->phl_sta->mac_addr[4], psta->phl_sta->mac_addr[5]);
-		RTW_PRINT("[txsc] cur_idx:%d\n", psta->txsc_cur_idx);
-		RTW_PRINT("[txsc][core] txsc_path_slow:%d\n", psta->txsc_path_slow);
-		RTW_PRINT("[txsc][core] txsc_path_ps:%d\n", psta->txsc_path_ps);
-		RTW_PRINT("[txsc][core] txsc_cache_hit:%d\n", psta->txsc_cache_hit);
-		RTW_PRINT("[txsc][core] txsc_cache_miss:%d\n", psta->txsc_cache_miss);
-		RTW_PRINT("\n");
-		for (j = 0 ; j < CORE_TXSC_ENTRY_NUM; j++) {
-			if (!psta->txsc_entry_cache[j].txsc_is_used)
-				continue;
+		while ((rtw_end_of_queue_search(phead, plist)) == _FALSE) {
+			psta = LIST_CONTAINOR(plist, struct sta_info, hash_list);
 
-			RTW_PRINT(" [%d][txsc][core] txsc_core_hit:%d\n", j, psta->txsc_entry_cache[j].txsc_cache_hit);
-			#ifdef CONFIG_PHL_TXSC
-			RTW_PRINT(" [%d][txsc][phl]  txsc_phl_hit:%d\n", j, psta->phl_sta->phl_txsc[j].txsc_cache_hit);
+			plist = get_next(plist);
+
+			RTW_PRINT_SEL(m, "[%d] STA[%02x:%02x:%02x:%02x:%02x:%02x]\n", i,
+				psta->phl_sta->mac_addr[0], psta->phl_sta->mac_addr[1], psta->phl_sta->mac_addr[2],
+				psta->phl_sta->mac_addr[3], psta->phl_sta->mac_addr[4], psta->phl_sta->mac_addr[5]);
+			RTW_PRINT_SEL(m, "[txsc] cur_idx:%d\n", psta->txsc_cur_idx);
+			RTW_PRINT_SEL(m, "[txsc][core] txsc_path_slow:%d\n", psta->txsc_path_slow);
+			RTW_PRINT_SEL(m, "[txsc][core] txsc_path_ps:%d\n", psta->txsc_path_ps);
+			RTW_PRINT_SEL(m, "[txsc][core] txsc_cache_hit:%d\n", psta->txsc_cache_hit);
+			#ifdef CONFIG_TXSC_AMSDU
+			RTW_PRINT_SEL(m, "[txsc][core] txsc_amsdu_hit:%d\n", psta->txsc_amsdu_hit);
 			#endif
-			RTW_PRINT("\n");
+			RTW_PRINT_SEL(m, "[txsc][core] txsc_cache_miss:%d\n", psta->txsc_cache_miss);
+			RTW_PRINT_SEL(m, "\n");
+			for (j = 0 ; j < CORE_TXSC_ENTRY_NUM; j++) {
+				if (!psta->txsc_entry_cache[j].txsc_is_used)
+					continue;
+				RTW_PRINT_SEL(m, " [%d][txsc][core] txsc_core_hit:%d\n", j, psta->txsc_entry_cache[j].txsc_cache_hit);
+				#ifdef CONFIG_PHL_TXSC
+				RTW_PRINT_SEL(m, " [%d][txsc][phl] txsc_phl_hit:%d\n", j, psta->phl_sta->phl_txsc[j].txsc_cache_hit);
+				#endif
+				#ifdef CONFIG_TXSC_AMSDU
+				RTW_PRINT_SEL(m, " [%d][txsc] txsc_amsdu:%d\n", j, psta->txsc_entry_cache[j].txsc_amsdu);
+				#endif
+				RTW_PRINT_SEL(m, "\n");
+			}
 		}
 	}
 }
@@ -289,6 +634,12 @@ static void txsc_init_pkt_entry(_adapter *padapter, struct sk_buff *pskb, struct
 	txsc_pkt->xmit_skb[0] = pskb;
 	txsc_pkt->skb_cnt = 1;
 
+#ifdef CONFIG_TXSC_AMSDU
+	txsc_pkt->amsdu = false;
+	txsc_pkt->ac = 2; /* default be */
+	txsc_pkt->is_amsdu_timeout = false;
+#endif
+
 	priority = *(pskb->data + ETH_HLEN + 1);
 	txsc_pkt->priority = tos_to_up(priority);
 }
@@ -341,9 +692,17 @@ static u8 txsc_get_sc_entry(_adapter *padapter, struct sk_buff *pskb, struct txs
 
 	res = _FAIL;
 	offset = 6;
+	txsc_pkt->is_sta_sleep = 0;
 
 	if (!pxmitpriv->txsc_enable)
 		return res;
+
+#ifdef CONFIG_TXSC_AMSDU
+	if (txsc_pkt->is_amsdu_timeout) {
+		psta = txsc_pkt->psta;
+		goto get_txsc_entry;
+	}
+#endif
 
 	if (pxmitpriv->ptxsc_sta_cached) {
 		if (pxmitpriv->ptxsc_sta_cached->phl_sta)
@@ -368,19 +727,29 @@ static u8 txsc_get_sc_entry(_adapter *padapter, struct sk_buff *pskb, struct txs
 		}
 	}
 
-	if (!psta) {
-		res = _FAIL;
+	if (check_fwstate(pmlmepriv, WIFI_STATION_STATE) && IS_MCAST(pskb->data)) {
+		txsc_pkt->step = TXSC_SKIP;
 		goto exit;
 	}
+	if (!psta) {
+		res = _FAIL;
+		//RTW_INFO("%s get sta fail\n", __func__);
+		goto exit;
+	}
+
+#ifdef CONFIG_TXSC_AMSDU
+get_txsc_entry:
+#endif
 
 	/* skip power saving mode */
 	if (psta->state & WIFI_SLEEP_STATE) {
 		res = _FAIL;
+		txsc_pkt->is_sta_sleep = 1;
 		txsc_pkt->step = TXSC_SKIP;
 		psta->txsc_path_ps++;
+		RTW_INFO("sta sleep state, goto exit\n");
 		goto exit;
 	}
-
 
 	if (psta->txsc_cache_num == 0) {
 		res = _FAIL;
@@ -395,10 +764,17 @@ static u8 txsc_get_sc_entry(_adapter *padapter, struct sk_buff *pskb, struct txs
 	if (res2 &&
 		(pskb->len <= psta->txsc_entry_cache[psta->txsc_cache_idx].txsc_frag_len)) {
 
-		txsc_pkt->step = TXSC_APPLY;
+#ifdef CONFIG_TXSC_AMSDU
+		if (pxmitpriv->txsc_amsdu_enable &&
+			psta->txsc_entry_cache[psta->txsc_cache_idx].txsc_amsdu &&
+			(psta->txsc_amsdu_num || txsc_pkt->is_amsdu_timeout))
+			txsc_pkt->step = TXSC_AMSDU_APPLY;
+		else
+#endif
+			txsc_pkt->step = TXSC_APPLY;
+
 		txsc_pkt->psta = psta;
 		txsc_pkt->txsc_id = psta->txsc_cache_idx;
-
 		res = _SUCCESS;
 	} else {
 
@@ -408,8 +784,15 @@ static u8 txsc_get_sc_entry(_adapter *padapter, struct sk_buff *pskb, struct txs
 				ptxsc_ethdr = (u8 *)&(psta->txsc_entry_cache[i].txsc_ethdr);
 				if (_rtw_memcmp((pskb->data + offset), (ptxsc_ethdr + offset), (ETH_HLEN - offset)) &&
 					(pskb->len <= psta->txsc_entry_cache[i].txsc_frag_len)) {
+#ifdef CONFIG_TXSC_AMSDU
+					if (pxmitpriv->txsc_amsdu_enable &&
+						psta->txsc_entry_cache[i].txsc_amsdu &&
+						(psta->txsc_amsdu_num || txsc_pkt->is_amsdu_timeout))
+						txsc_pkt->step = TXSC_AMSDU_APPLY;
+					else
+#endif
+						txsc_pkt->step = TXSC_APPLY;
 
-					txsc_pkt->step = TXSC_APPLY;
 					txsc_pkt->txsc_id = i;
 					txsc_pkt->psta = psta;
 					psta->txsc_cache_idx = i;
@@ -421,9 +804,22 @@ static u8 txsc_get_sc_entry(_adapter *padapter, struct sk_buff *pskb, struct txs
 		}
 	}
 
-	if ((res == _SUCCESS) && (pxmitpriv->txsc_debug_mode == 1)) {
-		txsc_pkt->step = TXSC_DEBUG;
-		res = _FAIL;
+#ifdef CONFIG_TXSC_AMSDU
+	if (txsc_pkt->step == TXSC_AMSDU_APPLY)
+		txsc_pkt->amsdu = true;
+	else
+		txsc_pkt->amsdu = false;
+#endif
+
+	/* skip power saving mode */
+	if (res == _SUCCESS && (psta->state & WIFI_SLEEP_STATE)) {
+	#ifdef CONFIG_TXSC_AMSDU
+		if (!txsc_pkt->amsdu) {
+			res = _FAIL;
+			txsc_pkt->step = TXSC_SKIP;
+		}
+	#endif
+		psta->txsc_path_ps++;
 	}
 
 exit:
@@ -498,8 +894,10 @@ static void txsc_prepare_sc_entry(_adapter *padapter, struct xmit_frame *pxframe
 	/* pkt_list[0] */
 	ptxsc_pkt_list0->vir_addr = ptxsc_wlhdr;
 	ptxsc_pkt_list0->length = pkt_list->length;
+	#ifdef USE_ONE_WLHDR
 	#ifdef CONFIG_PCI_HCI
 	txsc_fill_txreq_phyaddr(padapter, ptxsc_pkt_list0);
+	#endif
 	#endif
 
 	/* META DATA */
@@ -524,15 +922,18 @@ static void txsc_prepare_sc_entry(_adapter *padapter, struct xmit_frame *pxframe
 	txreq->shortcut_id = idx;
 	psta->txsc_entry_cache[idx].txsc_phl_id = idx;
 
-	/* disable phl txsc  */
-	if (!(pxmitpriv->txsc_debug_mask&BIT1))
-		txreq->shortcut_id = 0;
-
 	RTW_PRINT("[CORE_TXSC][ADD] core_txsc_idx:%d(cur_idx:%d), txreq_sc_id:%d, txsc_frag_len:%d\n",
 		idx, psta->txsc_cur_idx, txreq->shortcut_id, psta->txsc_entry_cache[idx].txsc_frag_len);
 
+#ifdef CONFIG_TXSC_AMSDU
+	if (pxmitpriv->txsc_amsdu_enable && pxframe->attrib.amsdu_ampdu_en)
+		psta->txsc_entry_cache[idx].txsc_amsdu = true;
+	else
+		psta->txsc_entry_cache[idx].txsc_amsdu = false;
+#endif
+
 	/* for debug */
-	_print_txreq_mdata(ptxsc_mdata, __func__);
+	dbg_dump_txreq_mdata(ptxsc_mdata, __func__);
 
 	_rtw_spinunlock_bh(&pxmitpriv->txsc_lock);
 }
@@ -547,6 +948,53 @@ void txsc_add_sc_cache_entry(_adapter *padapter, struct xmit_frame *pxframe, str
 {
 	txsc_add_sc_check(padapter, pxframe, txsc_pkt);
 	txsc_prepare_sc_entry(padapter, pxframe, txsc_pkt);
+}
+
+static void _txsc_update_sec_iv(_adapter *padapter, struct sta_info *psta, struct rtw_xmit_req *txreq)
+{
+	if (!psta)
+		return;
+
+	//RTW_INFO("%s sec_type = %d\n\n", __func__, txreq->mdata.sec_type);
+	switch (txreq->mdata.sec_type) {
+	case RTW_ENC_WEP40:
+	case RTW_ENC_WEP104:
+		WEP_IV(psta->iv, psta->dot11txpn, psta->key_idx);
+		break;
+
+	case RTW_ENC_TKIP:
+		TKIP_IV(psta->iv, psta->dot11txpn, 0);
+		break;
+
+	case RTW_ENC_CCMP:
+		AES_IV(psta->iv, psta->dot11txpn, 0);
+		//RTW_INFO("AES IV \n");
+		break;
+
+	case RTW_ENC_GCMP:
+	case RTW_ENC_GCMP256:
+		GCMP_IV(psta->iv, psta->dot11txpn, 0);
+
+		break;
+
+	case RTW_ENC_CCMP256:
+		GCMP_IV(psta->iv, psta->dot11txpn, 0);
+
+		break;
+
+/*
+#ifdef CONFIG_WAPI_SUPPORT
+	case _SMS4_:
+		rtw_wapi_get_iv(padapter, pattrib->ra, pattrib->iv);
+		break;
+#endif
+*/
+	default:
+		break;
+	}
+
+	return;
+
 }
 
 u8 txsc_apply_sc_cached_entry(_adapter *padapter, struct txsc_pkt_entry *txsc_pkt)
@@ -565,6 +1013,8 @@ u8 txsc_apply_sc_cached_entry(_adapter *padapter, struct txsc_pkt_entry *txsc_pk
 	int wlhdr_copy_len, payload_offset = ETH_HLEN;
 	u8 idx, priority = 0, res = _SUCCESS;
 	u8 i, skb_cnt = 0, is_hdr_need_update = 0, txsc_wlhdr_len;
+	u32 tail_sz, wlan_tail;
+	u8 *tail, iv, offset;
 	#ifndef USE_ONE_WLHDR
 	u8 *head, *ptxsc_wlhdr;
 	#endif
@@ -573,8 +1023,7 @@ u8 txsc_apply_sc_cached_entry(_adapter *padapter, struct txsc_pkt_entry *txsc_pk
 		return _SUCCESS;
 
 	if (txsc_pkt->step != TXSC_APPLY &&
-		txsc_pkt->step != TXSC_AMSDU_APPLY &&
-		txsc_pkt->step != TXSC_DEBUG)
+		txsc_pkt->step != TXSC_AMSDU_APPLY)
 		return _SUCCESS;
 
 	_rtw_memset(xmit_skb, 0x0, sizeof(xmit_skb));
@@ -592,21 +1041,15 @@ u8 txsc_apply_sc_cached_entry(_adapter *padapter, struct txsc_pkt_entry *txsc_pk
 	txsc_wlhdr_len = txsc->txsc_wlhdr_len;
 	#endif
 
-	if (txsc_pkt->step == TXSC_DEBUG) {
-		_rtw_memset(psta->debug_buf, 0x0, (sizeof(struct rtw_xmit_req)+sizeof(struct rtw_pkt_buf_list)*2));
-		txreq = (struct rtw_xmit_req *)psta->debug_buf;
-		pkt_list = (struct rtw_pkt_buf_list *)psta->debug_buf + sizeof(struct rtw_xmit_req);
-	} else {
-		#ifdef USE_ONE_WLHDR
-		txreq_buf = (struct xmit_txreq_buf *)get_txreq_buffer(padapter, (u8 **)&txreq, (u8 **)&pkt_list, NULL, NULL);
-		#else
-		txreq_buf = (struct xmit_txreq_buf *)get_txreq_buffer(padapter, (u8 **)&txreq, (u8 **)&pkt_list, (u8 **)&head, NULL);
-		#endif
+	#ifdef USE_ONE_WLHDR
+	txreq_buf = (struct xmit_txreq_buf *)get_txreq_buffer(padapter, (u8 **)&txreq, (u8 **)&pkt_list, NULL, NULL);
+	#else
+	txreq_buf = (struct xmit_txreq_buf *)get_txreq_buffer(padapter, (u8 **)&txreq, (u8 **)&pkt_list, (u8 **)&head, NULL);
+	#endif
 
-		if (txreq_buf == NULL) {
-			res = _FAIL;
-			goto exit;
-		}
+	if (txreq_buf == NULL) {
+		res = _FAIL;
+		goto exit;
 	}
 
 	/* init txreq buf */
@@ -621,6 +1064,30 @@ u8 txsc_apply_sc_cached_entry(_adapter *padapter, struct txsc_pkt_entry *txsc_pk
 	/* fill txsc pkt entry */
 	txsc_pkt->ptxreq = txreq;
 
+#ifdef CONFIG_TXSC_AMSDU
+	if (txsc_pkt->amsdu) {
+		payload_offset = 0;
+
+		/* if amsdu timeout, it is deq already */
+		if (txsc_pkt->is_amsdu_timeout)
+			skb_cnt = txsc_pkt->skb_cnt;
+		else
+			skb_cnt = txsc_amsdu_dequeue(padapter, txsc_pkt);
+
+		if (skb_cnt > 0) {
+			for (i = 0; i < skb_cnt; i++) {
+				xmit_skb[i] = txsc_pkt->xmit_skb[i];
+				ieee8023_header_to_rfc1042(xmit_skb[i], ((i + 1) == skb_cnt) ? false : true);
+			}
+			pxmitpriv->cnt_txsc_amsdu_dump[skb_cnt]++;
+		} else {
+			pxmitpriv->cnt_txsc_amsdu_dump[skb_cnt]++;
+			pxmitpriv->cnt_txsc_amsdu_deq_empty++;
+			res = _FAIL;
+			goto exit;
+		}
+	} else
+#endif
 	{
 		/* for no tx_amsdu case */
 		xmit_skb[0] = txsc_pkt->xmit_skb[0];
@@ -629,6 +1096,12 @@ u8 txsc_apply_sc_cached_entry(_adapter *padapter, struct txsc_pkt_entry *txsc_pk
 
 	if (skb_cnt == 0)
 		RTW_PRINT("[ERR][%s:%d] skb_cnt = 0 is a fatel error, plz check\n", __func__, __LINE__);
+
+#ifdef CONFIG_TXSC_AMSDU
+	/*for avoid amsdu exchange */
+	if (!pxmitpriv->txsc_amsdu_enable)
+		txsc->txsc_amsdu = false;
+#endif
 
 	/* fill_txreq_mdata */
 	_rtw_memcpy(&txreq->mdata, mdata, sizeof(txreq->mdata));
@@ -652,10 +1125,46 @@ u8 txsc_apply_sc_cached_entry(_adapter *padapter, struct txsc_pkt_entry *txsc_pk
 		hdr = txsc->txsc_wlhdr;
 		SetSeqNum(hdr, txreq->mdata.sw_seq);
 
+		#ifdef CONFIG_TXSC_AMSDU
+			qc = (u16 *)(hdr + WLAN_HDR_A3_LEN);/* set amsdu bit */
+			if (txsc_pkt->amsdu && txsc->txsc_amsdu)
+			SetAMsdu(qc, 1);
+			else
+				SetAMsdu(qc, 0);
+		#endif
+
 		is_hdr_need_update = 1;
 	}
 
-	wlhdr_copy_len = txsc_wlhdr_len;
+	#ifdef CONFIG_TXSC_AMSDU
+	if (txsc_pkt->amsdu && txsc->txsc_amsdu)
+		wlhdr_copy_len = (txsc_wlhdr_len - (SNAP_SIZE + sizeof(u16)));
+	else
+	#endif
+		wlhdr_copy_len = txsc_wlhdr_len;
+
+	if (txreq->mdata.sec_hw_enc) {
+		if (padapter->dvobj->phl_com->dev_cap.sec_cap.hw_form_hdr &&
+		    mdata->sec_type != RTW_ENC_WAPI && mdata->hw_sec_iv == 0) {
+			txreq->mdata.sec_keyid = psta->key_idx;
+			/* Fill PN of IV */
+			for (i = 0; i < 6; i++)
+				txreq->mdata.iv[i] = (psta->dot11txpn.val >> 8 * i) & 0xff;
+			_txsc_update_sec_iv(padapter, psta, txreq);
+			RTW_DBG("%s: keyid=%d, iv=" PN_FMT "\n", __func__,
+				txreq->mdata.sec_keyid, PN_ARG(txreq->mdata.iv));
+		}
+		else {
+			//RTW_INFO("%s udpate iv, psta->iv_len : %d, psta->dot11txpn : %d\n", __func__, psta->iv_len, psta->dot11txpn);
+			//RTW_PRINT_DUMP("[before upadte iv]", ptxsc_wlhdr, wlhdr_copy_len);
+			_txsc_update_sec_iv(padapter, psta, txreq);
+			offset = wlhdr_copy_len - psta->iv_len  - RTW_SZ_LLC;
+			_rtw_memcpy((hdr + offset), psta->iv, psta->iv_len);
+			//RTW_INFO("%s offset : %d\n", __func__, offset);
+			//RTW_PRINT_DUMP("[IV]", psta->iv, psta->iv_len);
+			//RTW_PRINT_DUMP("[after upadte iv]", pkt_list0->vir_addr, wlhdr_copy_len);
+		}
+	}
 
 	/* WLAN header from cache */
 	#ifdef USE_ONE_WLHDR
@@ -663,8 +1172,22 @@ u8 txsc_apply_sc_cached_entry(_adapter *padapter, struct txsc_pkt_entry *txsc_pk
 	#else
 	#ifdef USE_PREV_WLHDR_BUF
 	if (txreq_buf->macid == txreq->mdata.macid && txreq_buf->txsc_id == idx) {
-		if (is_hdr_need_update)
+		if (is_hdr_need_update) {
 			SetSeqNum(head, txreq->mdata.sw_seq);/* set sw seq */
+			if (padapter->dvobj->phl_com->dev_cap.sec_cap.hw_form_hdr &&
+			    mdata->sec_type != RTW_ENC_WAPI && mdata->hw_sec_iv == 0)
+				; /* do nothing if hw_form_hdr */
+			else
+				_rtw_memcpy((head + offset), psta->iv, psta->iv_len);
+
+			#ifdef CONFIG_TXSC_AMSDU
+				qc = (u16 *)(head + WLAN_HDR_A3_LEN);/* set amsdu bit */
+			if (txsc_pkt->amsdu && txsc->txsc_amsdu)
+					SetAMsdu(qc, 1);/* set amsdu bit */
+				else
+					SetAMsdu(qc, 0);
+			#endif
+		}
 	} else
 	#endif /* USE_PREV_WLHDR_BUF */
 	{
@@ -696,6 +1219,7 @@ u8 txsc_apply_sc_cached_entry(_adapter *padapter, struct txsc_pkt_entry *txsc_pk
 
 		txreq->total_len += pkt_list->length;
 		txreq->pkt_cnt++;
+		
 		#ifdef CONFIG_PCI_HCI
 		txsc_fill_txreq_phyaddr(padapter, pkt_list);
 		#endif
@@ -708,7 +1232,14 @@ u8 txsc_apply_sc_cached_entry(_adapter *padapter, struct txsc_pkt_entry *txsc_pk
 	if (txsc_pkt->step == TXSC_APPLY) {
 		psta->txsc_cache_hit++;
 		txsc->txsc_cache_hit++;
-	} else
+	}
+#ifdef CONFIG_TXSC_AMSDU
+	else if (txsc_pkt->step == TXSC_AMSDU_APPLY) {
+		psta->txsc_amsdu_hit++;
+		txsc->txsc_cache_hit++;
+	}
+#endif
+	else
 		psta->txsc_path_slow++;
 	/* SW shortcut --- */
 
@@ -716,11 +1247,17 @@ u8 txsc_apply_sc_cached_entry(_adapter *padapter, struct txsc_pkt_entry *txsc_pk
 	txreq->mdata.pktlen = txreq->total_len;
 	txreq->shortcut_id = psta->txsc_entry_cache[idx].txsc_phl_id;
 
-	if (!(pxmitpriv->txsc_debug_mask&BIT1))
-		txreq->shortcut_id = 0;
-
 	/* send addbareq */
 	txsc_issue_addbareq_cmd(padapter, priority, psta, _TRUE);
+
+	/* fix rate */
+	if (padapter->fix_rate != NO_FIX_RATE) {
+		mdata->userate_sel = 1;
+		mdata->f_rate = GET_FIX_RATE(padapter->fix_rate);
+		mdata->f_gi_ltf = GET_FIX_RATE_SGI(padapter->fix_rate);
+		if (!padapter->data_fb)
+			mdata->dis_data_rate_fb = 1;
+	}
 
 #ifdef RTW_PHL_DBG_CMD
 	/* Update force rate settings so force rate takes effects
@@ -747,7 +1284,7 @@ u8 txsc_apply_sc_cached_entry(_adapter *padapter, struct txsc_pkt_entry *txsc_pk
 #endif /* RTW_PHL_DBG_CMD */
 
 	/* for tx debug */
-	_print_txreq_mdata(&txreq->mdata, __func__);
+	dbg_dump_txreq_mdata(&txreq->mdata, __func__);
 	_print_txreq_pklist(NULL, txsc_pkt->ptxreq, xmit_skb[0], __func__);
 
 exit:
@@ -783,16 +1320,9 @@ void txsc_free_txreq(_adapter *padapter, struct rtw_xmit_req *txreq)
 	queue = &padapter->free_txreq_queue;
 	_rtw_spinlock_bh(&queue->lock);
 
-	rtw_list_delete(&ptxreq_buf->list);
-	rtw_list_insert_tail(&ptxreq_buf->list, get_list_head(queue));
-
 	txreq->os_priv = NULL;
 	txreq->pkt_list = NULL;
 	txreq->treq_type = RTW_PHL_TREQ_TYPE_NORMAL;
-
-	/* this must be protected in  spinlock section */
-	if (ptxreq_buf->pkt_cnt == 0)
-		RTW_PRINT("[ERR][%s:%d] pkt_cnt = 0 is a fatel error, plz check\n", __func__, __LINE__);
 
 	for (i = 0; i < ptxreq_buf->pkt_cnt; i++) {
 		tx_skb = (struct sk_buff *)ptxreq_buf->pkt[i];
@@ -800,13 +1330,17 @@ void txsc_free_txreq(_adapter *padapter, struct rtw_xmit_req *txreq)
 			rtw_os_pkt_complete(padapter, tx_skb);
 		else
 			RTW_DBG("%s:tx recyele: tx_skb=NULL\n", __func__);
-		ptxreq_buf->pkt[i] = NULL;
+		/* ptxreq_buf->pkt[i] = NULL; */
 	}
+
+	rtw_list_delete(&ptxreq_buf->list);
+	rtw_list_insert_tail(&ptxreq_buf->list, get_list_head(queue));
 	padapter->free_txreq_cnt++;
 
 	_rtw_spinunlock_bh(&queue->lock);
 }
 
+#if 0/* tmp mark this debug function */
 void txsc_debug_sc_entry(_adapter *padapter, struct xmit_frame *pxframe, struct txsc_pkt_entry *txsc_pkt)
 {
 	struct xmit_priv *pxmitpriv = &padapter->xmitpriv;
@@ -874,6 +1408,187 @@ void txsc_debug_sc_entry(_adapter *padapter, struct xmit_frame *pxframe, struct 
 	txreq->shortcut_id = 0;
 	txreq->treq_type = RTW_PHL_TREQ_TYPE_NORMAL;
 }
+#endif
+
+#ifdef CONFIG_TXSC_AMSDU
+void txsc_amsdu_clear(_adapter *padapter)
+{
+	struct xmit_priv *pxmitpriv = &padapter->xmitpriv;
+	int i;
+
+	RTW_PRINT("[amsdu] clear amsdu counter\n");
+
+	for (i = 0; i < 4; i++) {
+		pxmitpriv->cnt_txsc_amsdu_enq[i] = 0;
+		pxmitpriv->cnt_txsc_amsdu_enq_abort[i] = 0;
+		pxmitpriv->cnt_txsc_amsdu_deq[i] = 0;
+	}
+	pxmitpriv->cnt_txsc_amsdu_deq_empty = 0;
+	//pxmitpriv->cnt_txsc_amsdu_deq_ampdu = 0;
+	pxmitpriv->cnt_txsc_amsdu_enq_ps = 0;
+	pxmitpriv->cnt_txsc_amsdu_deq_ps = 0;
+	pxmitpriv->cnt_txsc_amsdu_timeout_deq_empty = 0;
+
+	for (i = 0; i < (MAX_TXSC_SKB_NUM + 1); i++) {
+		pxmitpriv->cnt_txsc_amsdu_dump[i] = 0;
+		pxmitpriv->cnt_txsc_amsdu_timeout_dump[i] = 0;
+	}
+	for(i = 0; i < ARRAY_SIZE(pxmitpriv->cnt_txsc_amsdu_timeout_ok); i++) {
+		pxmitpriv->cnt_txsc_amsdu_timeout_ok[i] = 0;
+		pxmitpriv->cnt_txsc_amsdu_timeout_fail[i] = 0;
+	}
+}
+void txsc_amsdu_dump(_adapter *padapter, void *m)
+{
+	struct dvobj_priv *dvobj = adapter_to_dvobj(padapter);
+	//_queue *queue = &dvobj->txsc_amsdu_timeout_queue;
+	struct sta_priv	*pstapriv = &padapter->stapriv;
+	struct xmit_priv *pxmitpriv = &padapter->xmitpriv;
+	struct sta_info *psta = NULL;
+	u8 i, j;
+	_list *plist, *phead;
+
+	RTW_PRINT_SEL(m, "[amsdu] txsc amsdu enable: %d\n", pxmitpriv->txsc_amsdu_enable);
+	//RTW_PRINT_SEL(m, "[amsdu] txsc amsdu mode: %d\n", pxmitpriv->txsc_amsdu_mode);
+	RTW_PRINT_SEL(m, "[amsdu] amsdu num: %d\n", padapter->tx_amsdu);
+	RTW_PRINT_SEL(m, "[amsdu] amsdu rate: %d\n", padapter->tx_amsdu_rate);
+	RTW_PRINT_SEL(m, "[amsdu] txsc_amsdu_force_num: %d\n", pxmitpriv->txsc_amsdu_force_num);
+	RTW_PRINT_SEL(m, "[amsdu] amsdu max num: %d\n", MAX_TXSC_SKB_NUM);
+	RTW_PRINT_SEL(m, "[amsdu] amsdu max queue num: %d\n", MAX_AMSDU_ENQ_NUM);
+
+	RTW_PRINT_SEL(m, "\n");
+	for (i = 0; i < 4; i++) {
+		if (pxmitpriv->cnt_txsc_amsdu_enq[i] != 0 ||
+			pxmitpriv->cnt_txsc_amsdu_deq[i] != 0 ||
+			pxmitpriv->cnt_txsc_amsdu_enq_abort[i] != 0) {
+			RTW_PRINT_SEL(m, "[amsdu] ac[%d] enq/deq/abort: %llu / %llu / %llu\n", i,
+				pxmitpriv->cnt_txsc_amsdu_enq[i],
+				pxmitpriv->cnt_txsc_amsdu_deq[i],
+				pxmitpriv->cnt_txsc_amsdu_enq_abort[i]);
+		}
+	}
+
+	RTW_PRINT_SEL(m, "\n");
+	for (i = 0; i < (MAX_TXSC_SKB_NUM + 1); i++) {
+		if (pxmitpriv->cnt_txsc_amsdu_dump[i] != 0)
+			RTW_PRINT_SEL(m, "[amsdu] pkt_num:%d tx: %llu\n", i, pxmitpriv->cnt_txsc_amsdu_dump[i]);
+	}
+	/*RTW_PRINT_SEL(m, "[amsdu] deq empty/ampdu: %d / %d\n",
+		pxmitpriv->cnt_txsc_amsdu_deq_empty, pxmitpriv->cnt_txsc_amsdu_deq_ampdu);*/
+	RTW_PRINT_SEL(m, "[amsdu] ps enq/deq: %llu / %llu\n",
+		pxmitpriv->cnt_txsc_amsdu_enq_ps, pxmitpriv->cnt_txsc_amsdu_deq_ps);
+
+	RTW_PRINT_SEL(m, "\n");
+	for (i = 0; i < (MAX_TXSC_SKB_NUM + 1); i++) {
+		if (pxmitpriv->cnt_txsc_amsdu_timeout_dump[i] != 0)
+			RTW_PRINT_SEL(m, "[amsdu] pkt_num:%d timout_tx: %llu\n", i, pxmitpriv->cnt_txsc_amsdu_timeout_dump[i]);
+	}
+	RTW_PRINT_SEL(m, "[amsdu] timeout_deq_empty: %llu\n", pxmitpriv->cnt_txsc_amsdu_timeout_deq_empty);
+
+	RTW_PRINT_SEL(m, "\n");
+	for (i = 0; i < ARRAY_SIZE(pxmitpriv->cnt_txsc_amsdu_timeout_ok); i++) {
+		if (pxmitpriv->cnt_txsc_amsdu_timeout_ok[i] != 0 ||
+			pxmitpriv->cnt_txsc_amsdu_timeout_fail[i] != 0)
+			RTW_PRINT_SEL(m, "[amsdu] ac[%d] timeout ok/fail: %llu / %llu\n", i,
+				pxmitpriv->cnt_txsc_amsdu_timeout_ok[i],
+				pxmitpriv->cnt_txsc_amsdu_timeout_fail[i]);
+	}
+
+	RTW_PRINT_SEL(m, "\n");
+	/*RTW_PRINT_SEL(m, "[amsdu] dvobj->txsc_amsdu_timeout_use_hw_timer: %d\n",
+	              dvobj->txsc_amsdu_timeout_use_hw_timer);
+	RTW_PRINT_SEL(m, "[amsdu] dvobj->txsc_amsdu_timeout_queue: empty/cnt: %d / %d\n",
+	              _rtw_queue_empty(queue), queue->qlen);
+	for (j = 0; j < N_TIMEOUT; j++)
+		RTW_PRINT_SEL(m, "[amsdu] dvobj->txsc_amsdu_timeout[%u]: %u\n",
+		              j, dvobj->txsc_amsdu_timeout[j]);*/
+	RTW_PRINT_SEL(m, "\n");
+	for (i = 0; i < NUM_STA; i++) {
+		phead = &(pstapriv->sta_hash[i]);
+		plist = get_next(phead);
+
+		while ((rtw_end_of_queue_search(phead, plist)) == _FALSE) {
+			psta = LIST_CONTAINOR(plist, struct sta_info, hash_list);
+			plist = get_next(plist);
+
+			//if (!psta || (psta == padapter->self_sta))
+			if (!psta)
+				continue;
+
+			RTW_PRINT_SEL(m, "[%d] STA[%pM]->txq[ac]\n", i, psta->phl_sta->mac_addr);
+			/*RTW_PRINT_SEL(m, "	[amsdu] txsc_amsdu_timeout:%u\n",
+			              psta->txsc_amsdu_timeout);*/
+			/* AMSDU_BY_SIZE */
+			RTW_PRINT_SEL(m, "	[amsdu] cap:%d, num:%d, max:%d, size:%d, max_size:%d\n",
+			              psta->phl_sta->asoc_cap.max_amsdu_len,
+			              psta->txsc_amsdu_num,
+			              psta->txsc_amsdu_max,
+			              //psta->txsc_amsdu_size,
+						  0,
+			              //psta->txsc_amsdu_max_size
+						  0);
+			for (j = 0; j < 4; j++) {
+				if (psta->amsdu_txq[j].cnt != 0 ||
+					psta->amsdu_txq[j].rptr !=0 ||
+					psta->amsdu_txq[j].wptr !=0)// ||
+					//psta->amsdu_txq[j].skb_qlen != 0)
+					RTW_PRINT_SEL(m, "	amsdu_txq[%d]: cnt:%d, rptr:%d, wptr:%d, qlen:%d\n",
+					              j,
+					              psta->amsdu_txq[j].cnt,
+					              psta->amsdu_txq[j].rptr,
+					              psta->amsdu_txq[j].wptr,
+					              //psta->amsdu_txq[j].skb_qlen
+								  0);
+			}
+			RTW_PRINT_SEL(m, "\n");
+		}
+	}
+}
+
+s32 txsc_amsdu_timeout_tx(struct sta_info *psta, u8 ac)
+{
+	_adapter *padapter = psta->padapter;
+	struct xmit_priv *pxmitpriv = &padapter->xmitpriv;
+	struct txsc_pkt_entry txsc_pkt;
+	u8 i;
+
+	txsc_amsdu_timeout_init_pkt_entry(padapter, &txsc_pkt, psta, ac);
+
+	txsc_pkt.skb_cnt = txsc_amsdu_dequeue(padapter, &txsc_pkt);
+	if (txsc_pkt.skb_cnt == 0) {
+		pxmitpriv->cnt_txsc_amsdu_timeout_deq_empty++;
+		goto abort_core_tx;
+	}
+
+	if (txsc_get_sc_entry(padapter, txsc_pkt.xmit_skb[0], &txsc_pkt) != _SUCCESS)
+		goto abort_core_tx;
+
+	if (txsc_apply_sc_cached_entry(padapter, &txsc_pkt) == _FAIL)
+		goto abort_core_tx;
+
+	if (core_tx_call_phl(padapter, NULL, &txsc_pkt) == FAIL)
+		goto abort_core_tx;
+
+	pxmitpriv->cnt_txsc_amsdu_timeout_ok[ac]++;
+
+	return SUCCESS;
+
+abort_core_tx:
+
+	if (txsc_pkt.ptxreq)
+		txsc_free_txreq(padapter, txsc_pkt.ptxreq);
+	else {
+		for (i = 0; i < txsc_pkt.skb_cnt; i++) {
+			if (txsc_pkt.xmit_skb[i])
+				rtw_os_pkt_complete(padapter, txsc_pkt.xmit_skb[i]);
+		}
+	}
+
+	pxmitpriv->cnt_txsc_amsdu_timeout_fail[ac]++;
+
+	return FAIL;
+}
+#endif
 
 #ifdef CONFIG_80211N_HT
 static u8 txsc_issue_addbareq_check(_adapter *padapter, u8 issue_when_busy)

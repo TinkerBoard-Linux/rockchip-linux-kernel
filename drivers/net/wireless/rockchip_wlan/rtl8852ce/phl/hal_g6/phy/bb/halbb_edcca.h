@@ -30,7 +30,7 @@
 #define EDCCA_HL_DIFF_NORMAL 8
 
 // EDCCA
-#define CBP_6G                         60 /*@-68 dB to avoid cross-band loss*/
+#define CBP_6G                         53 /*@-75 dB to avoid cross-band loss*/
 #define EDCCA_5G                         63 /*@-62 dBm -3 dB margin*/
 #define EDCCA_2G                        68 /*@-57 dBm -3 dB margin*/
 #define CARRIER_SENSE                        75 /*@-50dBm -3 dB margin*/
@@ -110,6 +110,8 @@ struct bb_edcca_cr_info {
 	u32 r_edcca_rpt_sel_m;
 	u32 r_edcca_rpt_sel_p1;
 	u32 r_edcca_rpt_sel_p1_m;
+	u32 r_edcca_rptreg_sel_be_dd;
+	u32 r_edcca_rptreg_sel_be_dd_m;
 	u32 r_ppdu_level;
 	u32 r_ppdu_level_m;
 	u32 r_ppdu_level_p;
@@ -142,10 +144,58 @@ struct bb_edcca_cr_info {
 	u32 collision_t2r_th_mcs10_m;
 	u32 collision_t2r_th_mcs11;
 	u32 collision_t2r_th_mcs11_m;
+	u32 collision_t2r_th_mcs12;
+	u32 collision_t2r_th_mcs12_m;
+	u32 collision_t2r_th_mcs13;
+	u32 collision_t2r_th_mcs13_m;
 	u32 collision_t2r_th_cck;
 	u32 collision_t2r_th_cck_m;
+	u32 collision_t2r_th_cck_1M;
+	u32 collision_t2r_th_cck_1M_m;
+	u32 collision_t2r_th_cck_2M;
+	u32 collision_t2r_th_cck_2M_m;
+	u32 collision_t2r_th_cck_5p5M;
+	u32 collision_t2r_th_cck_5p5M_m;
+	u32 collision_t2r_th_cck_11M;
+	u32 collision_t2r_th_cck_11M_m;
+	u32 collision_map2dbm;
+	u32 collision_map2dbm_m;
+	u32 collision_t2r_th_he_dcm_mcs0;
+	u32 collision_t2r_th_he_dcm_mcs0_m;
+	u32 collision_t2r_th_he_dcm_mcs1;
+	u32 collision_t2r_th_he_dcm_mcs1_m;
+	u32 collision_t2r_th_he_dcm_mcs2;
+	u32 collision_t2r_th_he_dcm_mcs2_m;
+	u32 collision_t2r_th_he_dcm_mcs3;
+	u32 collision_t2r_th_he_dcm_mcs3_m;
+	u32 collision_t2r_th_he_dcm_mcs4;
+	u32 collision_t2r_th_he_dcm_mcs4_m;
+	u32 collision_t2r_th_eht_dcm_mcs14;
+	u32 collision_t2r_th_eht_dcm_mcs14_m;
+	u32 collision_t2r_th_eht_dcm_mcs15;
+	u32 collision_t2r_th_eht_dcm_mcs15_m;
+	u32 collision_t2r_th_legacy_6M;
+	u32 collision_t2r_th_legacy_6M_m;
+	u32 collision_t2r_th_legacy_9M;
+	u32 collision_t2r_th_legacy_9M_m;
+	u32 collision_t2r_th_legacy_12M;
+	u32 collision_t2r_th_legacy_12M_m;
+	u32 collision_t2r_th_legacy_18M;
+	u32 collision_t2r_th_legacy_18M_m;
+	u32 collision_t2r_th_legacy_24M;
+	u32 collision_t2r_th_legacy_24M_m;
+	u32 collision_t2r_th_legacy_36M;
+	u32 collision_t2r_th_legacy_36M_m;
+	u32 collision_t2r_th_legacy_48M;
+	u32 collision_t2r_th_legacy_48M_m;
+	u32 collision_t2r_th_legacy_54M;
+	u32 collision_t2r_th_legacy_54M_m;
+	u32 r_collision_t2r_state;
+	u32 r_collision_t2r_state_m;
 	u32 r_pwrofst;
 	u32 r_pwrofst_m;
+	u32 r_dc_remove;
+	u32 r_dc_remove_m;
 };
 
 struct edcca_hw_rpt {
@@ -169,10 +219,17 @@ struct edcca_hw_rpt {
 	s8 pwdb_7;
 	s8 pwdb_8;
 	u8 path;
+	s8 per20_bitmap_0;
+	s8 per20_bitmap_1;
+	s8 per20_bitmap_2;
+	s8 per20_bitmap_3;
+	s8 per20_bitmap_4;
+	s8 per20_bitmap_5;
+	s8 per20_bitmap_6;
+	s8 per20_bitmap_7;
 };
 
 struct bb_edcca_info {
-	struct bb_edcca_cr_info bb_edcca_cr_i;
 	u8 th_l;
 	u8 th_h;
 	u8 th_hl_diff;
@@ -182,11 +239,14 @@ struct bb_edcca_info {
 	u8 th_h_5g;
 	u8 th_h_2p4g;
 	u8 th_h_cs;
+	u8 th_h_obss;
+	bool collision_th_en;
 	u8 colli_th;
 	u8 colli_ofst;
 	struct edcca_hw_rpt edcca_rpt;
 	u8 pwrofst; /*max(ext_loss, 2), 0~31=>[-16:1:15]*/
 	u32 rvrt_val; /*all rvrt_val for pause API must set to u32*/
+	bool init_edcca_cr_success;
 };
 #ifdef HALBB_DYN_L2H_SUPPORT
 struct bb_dyn_l2h_info {
@@ -207,10 +267,11 @@ void halbb_set_collision_thre(struct bb_info *bb);
 void halbb_set_edcca_pause_val(struct bb_info *bb, u32 *val_buf, u8 val_len);
 void halbb_edcca_event_nofity(struct bb_info * bb, u8 pause_type);
 void halbb_edcca_dev_hw_cap(struct bb_info * bb);
+void halbb_edcca_init_io_en(struct bb_info *bb);
 void halbb_edcca_init(struct bb_info *bb);
 void halbb_cr_cfg_edcca_init(struct bb_info *bb);
 void halbb_edcca_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 			      char *output, u32 *_out_len);
-
+void halbb_edcca_cmn_log(struct bb_info *bb);
 #endif
 

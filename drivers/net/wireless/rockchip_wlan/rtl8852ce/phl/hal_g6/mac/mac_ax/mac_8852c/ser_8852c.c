@@ -265,6 +265,13 @@ static u32 rmac_imr_enable_8852c(struct mac_ax_adapter *adapter, u8 band)
 		MAC_REG_W32(reg, val32);
 	}
 #endif
+	reg = band == MAC_AX_BAND_0 ?
+	      R_AX_PHYINFO_ERR_IMR_V1 : R_AX_PHYINFO_ERR_IMR_V1_C1;
+	val32 = MAC_REG_R32(reg);
+	val32 |= B_AX_PHY_TXON_TIMEOUT_EN;
+	val32 = SET_CLR_WORD(val32, 0x7, B_AX_PHYINTF_TIMEOUT_THR_V1);
+	MAC_REG_W32(reg, val32);
+
 	return 0;
 }
 
@@ -1090,8 +1097,8 @@ static u32 haxidma_imr_enable_8852c(struct mac_ax_adapter *adapter)
 		   B_AX_TXMDA_STUCK_IDCT_SER_EN));
 	MAC_REG_W32(R_AX_HAXI_IDCT_MSK, val32);
 
-	if (adapter->hw_info->intf == MAC_AX_INTF_USB ||
-	    adapter->hw_info->intf == MAC_AX_INTF_SDIO) {
+	if (adapter->env_info.intf == MAC_AX_INTF_USB ||
+	    adapter->env_info.intf == MAC_AX_INTF_SDIO) {
 		val32 = MAC_REG_R32(R_AX_HAXI_IDCT_MSK);
 		val32 &= ~(B_AX_RXMDA_STUCK_IDCT_MSK);
 		MAC_REG_W32(R_AX_HAXI_IDCT_MSK, val32);
@@ -1101,8 +1108,8 @@ static u32 haxidma_imr_enable_8852c(struct mac_ax_adapter *adapter)
 	if (chk_patch_haxidma_ind(adapter) == PATCH_DISABLE) {
 		return MACSUCCESS;
 	} else {
-		if (adapter->hw_info->intf == MAC_AX_INTF_USB ||
-		    adapter->hw_info->intf == MAC_AX_INTF_SDIO) {
+		if (adapter->env_info.intf == MAC_AX_INTF_USB ||
+		    adapter->env_info.intf == MAC_AX_INTF_SDIO) {
 			val32 = MAC_REG_R32(R_AX_HAXI_IDCT_MSK);
 
 			val32 &= ~(B_AX__TXBD_LEN0_ERR_IDCT_MSK |

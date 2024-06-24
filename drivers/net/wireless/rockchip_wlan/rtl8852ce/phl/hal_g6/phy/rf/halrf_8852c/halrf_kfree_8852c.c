@@ -48,6 +48,8 @@ u8 _halrf_get_1byte_efuse_8852c(struct rf_info *rf, u32 addr, u8 *value)
 
 	*value = kfree->efuse_content[addr - HIDE_EFUSE_START_ADDR_8852C];
 
+	RF_DBG(rf, DBG_RF_TSSI_TRIM, "===> %s addr(0x%x) = 0x%x\n", __func__, addr, *value);
+
 	return *value;
 }
 
@@ -207,67 +209,35 @@ void _halrf_get_tssi_trim_8852c(struct rf_info *rf,
 		(u8 *)&tssi->tssi_trim_6g[RF_PATH_A][0]);
 	_halrf_get_1byte_efuse_8852c(rf, TSSI_TRIM_HIDE_EFUSE_6GL2_A_8852C,
 		(u8 *)&tssi->tssi_trim_6g[RF_PATH_A][1]);
-	_halrf_get_1byte_efuse_8852c(rf, TSSI_TRIM_HIDE_EFUSE_6GL3_A_8852C,
-		(u8 *)&tssi->tssi_trim_6g[RF_PATH_A][2]);
-	_halrf_get_1byte_efuse_8852c(rf, TSSI_TRIM_HIDE_EFUSE_6GL4_A_8852C,
-		(u8 *)&tssi->tssi_trim_6g[RF_PATH_A][3]);
 	_halrf_get_1byte_efuse_8852c(rf, TSSI_TRIM_HIDE_EFUSE_6GM1_A_8852C,
-		(u8 *)&tssi->tssi_trim_6g[RF_PATH_A][4]);
+		(u8 *)&tssi->tssi_trim_6g[RF_PATH_A][2]);
 	_halrf_get_1byte_efuse_8852c(rf, TSSI_TRIM_HIDE_EFUSE_6GM2_A_8852C,
-		(u8 *)&tssi->tssi_trim_6g[RF_PATH_A][5]);
-	_halrf_get_1byte_efuse_8852c(rf, TSSI_TRIM_HIDE_EFUSE_6GM3_A_8852C,
-		(u8 *)&tssi->tssi_trim_6g[RF_PATH_A][6]);
-	_halrf_get_1byte_efuse_8852c(rf, TSSI_TRIM_HIDE_EFUSE_6GM4_A_8852C,
-		(u8 *)&tssi->tssi_trim_6g[RF_PATH_A][7]);
+		(u8 *)&tssi->tssi_trim_6g[RF_PATH_A][3]);
 	_halrf_get_1byte_efuse_8852c(rf, TSSI_TRIM_HIDE_EFUSE_6GH1_A_8852C,
-		(u8 *)&tssi->tssi_trim_6g[RF_PATH_A][8]);
+		(u8 *)&tssi->tssi_trim_6g[RF_PATH_A][4]);
 	_halrf_get_1byte_efuse_8852c(rf, TSSI_TRIM_HIDE_EFUSE_6GH2_A_8852C,
-		(u8 *)&tssi->tssi_trim_6g[RF_PATH_A][9]);
-	_halrf_get_1byte_efuse_8852c(rf, TSSI_TRIM_HIDE_EFUSE_6GH3_A_8852C,
-		(u8 *)&tssi->tssi_trim_6g[RF_PATH_A][10]);
-	_halrf_get_1byte_efuse_8852c(rf, TSSI_TRIM_HIDE_EFUSE_6GH4_A_8852C,
-		(u8 *)&tssi->tssi_trim_6g[RF_PATH_A][11]);
+		(u8 *)&tssi->tssi_trim_6g[RF_PATH_A][5]);
 	_halrf_get_1byte_efuse_8852c(rf, TSSI_TRIM_HIDE_EFUSE_6GUH1_A_8852C,
-		(u8 *)&tssi->tssi_trim_6g[RF_PATH_A][12]);
+		(u8 *)&tssi->tssi_trim_6g[RF_PATH_A][6]);
 	_halrf_get_1byte_efuse_8852c(rf, TSSI_TRIM_HIDE_EFUSE_6GUH2_A_8852C,
-		(u8 *)&tssi->tssi_trim_6g[RF_PATH_A][13]);
-	_halrf_get_1byte_efuse_8852c(rf, TSSI_TRIM_HIDE_EFUSE_6GUH3_A_8852C,
-		(u8 *)&tssi->tssi_trim_6g[RF_PATH_A][14]);
-	_halrf_get_1byte_efuse_8852c(rf, TSSI_TRIM_HIDE_EFUSE_6GUH4_A_8852C,
-		(u8 *)&tssi->tssi_trim_6g[RF_PATH_A][15]);
+		(u8 *)&tssi->tssi_trim_6g[RF_PATH_A][7]);
 
 	_halrf_get_1byte_efuse_8852c(rf, TSSI_TRIM_HIDE_EFUSE_6GL1_B_8852C,
 		(u8 *)&tssi->tssi_trim_6g[RF_PATH_B][0]);
 	_halrf_get_1byte_efuse_8852c(rf, TSSI_TRIM_HIDE_EFUSE_6GL2_B_8852C,
 		(u8 *)&tssi->tssi_trim_6g[RF_PATH_B][1]);
-	_halrf_get_1byte_efuse_8852c(rf, TSSI_TRIM_HIDE_EFUSE_6GL3_B_8852C,
-		(u8 *)&tssi->tssi_trim_6g[RF_PATH_B][2]);
-	_halrf_get_1byte_efuse_8852c(rf, TSSI_TRIM_HIDE_EFUSE_6GL4_B_8852C,
-		(u8 *)&tssi->tssi_trim_6g[RF_PATH_B][3]);
 	_halrf_get_1byte_efuse_8852c(rf, TSSI_TRIM_HIDE_EFUSE_6GM1_B_8852C,
-		(u8 *)&tssi->tssi_trim_6g[RF_PATH_B][4]);
+		(u8 *)&tssi->tssi_trim_6g[RF_PATH_B][2]);
 	_halrf_get_1byte_efuse_8852c(rf, TSSI_TRIM_HIDE_EFUSE_6GM2_B_8852C,
-		(u8 *)&tssi->tssi_trim_6g[RF_PATH_B][5]);
-	_halrf_get_1byte_efuse_8852c(rf, TSSI_TRIM_HIDE_EFUSE_6GM3_B_8852C,
-		(u8 *)&tssi->tssi_trim_6g[RF_PATH_B][6]);
-	_halrf_get_1byte_efuse_8852c(rf, TSSI_TRIM_HIDE_EFUSE_6GM4_B_8852C,
-		(u8 *)&tssi->tssi_trim_6g[RF_PATH_B][7]);
+		(u8 *)&tssi->tssi_trim_6g[RF_PATH_B][3]);
 	_halrf_get_1byte_efuse_8852c(rf, TSSI_TRIM_HIDE_EFUSE_6GH1_B_8852C,
-		(u8 *)&tssi->tssi_trim_6g[RF_PATH_B][8]);
+		(u8 *)&tssi->tssi_trim_6g[RF_PATH_B][4]);
 	_halrf_get_1byte_efuse_8852c(rf, TSSI_TRIM_HIDE_EFUSE_6GH2_B_8852C,
-		(u8 *)&tssi->tssi_trim_6g[RF_PATH_B][9]);
-	_halrf_get_1byte_efuse_8852c(rf, TSSI_TRIM_HIDE_EFUSE_6GH3_B_8852C,
-		(u8 *)&tssi->tssi_trim_6g[RF_PATH_B][10]);
-	_halrf_get_1byte_efuse_8852c(rf, TSSI_TRIM_HIDE_EFUSE_6GH4_B_8852C,
-		(u8 *)&tssi->tssi_trim_6g[RF_PATH_B][11]);
+		(u8 *)&tssi->tssi_trim_6g[RF_PATH_B][5]);
 	_halrf_get_1byte_efuse_8852c(rf, TSSI_TRIM_HIDE_EFUSE_6GUH1_B_8852C,
-		(u8 *)&tssi->tssi_trim_6g[RF_PATH_B][12]);
+		(u8 *)&tssi->tssi_trim_6g[RF_PATH_B][6]);
 	_halrf_get_1byte_efuse_8852c(rf, TSSI_TRIM_HIDE_EFUSE_6GUH2_B_8852C,
-		(u8 *)&tssi->tssi_trim_6g[RF_PATH_B][13]);
-	_halrf_get_1byte_efuse_8852c(rf, TSSI_TRIM_HIDE_EFUSE_6GUH3_B_8852C,
-		(u8 *)&tssi->tssi_trim_6g[RF_PATH_B][14]);
-	_halrf_get_1byte_efuse_8852c(rf, TSSI_TRIM_HIDE_EFUSE_6GUH4_B_8852C,
-		(u8 *)&tssi->tssi_trim_6g[RF_PATH_B][15]);
+		(u8 *)&tssi->tssi_trim_6g[RF_PATH_B][7]);
 
 	/*TSSI Trim 2G, 5G*/
 	for (i = 0; i < 2; i++) {
@@ -314,8 +284,14 @@ void halrf_get_efuse_trim_8852c(struct rf_info *rf,
 					enum phl_phy_idx phy)
 {
 	_halrf_get_total_efuse_8852c(rf, phy);
+
+	halrf_write_fwofld_start(rf);	/*FW Offload Start*/
+
 	_halrf_set_thermal_trim_8852c(rf, phy);
 	_halrf_set_pa_bias_trim_8852c(rf, phy);
+
+	halrf_write_fwofld_end(rf); 	/*FW Offload End*/
+
 	_halrf_get_tssi_trim_8852c(rf, phy);
 }
 

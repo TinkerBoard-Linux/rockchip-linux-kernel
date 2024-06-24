@@ -20,6 +20,7 @@ u32 rtw_hal_mac_coex_reg_read(struct rtw_hal_com_t *hal_com, u32 offset, u32 *va
 u32 rtw_hal_mac_coex_reg_write(struct rtw_hal_com_t *hal_com, u32 offset, u32 value);
 u32 rtw_hal_mac_set_scoreboard(struct rtw_hal_com_t *hal_com, u32 *value);
 u32 rtw_hal_mac_get_scoreboard(struct rtw_hal_com_t *hal_com, u32 *value);
+u32 rtw_hal_mac_set_grant_act(struct rtw_hal_com_t *hal_com, u8 *value);
 u32 rtw_hal_mac_set_grant(struct rtw_hal_com_t *hal_com, u8 *value);
 u32 rtw_hal_mac_get_grant(struct rtw_hal_com_t *hal_com, u8 *value);
 u32 rtw_hal_mac_set_polluted(struct rtw_hal_com_t *hal_com, u8 band, u8 tx_val, u8 rx_val);
@@ -60,7 +61,11 @@ bool rtw_hal_bb_write_cr(struct rtw_hal_com_t *hal_com, u32 addr, u32 mask,
 			 u32 data);
 
 #ifdef CONFIG_PHL_DFS
+bool rtw_hal_is_radar_detect_enabled(struct rtw_hal_com_t *hal_com, enum phl_phy_idx phy_idx);
+bool rtw_hal_is_under_cac(struct rtw_hal_com_t *hal_com, enum phl_phy_idx phy_idx);
 u32 rtw_hal_mac_cfg_dfs_rpt(struct rtw_hal_com_t *hal_com, struct hal_mac_dfs_rpt_cfg *conf);
+enum rtw_hal_status
+rtw_hal_bb_dfs_rpt_cfg(struct rtw_hal_com_t *hal_com, enum phl_phy_idx phy_idx, bool dfs_en);
 #endif
 
 u32 rtw_hal_mac_write_msk_pwr_reg(
@@ -200,6 +205,10 @@ void rtw_hal_btc_power_on_ntfy(void *hinfo);
 void rtw_hal_btc_power_off_ntfy(void *hinfo);
 
 enum rtw_hal_status
+rtw_hal_pause_tx_fifo_sw(void *hal, u8 band_idx,
+			bool tx_pause, enum tx_pause_rson rson);
+
+enum rtw_hal_status
 rtw_hal_tx_pause(struct rtw_hal_com_t *hal_com,
 			u8 band_idx, bool tx_pause, enum tx_pause_rson rson);
 
@@ -210,10 +219,6 @@ rtw_hal_mac_set_macid_pause(struct rtw_hal_com_t *hal_com,
 enum rtw_hal_status
 rtw_hal_mac_set_macid_grp_pause(struct rtw_hal_com_t *hal_com,
                             u32 *macid_arr, u8 macid_arr_sz, bool pause);
-
-enum rtw_hal_status
-rtw_hal_mac_set_macid_pause_sleep(struct rtw_hal_com_t *hal_com,
-                            u16 macid, bool pause, bool sleep);
 
 enum rtw_hal_status
 rtw_hal_mac_set_macid_pkt_drop(struct rtw_hal_com_t *hal_com,
@@ -249,6 +254,9 @@ enum rtw_hal_status
 rtw_hal_mac_tx_path_map_cfg(struct rtw_hal_com_t *hal_com,
                             struct hal_txmap_cfg *txmap_cfg);
 
+enum rtw_hal_status
+rtw_hal_mac_ctrl_ser(struct rtw_hal_com_t *hal_com,
+			enum rtw_hal_ser_rsn rsn, bool en);
 /* HALBB APIs for HW TX */
 
 enum rtw_hal_status
@@ -264,7 +272,7 @@ rtw_hal_bb_set_pmac_cont_tx(struct rtw_hal_com_t *hal_com, u8 enable, u8 is_cck,
 
 enum rtw_hal_status
 rtw_hal_bb_set_pmac_carrier_suppression_tx(struct rtw_hal_com_t *hal_com, u8 enable, u8 is_cck,
-							enum phl_phy_idx phy_idx);
+							u16 tx_cnt, u16 period, enum phl_phy_idx phy_idx);
 
 enum rtw_hal_status
 rtw_hal_bb_set_pmac_packet_tx(struct rtw_hal_com_t *hal_com, u8 enable,
@@ -275,6 +283,9 @@ enum rtw_hal_status
 rtw_hal_bb_set_pmac_fw_trigger_tx(struct rtw_hal_com_t *hal_com, u8 enable,
 							u8 is_cck, u16 tx_cnt, u8 tx_duty,
 							enum phl_phy_idx phy_idx);
+
+enum rtw_hal_status
+rtw_hal_bb_switch_antenna(struct rtw_hal_com_t *hal_com, u8 ant_sw);
 
 enum rtw_hal_status
 rtw_hal_bb_set_dpd_bypass(struct rtw_hal_com_t *hal_com, bool pdp_bypass,
@@ -298,13 +309,16 @@ rtw_hal_rf_set_ch_bw(struct rtw_hal_com_t *hal_com,
 enum rtw_hal_status
 rtw_hal_rf_chl_rfk_trigger(struct rtw_hal_com_t *hal_com,
                            u8 phy_idx,
-                           u8 force);
+                           enum rfk_tri_type rt_type);
 
 enum rtw_hal_status
 rtw_hal_bb_ctrl_btg(struct rtw_hal_com_t *hal_com, bool btg);
 
 enum rtw_hal_status
 rtw_hal_bb_ctrl_btc_preagc(struct rtw_hal_com_t *hal_com, bool bt_en);
+
+void
+rtw_hal_bb_npath_en_update(struct rtw_hal_com_t *hal_com, bool npath_en);
 
 enum rtw_hal_status
 rtw_hal_bb_cfg_rx_path(struct rtw_hal_com_t *hal_com, u8 rx_path, u8 phy_idx);
@@ -365,7 +379,6 @@ rtw_hal_mac_write_log_efuse_bt_map(struct rtw_hal_com_t *hal_com,
                             u32 map_size,
                             u8 *mask,
                             u32 mask_size);
-
 
 enum rtw_hal_status
 rtw_hal_bb_backup_info(struct rtw_hal_com_t *hal_com, u8 cur_phy_idx);
@@ -433,15 +446,16 @@ rtw_hal_cmd_notify(struct rtw_phl_com_t *phl_com,
                    void *hal_cmd,
                    u8 hw_idx);
 
+#ifdef CONFIG_PHL_DIAGNOSE
+void rtw_hal_bb_diagnostic_event(struct rtw_hal_com_t *hal, u8 type,
+		u8 level, u8 version, u8 *buf, u32 len);
+
+void rtw_hal_rf_diagnostic_event(struct rtw_hal_com_t *hal, u8 type,
+		u8 level, u8 version, u8 *buf, u32 len);
+#endif
+
 enum rtw_hal_status rtw_hal_mac_add_cmd_ofld(struct rtw_hal_com_t *hal_com, struct rtw_mac_cmd *cmd);
 enum rtw_hal_status rtw_hal_mac_cmd_ofld(struct rtw_hal_com_t *hal_com);
-#ifdef CONFIG_FW_IO_OFLD_SUPPORT
-void
-rtw_hal_bb_fwofld_cfgcr_start(struct rtw_hal_com_t *hal_com);
-void
-rtw_hal_bb_fwofld_cfgcr_end(struct rtw_hal_com_t *hal_com);
-
-#endif
 
 void rtw_hal_bb_env_rpt(struct rtw_hal_com_t *hal_com, struct rtw_env_report *env_rpt,
 		     enum phl_phy_idx phy_indx);
@@ -464,5 +478,23 @@ rtw_hal_rf_syn_config(struct rtw_hal_com_t *hal_com,
                       u8 path,
                       bool turn_on);
 void rtw_hal_rf_set_pwr_lmt_main_or_aux(struct rtw_hal_com_t *hal_com, u8 ant);
+
+bool
+rtw_hal_bb_adc_cfg(struct rtw_hal_com_t *hal_com,
+                   enum channel_width bw,
+                   enum rf_path path,
+                   enum phl_phy_idx phy_idx);
+
+void rtw_hal_rf_set_ant_main_or_aux(void *hal, enum rf_path path, bool main);
+
+struct halrf_fem_info rtw_hal_rf_efem_info(struct rtw_hal_com_t *hal_com);
+
+enum rtw_hal_status
+rtw_hal_mac_sr_update(struct rtw_hal_com_t *hal_com,
+                      void *sr_info,
+                      u8 hw_band);
+
+char *rtw_hal_get_ext_regd_name(struct rtw_para_pwrlmt_info_t *para_info, u8 idx);
+void rtw_hal_bb_bb_reset_cmn(struct rtw_hal_com_t *hal, bool en, enum phl_phy_idx phy_idx);
 
 #endif /*_HAL_API_DRV_H_*/

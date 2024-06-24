@@ -19,7 +19,9 @@
 #define RTW_CFG80211_BLOCK_DISCON_WHEN_DISCONNECT	BIT1
 
 #define CONFIG_CFG80211_REPORT_PROBE_REQ
-
+#ifdef CONFIG_80211BE_EHT
+#undef CONFIG_CFG80211_REPORT_PROBE_REQ
+#endif
 #ifndef RTW_CFG80211_BLOCK_STA_DISCON_EVENT
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 2, 0))
 #define RTW_CFG80211_BLOCK_STA_DISCON_EVENT (RTW_CFG80211_BLOCK_DISCON_WHEN_CONNECT)
@@ -90,13 +92,17 @@
 
 #if defined(CONFIG_DFS_MASTER) && (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0))
 #ifndef CONFIG_RTW_CFG80211_CAC_EVENT
-#define CONFIG_RTW_CFG80211_CAC_EVENT 0
+#define CONFIG_RTW_CFG80211_CAC_EVENT 1
 #endif
 #else
 #ifdef CONFIG_RTW_CFG80211_CAC_EVENT
 #undef CONFIG_RTW_CFG80211_CAC_EVENT
 #endif
 #define CONFIG_RTW_CFG80211_CAC_EVENT 0
+#endif
+
+#if CONFIG_RTW_CFG80211_CAC_EVENT && RTW_PER_ADAPTER_WIPHY
+#error "CONFIG_RTW_CFG80211_CAC_EVENT is not supported when enable RTW_PER_ADAPTER_WIPHY"
 #endif
 
 #if !defined(CONFIG_P2P) && RTW_P2P_GROUP_INTERFACE
@@ -296,6 +302,8 @@ struct rtw_wiphy_data {
 	struct wireless_dev *du_wdev;
 	struct cfg80211_chan_def du_chdef;
 #endif
+
+	s16 txpwr_total_lmt_mbm;	/* EIRP */
 };
 
 #define rtw_wiphy_priv(wiphy) ((struct rtw_wiphy_data *)wiphy_priv(wiphy))
@@ -340,6 +348,7 @@ int rtw_cfg80211_dev_res_alloc(struct dvobj_priv *dvobj);
 void rtw_cfg80211_dev_res_free(struct dvobj_priv *dvobj);
 int rtw_cfg80211_dev_res_register(struct dvobj_priv *dvobj);
 void rtw_cfg80211_dev_res_unregister(struct dvobj_priv *dvobj);
+s16 rtw_cfg80211_dev_get_total_txpwr_lmt_mbm(struct dvobj_priv *dvobj);
 
 void rtw_cfg80211_unlink_bss(_adapter *padapter, struct wlan_network *pnetwork);
 void rtw_cfg80211_surveydone_event_callback(_adapter *padapter);
@@ -386,7 +395,7 @@ u8 rtw_mgnt_tx_handler(_adapter *adapter, u8 *buf);
 void rtw_cfg80211_rx_p2p_action_public(_adapter *padapter, union recv_frame *rframe);
 void rtw_cfg80211_rx_action_p2p(_adapter *padapter, union recv_frame *rframe);
 void rtw_cfg80211_rx_action(_adapter *adapter, union recv_frame *rframe, const char *msg);
-void rtw_cfg80211_rx_mframe(_adapter *adapter, union recv_frame *rframe, const char *msg);
+int rtw_cfg80211_rx_mframe(_adapter *adapter, union recv_frame *rframe, const char *msg);
 void rtw_cfg80211_rx_probe_request(_adapter *padapter, union recv_frame *rframe);
 
 void rtw_cfg80211_external_auth_request(_adapter *padapter, union recv_frame *rframe);
@@ -396,7 +405,7 @@ void rtw_cfg80211_external_auth_status(struct wiphy *wiphy, struct net_device *d
 int rtw_cfg80211_set_mgnt_wpsp2pie(struct net_device *net, char *buf, int len, int type);
 
 bool rtw_cfg80211_pwr_mgmt(_adapter *adapter);
-#ifdef CONFIG_RTW_80211K
+#if defined(CONFIG_RTW_80211K) || defined(CONFIG_RTW_FSM_RRM)
 void rtw_cfg80211_rx_rrm_action(_adapter *adapter, union recv_frame *rframe);
 #endif
 
@@ -467,7 +476,16 @@ void rtw_cfg80211_deinit_rfkill(struct wiphy *wiphy);
 #endif
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 5, 0))
-u8 rtw_cfg80211_ch_switch_notify(_adapter *adapter, struct rtw_chan_def *rtw_chdef, u8 ht, bool started);
+u8 rtw_cfg80211_ch_switch_notify(_adapter *adapter,
+					struct _ADAPTER_LINK *alink,
+					struct rtw_chan_def *rtw_chdef,
+					u8 ht, bool started);
+#endif
+
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 36))
+#define NL80211_TX_POWER_AUTOMATIC	TX_POWER_AUTOMATIC
+#define NL80211_TX_POWER_LIMITED	TX_POWER_LIMITED
+#define NL80211_TX_POWER_FIXED		TX_POWER_FIXED
 #endif
 
 #if CONFIG_IEEE80211_BAND_6GHZ

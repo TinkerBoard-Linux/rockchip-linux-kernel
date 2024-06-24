@@ -52,5 +52,11 @@ void halrf_set_tx_shape_8852c(struct rf_info *rf, u8 tx_shape_idx);
 
 void halrf_set_bw160m_diff_8852c(struct rf_info *rf, enum phl_phy_idx phy);
 
+void halrf_set_power_limit_wa_8852c(struct rf_info *rf, enum phl_phy_idx phy);
+
+void halrf_set_bw_power_by_rate_offset_8852c(struct rf_info *rf, u32 pwr_by_rate_bw_ofst);
+
+s8 halrf_get_pwr_by_rate_bw_control_8852c(struct rf_info *rf, enum phl_phy_idx phy, u16 rate, u32 band, s8 pwr_by_rate);
+
 #endif	/*RF_8852C_SUPPORT*/
 #endif	/*_HALRF_SET_PWR_TABLE_8852C_H_*/

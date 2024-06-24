@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2007 - 2019 Realtek Corporation.
+ * Copyright(c) 2007 - 2023 Realtek Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -192,6 +192,7 @@ struct ss_res {
 	int bss_cnt;
 	u8 activate_ch_cnt;
 	#ifdef CONFIG_CMD_SCAN
+	_lock scan_param_lock;
 	struct rtw_phl_scan_param *scan_param;
 	#endif
 	struct submit_ctx sctx;
@@ -199,7 +200,7 @@ struct ss_res {
 	u16 scan_ch_ms;
 
 	u8 rx_ampdu_accept;
-	u8 rx_ampdu_size;
+	u16 rx_ampdu_size;
 #if 0
 	int channel_idx;
 	u8 force_ssid_scan;
@@ -243,8 +244,17 @@ struct ss_res {
 enum rtw_scan_type {
 	RTW_SCAN_NORMAL,
 	RTW_SCAN_P2P,
-	RTW_SCAN_RRM
+	RTW_SCAN_RRM,
+	RTW_SCAN_ROAM
 };
+
+#define RTW_MAX_NB_RPT_NUM 8
+#if defined(CONFIG_RTW_FSM_RRM) || defined(CONFIG_RTW_FSM_BTM)
+struct nb_bssid{
+	u8 ch;
+	u8 bssid[ETH_ALEN];
+};
+#endif
 
 struct sitesurvey_parm {
 	enum rtw_phl_scan_type scan_mode;	/* active: 1, passive: 0 */
@@ -261,11 +271,20 @@ struct sitesurvey_parm {
 	bool acs; /* aim to trigger channel selection when scan done */
 
 	enum rtw_scan_type scan_type;
+#ifdef CONFIG_RTW_FSM
+	struct sta_info *psta;
+#endif
 
 #if CONFIG_IEEE80211_BAND_6GHZ
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0))
 	bool pending_6ghz_scan; /* indicate separate scan for 6GHz channels later */
+	bool split_scan_6ghz; /* indicate if current scan is the second scan for 6GHz */
 #endif
+	bool scan_6ghz_only; /* indicate only 6GHz channels in scan request */
+#endif
+#if defined(CONFIG_RTW_FSM_RRM) || defined(CONFIG_RTW_FSM_BTM)
+	u8 nb_num;
+	struct nb_bssid nb[RTW_MAX_NB_RPT_NUM];
 #endif
 };
 
@@ -283,7 +302,7 @@ void rtw_survey_cmd_callback(_adapter  *padapter, struct cmd_obj *pcmd);
 #ifdef CONFIG_IOCTL_CFG80211
 u8 rtw_phl_remain_on_ch_cmd(_adapter *padapter, u64 cookie, struct wireless_dev *wdev,
 	struct ieee80211_channel *ch, u8 ch_type, unsigned int duration,
-	struct back_op_param *bkop_parm, u8 is_p2p);
+	struct back_op_param *bkop_parm);
 #endif
 
 u32 rtw_parse_reduced_nb_rpt(_adapter *adapter, u8 *ies, u32 ies_len,

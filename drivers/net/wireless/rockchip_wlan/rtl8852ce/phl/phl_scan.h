@@ -92,6 +92,7 @@ struct phl_scan_channel {
 	enum rtw_phl_scan_type type; /* active scan: 1, passive scan: 0 */
 	u8 scan_mode; /* according to phl_scan_mode */
 	u8 ext_act_scan; /* according to phl_ext_act_scan_state */
+	u32 ext_act_done_t; /* the pass time when DFS finish probing */
 	u32 start_t; /* start time */
 	u32 remain_t;
 	u32 pass_t;
@@ -148,9 +149,10 @@ struct cmd_scan_ctrl {
 };
 
 enum scan_result {
-	SCAN_REQ_ABORT, /* abort a non-started(queued) scan */
-	SCAN_REQ_CANCEL, /* cancel a started scan */
-	SCAN_REQ_COMPLETE /* scan complete */
+	SCAN_REQ_ABORT,         /* abort a non-started(queued) scan */
+	SCAN_REQ_CANCEL,        /* cancel a started scan */
+	SCAN_REQ_COMPLETE,      /* scan complete */
+	SCAN_REQ_EXCEPTION      /* MSG_FAIL/timeout/send_msg failed */
 };
 
 enum scan_cmd_opt {

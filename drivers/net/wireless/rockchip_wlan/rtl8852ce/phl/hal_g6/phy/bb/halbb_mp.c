@@ -26,7 +26,7 @@
 
 void halbb_mp_bt_cfg(struct bb_info *bb, bool bt_connect)
 {
-	struct bb_rpt_cr_info *cr = &bb->bb_rpt_i.bb_rpt_cr_i;
+	struct bb_rpt_cr_info *cr = &bb->bb_cmn_hooker->bb_rpt_i.bb_rpt_cr_i;
 	u8 lna_val = 0, lna_ori = 0, lna_gain_ofst = 0;
 
 	BB_DBG(bb, DBG_PHY_CONFIG, "<====== %s ======>\n", __func__);
@@ -59,7 +59,7 @@ u16 halbb_mp_get_tx_ok(struct bb_info *bb, u32 rate_index,
 {
 	u32 tx_ok;
 
-	struct bb_rpt_cr_info *cr = &bb->bb_rpt_i.bb_rpt_cr_i;
+	struct bb_rpt_cr_info *cr = &bb->bb_cmn_hooker->bb_rpt_i.bb_rpt_cr_i;
 
 	if (halbb_is_cck_rate(bb, (u16)rate_index))
 		tx_ok = halbb_get_reg(bb, cr->cnt_ccktxon, cr->cnt_ccktxon_m);
@@ -73,7 +73,7 @@ u32 halbb_rx_crc_ok_6(struct bb_info *bb, enum phl_phy_idx phy_idx)
 	u32 cck_ok = 0, ofdm_ok = 0, ht_ok = 0, vht_ok = 0, he_ok = 0;
 	u32 crc_ok;
 
-	struct bb_rpt_cr_info *cr = &bb->bb_rpt_i.bb_rpt_cr_i;
+	struct bb_rpt_cr_info *cr = &bb->bb_cmn_hooker->bb_rpt_i.bb_rpt_cr_i;
 
 	BB_DBG(bb, DBG_PHY_CONFIG, "[%s] phy_idx=%d\n", __func__, phy_idx);
 
@@ -105,11 +105,14 @@ u32 halbb_rx_crc_ok_7(struct bb_info *bb, enum phl_phy_idx phy_idx)
 	u32 cck_ok = 0, ofdm_ok = 0, ht_ok = 0, vht_ok = 0, he_ok = 0, eht_ok = 0;
 	u32 crc_ok;
 
-	struct bb_rpt_cr_info *cr = &bb->bb_rpt_i.bb_rpt_cr_i;
+	struct bb_rpt_cr_info *cr = &bb->bb_cmn_hooker->bb_rpt_i.bb_rpt_cr_i;
 
 	BB_DBG(bb, DBG_PHY_CONFIG, "[%s] phy_idx=%d\n", __func__, phy_idx);
 
-	cck_ok = halbb_get_reg_cmn(bb, cr->cnt_cck_crc32ok_p0, cr->cnt_cck_crc32ok_p0_m, phy_idx);
+	if (phy_idx == HW_PHY_0)
+		cck_ok = halbb_get_reg(bb, cr->cnt_cck_crc32ok_p0, cr->cnt_cck_crc32ok_p0_m);
+	else
+		cck_ok = halbb_get_reg(bb, cr->cnt_cck_crc32ok_p1, cr->cnt_cck_crc32ok_p1_m);
 	ofdm_ok = halbb_get_reg_cmn(bb, cr->cnt_l_crc_ok, cr->cnt_l_crc_ok_m, phy_idx);
 	ht_ok = halbb_get_reg_cmn(bb, cr->cnt_ht_crc_ok, cr->cnt_ht_crc_ok_m, phy_idx);
 	vht_ok = halbb_get_reg_cmn(bb, cr->cnt_vht_crc_ok, cr->cnt_vht_crc_ok_m, phy_idx);
@@ -133,7 +136,7 @@ u32 halbb_mp_get_rx_crc_ok(struct bb_info *bb, enum phl_phy_idx phy_idx)
 {
 	u32 crc_ok = 0;
 
-	struct bb_rpt_cr_info *cr = &bb->bb_rpt_i.bb_rpt_cr_i;
+	struct bb_rpt_cr_info *cr = &bb->bb_cmn_hooker->bb_rpt_i.bb_rpt_cr_i;
 
 
 	switch (bb->bb_80211spec) {
@@ -155,7 +158,7 @@ u32 halbb_rx_crc_err_6(struct bb_info *bb, enum phl_phy_idx phy_idx)
 	u32 cck_err = 0, ofdm_err = 0, ht_err = 0, vht_err = 0, he_err = 0;
 	u32 crc_err;
 
-	struct bb_rpt_cr_info *cr = &bb->bb_rpt_i.bb_rpt_cr_i;
+	struct bb_rpt_cr_info *cr = &bb->bb_cmn_hooker->bb_rpt_i.bb_rpt_cr_i;
 
 	BB_DBG(bb, DBG_PHY_CONFIG, "[%s] phy_idx=%d\n", __func__, phy_idx);
 
@@ -187,11 +190,14 @@ u32 halbb_rx_crc_err_7(struct bb_info *bb, enum phl_phy_idx phy_idx)
 	u32 cck_err = 0, ofdm_err = 0, ht_err = 0, vht_err = 0, he_err = 0, eht_err = 0;
 	u32 crc_err;
 
-	struct bb_rpt_cr_info *cr = &bb->bb_rpt_i.bb_rpt_cr_i;
+	struct bb_rpt_cr_info *cr = &bb->bb_cmn_hooker->bb_rpt_i.bb_rpt_cr_i;
 
 	BB_DBG(bb, DBG_PHY_CONFIG, "[%s] phy_idx=%d\n", __func__, phy_idx);
 
-	cck_err = halbb_get_reg_cmn(bb, cr->cnt_cck_crc32fail_p1, cr->cnt_cck_crc32fail_p1_m, phy_idx);
+	if (phy_idx == HW_PHY_0)
+		cck_err = halbb_get_reg(bb, cr->cnt_cck_crc32fail_p0, cr->cnt_cck_crc32fail_p0_m);
+	else
+		cck_err = halbb_get_reg(bb, cr->cnt_cck_crc32fail_p1, cr->cnt_cck_crc32fail_p1_m);
 	ofdm_err = halbb_get_reg_cmn(bb, cr->cnt_l_crc_err, cr->cnt_l_crc_err_m, phy_idx);
 	ht_err = halbb_get_reg_cmn(bb, cr->cnt_ht_crc_err, cr->cnt_ht_crc_err_m, phy_idx);
 	vht_err = halbb_get_reg_cmn(bb, cr->cnt_vht_crc_err, cr->cnt_vht_crc_err_m, phy_idx);
@@ -215,7 +221,7 @@ u32 halbb_mp_get_rx_crc_err(struct bb_info *bb, enum phl_phy_idx phy_idx)
 {
 	u32 crc_err = 0;
 
-	struct bb_rpt_cr_info *cr = &bb->bb_rpt_i.bb_rpt_cr_i;
+	struct bb_rpt_cr_info *cr = &bb->bb_cmn_hooker->bb_rpt_i.bb_rpt_cr_i;
 
 
 	switch (bb->bb_80211spec) {
@@ -234,7 +240,7 @@ u32 halbb_mp_get_rx_crc_err(struct bb_info *bb, enum phl_phy_idx phy_idx)
 
 void halbb_mp_cnt_reset(struct bb_info *bb)
 {
-	struct bb_rpt_cr_info *cr = &bb->bb_rpt_i.bb_rpt_cr_i;
+	struct bb_rpt_cr_info *cr = &bb->bb_cmn_hooker->bb_rpt_i.bb_rpt_cr_i;
 
 	halbb_set_reg_cmn(bb, cr->rst_all_cnt, cr->rst_all_cnt_m, 1, bb->bb_phy_idx);
 	halbb_set_reg_cmn(bb, cr->rst_all_cnt, cr->rst_all_cnt_m, 0, bb->bb_phy_idx);
@@ -242,7 +248,7 @@ void halbb_mp_cnt_reset(struct bb_info *bb)
 
 void halbb_mp_reset_cnt(struct bb_info *bb)
 {
-	struct bb_rpt_cr_info *cr = &bb->bb_rpt_i.bb_rpt_cr_i;
+	struct bb_rpt_cr_info *cr = &bb->bb_cmn_hooker->bb_rpt_i.bb_rpt_cr_i;
 
 	// PHY0 cnt reset
 	halbb_set_reg_cmn(bb, cr->rst_all_cnt, cr->rst_all_cnt_m, 1, HW_PHY_0);
@@ -255,7 +261,7 @@ void halbb_mp_reset_cnt(struct bb_info *bb)
 void halbb_mp_psts_setting(struct bb_info *bb, u32 ie_bitmap_setting)
 {
 	struct bb_physts_info	*physts = &bb->bb_physts_i;
-	struct bb_rpt_cr_info *cr = &bb->bb_rpt_i.bb_rpt_cr_i;
+	struct bb_rpt_cr_info *cr = &bb->bb_cmn_hooker->bb_rpt_i.bb_rpt_cr_i;
 
 	BB_DBG(bb, DBG_PHY_CONFIG, "<====== %s ======>\n", __func__);
 
@@ -348,7 +354,7 @@ halbb_mp_get_psts(struct bb_info *bb , struct bb_mp_psts *bb_mp_physts)
 void halbb_keeper_cond(struct bb_info *bb, bool keeper_en, u8 keeper_trig_cond,
 		       u8 dbg_sel, enum phl_phy_idx phy_idx)
 {
-	struct bb_rpt_cr_info *cr = &bb->bb_rpt_i.bb_rpt_cr_i;
+	struct bb_rpt_cr_info *cr = &bb->bb_cmn_hooker->bb_rpt_i.bb_rpt_cr_i;
 
 	halbb_set_reg_cmn(bb, cr->sts_keeper_en, cr->sts_keeper_en_m, keeper_en,
 			  phy_idx); //0x0738[4]
@@ -361,7 +367,7 @@ void halbb_keeper_cond(struct bb_info *bb, bool keeper_en, u8 keeper_trig_cond,
 void halbb_dbg_port_sel(struct bb_info *bb, u16 dbg_port_sel, u8 dbg_port_ip_sel,
 			bool dbg_port_ref_clk_en, bool dbg_port_en)
 {
-	struct bb_rpt_cr_info *cr = &bb->bb_rpt_i.bb_rpt_cr_i;
+	struct bb_rpt_cr_info *cr = &bb->bb_cmn_hooker->bb_rpt_i.bb_rpt_cr_i;
 
 	halbb_set_reg(bb, cr->dbg_port_sel, 0xfff, dbg_port_sel); // 0x20f0[11:0]
 	halbb_set_reg(bb, cr->dbg_port_ip_sel, cr->dbg_port_ip_sel_m,
@@ -376,7 +382,7 @@ u8 halbb_mp_get_rxevm(struct bb_info *bb, u8 user, u8 strm, bool is_seg_0)
 {
 #if 0
 	// Note: Only supports 2SS ! //
-	struct bb_rpt_cr_info *cr = &bb->bb_rpt_i.bb_rpt_cr_i;
+	struct bb_rpt_cr_info *cr = &bb->bb_cmn_hooker->bb_rpt_i.bb_rpt_cr_i;
 	enum phl_phy_idx phy_idx = bb->bb_phy_idx;
 	u8 rxevm;
 
@@ -503,7 +509,7 @@ u8 halbb_mp_get_rxevm(struct bb_info *bb, u8 user, u8 strm, bool is_seg_0)
 	u8 mode;
 	u32 user_mask[4] = {0xff000000, 0xff0000, 0xff00, 0xff};
 
-	struct bb_rpt_cr_info *cr = &bb->bb_rpt_i.bb_rpt_cr_i;
+	struct bb_rpt_cr_info *cr = &bb->bb_cmn_hooker->bb_rpt_i.bb_rpt_cr_i;
 
 	BB_DBG(bb, DBG_PHY_CONFIG, "<====== %s ======>\n", __func__);
 	/*==== Error handling ====*/
@@ -535,7 +541,7 @@ struct rxevm_physts halbb_mp_get_rxevm_physts(struct bb_info *bb,
 					      enum phl_phy_idx phy_idx)
 {
 	// Note: Only supports 2SS ! //
-	struct bb_rpt_cr_info *cr = &bb->bb_rpt_i.bb_rpt_cr_i;
+	struct bb_rpt_cr_info *cr = &bb->bb_cmn_hooker->bb_rpt_i.bb_rpt_cr_i;
 
 	bool is_cck;
 	u8 i = 0;
@@ -579,7 +585,11 @@ struct rxevm_physts halbb_mp_get_rxevm_physts(struct bb_info *bb,
 	// Config user0
 	halbb_set_reg_cmn(bb, cr->sts_user_sel, cr->sts_user_sel_m, 0, phy_idx);
 
-	halbb_set_reg_cmn(bb, cr->sts_keeper_read, cr->sts_keeper_read_m, 1, phy_idx);
+	// Set to Read State //
+	halbb_set_reg_cmn(bb, cr->sts_keeper_read, cr->sts_keeper_read_m, 0, HW_PHY_0);
+	halbb_delay_ms(bb, 1);
+	// Set to Write State //
+	halbb_set_reg_cmn(bb, cr->sts_keeper_read, cr->sts_keeper_read_m, 1, HW_PHY_0);
 
 	halbb_delay_us(bb, 2);
 
@@ -636,7 +646,6 @@ struct rxevm_physts halbb_mp_get_rxevm_physts(struct bb_info *bb,
 		BB_DBG(bb, DBG_PHY_CONFIG, "[Rxevm] No crc_ok\n");
 		bb->rxevm = bb->bb_cmn_backup_i.last_rxevm_rpt;
 	}
-	halbb_set_reg_cmn(bb, cr->sts_keeper_read, cr->sts_keeper_read_m, 0, phy_idx);
 
 	halbb_release_bb_dbg_port(bb);
 
@@ -667,7 +676,7 @@ u16 halbb_mp_get_pwdb_diff(struct bb_info *bb, enum rf_path path)
 
 u8 halbb_mp_get_rssi_td(struct bb_info *bb, enum rf_path path)
 {
-	struct bb_rpt_cr_info *cr = &bb->bb_rpt_i.bb_rpt_cr_i;
+	struct bb_rpt_cr_info *cr = &bb->bb_cmn_hooker->bb_rpt_i.bb_rpt_cr_i;
 	u32 rpt_mask_ofst[4] = {0xff, 0xff00, 0xff0000, 0xff000000};
 	u32 dbg_port = 0;
 	u8 rssi;
@@ -690,6 +699,9 @@ u8 halbb_mp_get_rssi_td(struct bb_info *bb, enum rf_path path)
 	}
 
 	// Set to Read State //
+	halbb_set_reg_cmn(bb, cr->sts_keeper_read, cr->sts_keeper_read_m, 0, HW_PHY_0);
+	halbb_delay_ms(bb, 1);
+	// Set to Write State //
 	halbb_set_reg_cmn(bb, cr->sts_keeper_read, cr->sts_keeper_read_m, 1, HW_PHY_0);
 
 	halbb_delay_us(bb, 2);
@@ -704,8 +716,6 @@ u8 halbb_mp_get_rssi_td(struct bb_info *bb, enum rf_path path)
 		rssi = 0xff;
 	}
 
-	halbb_set_reg_cmn(bb, cr->sts_keeper_read, cr->sts_keeper_read_m, 0, HW_PHY_0);
-
 	halbb_release_bb_dbg_port(bb);
 
 	return rssi;
@@ -713,49 +723,11 @@ u8 halbb_mp_get_rssi_td(struct bb_info *bb, enum rf_path path)
 
 u8 halbb_mp_get_rssi(struct bb_info *bb, enum rf_path path)
 {
-#if 0
-	struct bb_rpt_cr_info *cr = &bb->bb_rpt_i.bb_rpt_cr_i;
-	u32 rpt_mask_ofst[4] = {0xff, 0xff00, 0xff0000, 0xff000000};
-	u32 dbg_port = 0;
-	u8 rssi;
-
-	// Set keeper condition //
-	halbb_keeper_cond(bb, true, 0x1, 0x2, HW_PHY_0);
-
-	// DBG port polling //
-	if (halbb_bb_dbg_port_racing(bb, DBGPORT_PRI_3)) {
-		halbb_dbg_port_sel(bb, 0x700, 0x1, 0x0, 0x1);
-	} else {
-		dbg_port = halbb_get_bb_dbg_port_idx(bb);
-		BB_TRACE("[Set dbg_port fail!] Curr-DbgPort=0x%x\n", dbg_port);
-		return 0xff;
-	}
-
-	// Set to Read State //
-	halbb_set_reg_cmn(bb, cr->sts_keeper_read, cr->sts_keeper_read_m, 1, HW_PHY_0);
-
-	halbb_delay_us(bb, 2);
-
-	// Polling machanism that determines if read state is successfully set //
-	if (halbb_get_reg(bb, cr->dbg32_d, BIT(5)) == 1) {
-		halbb_set_reg_cmn(bb, cr->sts_keeper_addr, cr->sts_keeper_addr_m, 0, HW_PHY_0);
-		rssi = (u8)halbb_get_reg_cmn(bb, cr->sts_keeper_data, rpt_mask_ofst[path], HW_PHY_0); // Only use [23:15], Total [31:0]
-		bb->bb_cmn_backup_i.last_rpl = rssi;
-	} else {
-		rssi = bb->bb_cmn_backup_i.last_rpl;
-	}
-
-	halbb_set_reg_cmn(bb, cr->sts_keeper_read, cr->sts_keeper_read_m, 0, HW_PHY_0);
-
-	halbb_release_bb_dbg_port(bb);
-
-	return rssi;
-#else
 	u8 rssi;
 	u32 dbg_port = 0;
 
 	// RSSI_FD
-	struct bb_rpt_cr_info *cr = &bb->bb_rpt_i.bb_rpt_cr_i;
+	struct bb_rpt_cr_info *cr = &bb->bb_cmn_hooker->bb_rpt_i.bb_rpt_cr_i;
 
 	// Phy0 / 1
 	halbb_set_reg_cmn(bb, cr->sts_keeper_en, cr->sts_keeper_en_m, 1, HW_PHY_0);
@@ -775,6 +747,10 @@ u8 halbb_mp_get_rssi(struct bb_info *bb, enum rf_path path)
 		return bb->bb_cmn_backup_i.last_rpl;
 	}
 
+	// Set to Read State //
+	halbb_set_reg_cmn(bb, cr->sts_keeper_read, cr->sts_keeper_read_m, 0, HW_PHY_0);
+	halbb_delay_ms(bb, 1);
+	// Set to Write State //
 	halbb_set_reg_cmn(bb, cr->sts_keeper_read, cr->sts_keeper_read_m, 1, HW_PHY_0);
 
 	halbb_delay_us(bb, 2);
@@ -787,12 +763,10 @@ u8 halbb_mp_get_rssi(struct bb_info *bb, enum rf_path path)
 		rssi = bb->bb_cmn_backup_i.last_rpl;
 	}
 
-	halbb_set_reg_cmn(bb, cr->sts_keeper_read, cr->sts_keeper_read_m, 0, HW_PHY_0);
 
 	halbb_release_bb_dbg_port(bb);
 
 	return rssi;
-#endif
 }
 
 s32 halbb_rssi_cal(struct bb_info *bb, u8 rssi_0, u8 rssi_1, bool is_higher_rssi_path, enum phl_phy_idx phy_idx)
@@ -824,7 +798,7 @@ s32 halbb_rssi_cal(struct bb_info *bb, u8 rssi_0, u8 rssi_1, bool is_higher_rssi
 struct rssi_physts halbb_get_mp_rssi_physts(struct bb_info *bb, enum rf_path path, enum phl_phy_idx phy_idx)
 {
 	// RSSI_FD: This function is used for MP UI report, which is RPL value
-	struct bb_rpt_cr_info *cr = &bb->bb_rpt_i.bb_rpt_cr_i;
+	struct bb_rpt_cr_info *cr = &bb->bb_cmn_hooker->bb_rpt_i.bb_rpt_cr_i;
 	struct bb_physts_info *physts = &bb->bb_physts_i;
 	struct bb_physts_rslt_hdr_info *psts_h = &physts->bb_physts_rslt_hdr_i;
 	struct bb_efuse_info efuse = bb->bb_efuse_i;
@@ -845,7 +819,7 @@ struct rssi_physts halbb_get_mp_rssi_physts(struct bb_info *bb, enum rf_path pat
 
 	// 2G Band: (0)
 	// 5G Band: (1):Low, (2): Mid, (3):High
-	if (central_ch >= 0 && central_ch <= 14)
+	if (central_ch <= 14)
 		band = 0;
 	else if (central_ch >= 36 && central_ch <= 64)
 		band = 1;
@@ -872,7 +846,11 @@ struct rssi_physts halbb_get_mp_rssi_physts(struct bb_info *bb, enum rf_path pat
 		return bb->bb_cmn_backup_i.last_rssi_rpt;
 	}
 
-	halbb_set_reg_cmn(bb, cr->sts_keeper_read, cr->sts_keeper_read_m, 1, phy_idx);
+	// Set to Read State //
+	halbb_set_reg_cmn(bb, cr->sts_keeper_read, cr->sts_keeper_read_m, 0, HW_PHY_0);
+	halbb_delay_ms(bb, 1);
+	// Set to Write State //
+	halbb_set_reg_cmn(bb, cr->sts_keeper_read, cr->sts_keeper_read_m, 1, HW_PHY_0);
 
 	halbb_delay_us(bb, 2);
 
@@ -891,7 +869,6 @@ struct rssi_physts halbb_get_mp_rssi_physts(struct bb_info *bb, enum rf_path pat
 		}
 	#endif
 
-	halbb_set_reg_cmn(bb, cr->sts_keeper_read, cr->sts_keeper_read_m, 0, phy_idx);
 
 	halbb_release_bb_dbg_port(bb);
 
@@ -947,13 +924,13 @@ struct rssi_physts halbb_get_mp_rssi_physts(struct bb_info *bb, enum rf_path pat
 
 u16 halbb_mp_get_rpl(struct bb_info *bb, enum rf_path path, enum phl_phy_idx phy_idx)
 {
-	struct bb_rpt_cr_info *cr = &bb->bb_rpt_i.bb_rpt_cr_i;
+	struct bb_rpt_cr_info *cr = &bb->bb_cmn_hooker->bb_rpt_i.bb_rpt_cr_i;
 	u16 rpl = 0;
 	u32 rpl_m[2] = {0x1fff, 0x3ffe000};
 
 	// Error hadling
-	if (path > RF_PATH_D || path < RF_PATH_A) {
-		BB_WARNING("Invalid Path!\n");
+	if (path > RF_PATH_B || path < RF_PATH_A) {
+		BB_WARNING("[%s] path=%d\n", __func__, path);
 		return 0xffff;
 	}
 
@@ -967,14 +944,14 @@ u16 halbb_mp_get_rpl(struct bb_info *bb, enum rf_path path, enum phl_phy_idx phy
 
 u32 halbb_mp_get_dc_lvl(struct bb_info *bb, enum rf_path path, bool i_ch, enum phl_phy_idx phy_idx)
 {
-	struct bb_rpt_cr_info *cr = &bb->bb_rpt_i.bb_rpt_cr_i;
+	struct bb_rpt_cr_info *cr = &bb->bb_cmn_hooker->bb_rpt_i.bb_rpt_cr_i;
 	u16 path_tmp[2] = {0xb12, 0xb22};
 	u32 tmp = 0;
 	u32 dbg_port = 0;
 
 	// Error hadling
-	if (path > RF_PATH_D || path < RF_PATH_A) {
-		BB_WARNING("Invalid Path!\n");
+	if (path > RF_PATH_B || path < RF_PATH_A) {
+		BB_WARNING("[%s] path=%d\n", __func__, path);
 		return 0xffff;
 	}
 
@@ -1000,7 +977,7 @@ u32 halbb_mp_get_dc_lvl(struct bb_info *bb, enum rf_path path, bool i_ch, enum p
 
 u16 halbb_mp_get_pwdbm(struct bb_info *bb, enum rf_path path, enum phl_phy_idx phy_idx)
 {
-	struct bb_rpt_cr_info *cr = &bb->bb_rpt_i.bb_rpt_cr_i;
+	struct bb_rpt_cr_info *cr = &bb->bb_cmn_hooker->bb_rpt_i.bb_rpt_cr_i;
 	u16 pwdbm;
 
 	// Error hadling
@@ -1023,7 +1000,7 @@ u16 halbb_mp_get_pwdbm(struct bb_info *bb, enum rf_path path, enum phl_phy_idx p
 
 u16 halbb_mp_get_cfo(struct bb_info *bb, enum phl_phy_idx phy_idx)
 {
-	struct bb_rpt_cr_info *cr = &bb->bb_rpt_i.bb_rpt_cr_i;
+	struct bb_rpt_cr_info *cr = &bb->bb_cmn_hooker->bb_rpt_i.bb_rpt_cr_i;
 	u32 dbg_port = 0;
 	u16 cfo = 0;
 	u16 tmp = 0;
@@ -1042,6 +1019,9 @@ u16 halbb_mp_get_cfo(struct bb_info *bb, enum phl_phy_idx phy_idx)
 	}
 
 	// Set to Read State //
+	halbb_set_reg_cmn(bb, cr->sts_keeper_read, cr->sts_keeper_read_m, 0, HW_PHY_0);
+	halbb_delay_ms(bb, 1);
+	// Set to Write State //
 	halbb_set_reg_cmn(bb, cr->sts_keeper_read, cr->sts_keeper_read_m, 1, HW_PHY_0);
 
 	halbb_delay_us(bb, 2);
@@ -1055,8 +1035,6 @@ u16 halbb_mp_get_cfo(struct bb_info *bb, enum phl_phy_idx phy_idx)
 		cfo = bb->bb_cmn_backup_i.last_cfo;
 	}
 
-	// Set to Write State //
-	halbb_set_reg_cmn(bb, cr->sts_keeper_read, cr->sts_keeper_read_m, 0, HW_PHY_0);
 
 	// Release DBG port //
 	halbb_release_bb_dbg_port(bb);
@@ -1105,7 +1083,7 @@ void halbb_mp_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 
 void halbb_cr_cfg_mp_init(struct bb_info *bb)
 {
-	struct bb_rpt_info *rpt_info = &bb->bb_rpt_i;
+	struct bb_rpt_info *rpt_info = &bb->bb_cmn_hooker->bb_rpt_i;
 	struct bb_rpt_cr_info *cr = &rpt_info->bb_rpt_cr_i;
 
 	switch (bb->cr_type) {
@@ -1435,6 +1413,93 @@ void halbb_cr_cfg_mp_init(struct bb_info *bb)
 		cr->sts_user_sel_m = STS_USER_SEL_BE0_M;
 		cr->path1_g_lna6 = PATH1_R_G_G_LNA6_BE0;
 		cr->path1_g_lna6_m = PATH1_R_G_G_LNA6_BE0_M;
+		break;
+	#endif
+
+	#ifdef HALBB_COMPILE_BE1_SERIES
+	case BB_BE1:
+		cr->cnt_ccktxon = CNT_CCKTXON_BE1;
+		cr->cnt_ccktxon_m = CNT_CCKTXON_BE1_M;
+		cr->cnt_ofdmtxon = CNT_OFDMTXON_BE1;
+		cr->cnt_ofdmtxon_m = CNT_OFDMTXON_BE1_M;
+		cr->cnt_cck_crc32ok_p0 = CNT_CCK_CRC32OK_P0_BE1;
+		cr->cnt_cck_crc32ok_p0_m = CNT_CCK_CRC32OK_P0_BE1_M;
+		cr->cnt_cck_crc32ok_p1 = CNT_CCK_CRC32OK_P1_BE1;
+		cr->cnt_cck_crc32ok_p1_m = CNT_CCK_CRC32OK_P1_BE1_M;
+		cr->cnt_l_crc_ok = CNT_L_CRC_OK_BE1; //
+		cr->cnt_l_crc_ok_m = CNT_L_CRC_OK_BE1_M;
+		cr->cnt_ht_crc_ok = CNT_HT_CRC_OK_BE1;
+		cr->cnt_ht_crc_ok_m = CNT_HT_CRC_OK_BE1_M;
+		cr->cnt_vht_crc_ok = CNT_VHT_CRC_OK_BE1;
+		cr->cnt_vht_crc_ok_m = CNT_VHT_CRC_OK_BE1_M;
+		cr->cnt_he_crc_ok = CNT_HE_CRC_OK_BE1;
+		cr->cnt_he_crc_ok_m = CNT_HE_CRC_OK_BE1_M;
+		cr->cnt_eht_crc_ok = CNT_EHT_CRC_OK_BE1;
+		cr->cnt_eht_crc_ok_m = CNT_EHT_CRC_OK_BE1_M;
+		cr->cnt_cck_crc32fail_p0 = CNT_CCK_CRC32FAIL_P0_BE1;
+		cr->cnt_cck_crc32fail_p0_m = CNT_CCK_CRC32FAIL_P0_BE1_M;
+		cr->cnt_cck_crc32fail_p1 = CNT_CCK_CRC32FAIL_P1_BE1;
+		cr->cnt_cck_crc32fail_p1_m = CNT_CCK_CRC32FAIL_P1_BE1_M;
+		cr->cnt_l_crc_err = CNT_L_CRC_ERR_BE1;
+		cr->cnt_l_crc_err_m = CNT_L_CRC_ERR_BE1_M;
+		cr->cnt_ht_crc_err = CNT_HT_CRC_ERR_BE1;
+		cr->cnt_ht_crc_err_m = CNT_HT_CRC_ERR_BE1_M;
+		cr->cnt_vht_crc_err = CNT_VHT_CRC_ERR_BE1;
+		cr->cnt_vht_crc_err_m = CNT_VHT_CRC_ERR_BE1_M;
+		cr->cnt_he_crc_err = CNT_HE_CRC_ERR_BE1;
+		cr->cnt_he_crc_err_m = CNT_HE_CRC_ERR_BE1_M;
+		cr->cnt_eht_crc_err = CNT_EHT_CRC_ERR_BE1;
+		cr->cnt_eht_crc_err_m = CNT_EHT_CRC_ERR_BE1_M;
+		cr->rst_all_cnt = TOP_CTRL_P0_R_RST_ALL_CNT_BE1;
+		cr->rst_all_cnt_m = TOP_CTRL_P0_R_RST_ALL_CNT_BE1_M;
+		cr->phy_sts_bitmap_he_mu = TOP_CTRL_P0_R_PHY_STS_BITMAP_HE_MU_BE1;
+		cr->phy_sts_bitmap_he_mu_m = TOP_CTRL_P0_R_PHY_STS_BITMAP_HE_MU_BE1_M;
+		cr->phy_sts_bitmap_vht_mu = TOP_CTRL_P0_R_PHY_STS_BITMAP_VHT_MU_BE1;
+		cr->phy_sts_bitmap_vht_mu_m = TOP_CTRL_P0_R_PHY_STS_BITMAP_VHT_MU_BE1_M;
+		cr->phy_sts_bitmap_cck = TOP_CTRL_P0_R_PHY_STS_BITMAP_CCK_BE1;
+		cr->phy_sts_bitmap_cck_m = TOP_CTRL_P0_R_PHY_STS_BITMAP_CCK_BE1_M;
+		cr->phy_sts_bitmap_legacy = TOP_CTRL_P0_R_PHY_STS_BITMAP_LEGACY_BE1;
+		cr->phy_sts_bitmap_legacy_m = TOP_CTRL_P0_R_PHY_STS_BITMAP_LEGACY_BE1_M;
+		cr->phy_sts_bitmap_ht = TOP_CTRL_P0_R_PHY_STS_BITMAP_HT_BE1;
+		cr->phy_sts_bitmap_ht_m = TOP_CTRL_P0_R_PHY_STS_BITMAP_HT_BE1_M;
+		cr->phy_sts_bitmap_vht = TOP_CTRL_P0_R_PHY_STS_BITMAP_VHT_BE1;
+		cr->phy_sts_bitmap_vht_m = TOP_CTRL_P0_R_PHY_STS_BITMAP_VHT_BE1_M;
+		cr->phy_sts_bitmap_he = TOP_CTRL_P0_R_PHY_STS_BITMAP_HE_BE1;
+		cr->phy_sts_bitmap_he_m = TOP_CTRL_P0_R_PHY_STS_BITMAP_HE_BE1_M;
+		cr->rpt_tone_evm_idx = RXINT_R_RPT_TONE_EVM_IDX_BE1;
+		cr->rpt_tone_evm_idx_m = RXINT_R_RPT_TONE_EVM_IDX_BE1_M;
+		cr->dbg_port_ref_clk_en = DBG_PORT_REF_CLK_EN_BE1;
+		cr->dbg_port_ref_clk_en_m = DBG_PORT_REF_CLK_EN_BE1_M;
+		cr->dbg_port_en = DBG_PORT_EN_BE1;
+		cr->dbg_port_en_m = DBG_PORT_EN_BE1_M;
+		cr->dbg_port_ip_sel = DBG_PORT_IP_SEL_BE1;
+		cr->dbg_port_ip_sel_m = DBG_PORT_IP_SEL_BE1_M;
+		cr->dbg_port_sel = DBG_PORT_SEL_BE1;
+		cr->dbg_port_sel_m = DBG_PORT_SEL_BE1_M;
+		cr->dbg32_d = DBG32_D_BE1;
+		cr->dbg32_d_m = DBG32_D_BE1_M;
+		cr->phy_sts_bitmap_trigbase = TOP_CTRL_P0_R_PHY_STS_BITMAP_TRIGBASE_BE1;
+		cr->phy_sts_bitmap_trigbase_m = TOP_CTRL_P0_R_PHY_STS_BITMAP_TRIGBASE_BE1_M;
+		cr->sts_keeper_en = TOP_CTRL_P0_R_STS_KEEPER_EN_BE1;
+		cr->sts_keeper_en_m = TOP_CTRL_P0_R_STS_KEEPER_EN_BE1_M;
+		cr->sts_keeper_trig_cond = TOP_CTRL_P0_R_STS_KEEPER_TRIG_COND_BE1;
+		cr->sts_keeper_trig_cond_m = TOP_CTRL_P0_R_STS_KEEPER_TRIG_COND_BE1_M;
+		cr->sts_dbg_sel = TOP_CTRL_P0_R_STS_DBG_SEL_BE1;
+		cr->sts_dbg_sel_m = TOP_CTRL_P0_R_STS_DBG_SEL_BE1_M;
+		cr->sts_keeper_read = TOP_CTRL_P0_R_STS_KEEPER_READ_BE1;
+		cr->sts_keeper_read_m = TOP_CTRL_P0_R_STS_KEEPER_READ_BE1_M;
+		cr->sts_keeper_addr = TOP_CTRL_P0_R_STS_KEEPER_ADDR_BE1;
+		cr->sts_keeper_addr_m = TOP_CTRL_P0_R_STS_KEEPER_ADDR_BE1_M;
+		cr->sts_keeper_data = STS_KEEPER_DATA_BE1;
+		cr->sts_keeper_data_m = STS_KEEPER_DATA_BE1_M;
+		cr->path0_rssi_at_agc_rdy = RSSI_AT_AGC_RDY_PATH0_BE1;
+		cr->path0_rssi_at_agc_rdy_m = RSSI_AT_AGC_RDY_PATH0_BE1_M;
+		cr->path1_rssi_at_agc_rdy = RSSI_AT_AGC_RDY_PATH1_BE1;
+		cr->path1_rssi_at_agc_rdy_m = RSSI_AT_AGC_RDY_PATH1_BE1_M;
+		cr->sts_user_sel = TOP_CTRL_P0_R_STS_USER_SEL_BE1;
+		cr->sts_user_sel_m = TOP_CTRL_P0_R_STS_USER_SEL_BE1_M;
+		cr->path1_g_lna6 = PATH1_R_G_G_LNA6_BE1;
+		cr->path1_g_lna6_m = PATH1_R_G_G_LNA6_BE1_M;
 		break;
 	#endif
 

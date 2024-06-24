@@ -19,7 +19,7 @@
 
 /*@--------------------------[Define] ---------------------------------------*/
 
-#define RATE_UP_TH 6
+#define RATE_UP_TH 7
 
 enum highest_mcs {
 	L0_HIGHEST_MCS = 0x82,

@@ -17,9 +17,7 @@
 
 #ifdef CONFIG_PHL_CUSTOM_FEATURE_VR
 #include "phl_custom_vr.h"
-
-#define LLC_HDR_LENGTH                  6
-#define SNAP_HDR_LENGTH                 2
+#include "phl_custom_vr_csi.h"
 
 enum phl_mdl_ret_code
 _is_vr_mode_valid(void* custom_ctx,
@@ -44,8 +42,18 @@ _feature_vr_enable_init_setting(void* custom_ctx,
                              struct _custom_vr_ctx* vr_ctx)
 {
 	struct phl_info_t *phl = phl_custom_get_phl_info(custom_ctx);
+	struct rtw_hal_com_t *hal_com = rtw_hal_get_halcom(phl->hal);
 
 	vr_ctx->init.phl = phl;
+#ifdef CONFIG_USB_HCI
+	/* To Do: to offload gpio number in halmac for different ICs */
+	rtw_hal_set_sw_gpio_mode(phl->phl_com, phl->hal
+		, RTW_AX_SW_IO_MODE_OUTPUT_OD, 12);
+
+	rtw_hal_set_sw_gpio_mode(phl->phl_com, phl->hal
+		, RTW_AX_SW_IO_MODE_OUTPUT_OD, 14);
+#endif
+	rtw_hal_auto_debug_en_phy_util(hal_com, true);
 
 	return true;
 }
@@ -55,6 +63,10 @@ _feature_vr_enable_deinit_setting(void* custom_ctx,
                                struct _custom_vr_ctx* vr_ctx)
 {
 	/* TBD: merge codes from custom branch for the deinit setting*/
+	struct phl_info_t *phl = phl_custom_get_phl_info(custom_ctx);
+	struct rtw_hal_com_t *hal_com = rtw_hal_get_halcom(phl->hal);
+
+	rtw_hal_auto_debug_en_phy_util(hal_com, false);
 
 	return;
 }
@@ -573,6 +585,411 @@ exit:
 }
 
 enum phl_mdl_ret_code
+_phl_custom_vr_edca_query(void* custom_ctx,
+                          struct _custom_vr_ctx* vr_ctx,
+                          struct phl_msg* msg)
+{
+	enum phl_mdl_ret_code ret = MDL_RET_FAIL;
+	enum rtw_hal_status hal_status = RTW_HAL_STATUS_FAILURE;
+	struct phl_info_t *phl = phl_custom_get_phl_info(custom_ctx);
+	struct rtw_custom_decrpt *cmd = (struct rtw_custom_decrpt *)(msg->inbuf);
+	struct rtw_edca_param edca_param = {0};
+	struct rtw_wifi_role_t *wifi_role = NULL;
+	struct rtw_wifi_role_link_t *rlink = NULL;
+	u8 idx = 0;
+
+	edca_param.ac = 0xFF;
+	ret = _is_vr_mode_valid(custom_ctx, vr_ctx, msg, sizeof(u8));
+	if (ret != MDL_RET_SUCCESS)
+		goto exit;
+
+	wifi_role = vr_ctx->init.wifi_role;
+	edca_param.ac = *((u8*)(cmd->data));
+
+	for (idx = 0; idx < wifi_role->rlink_num; idx++) {
+		rlink = get_rlink(wifi_role, idx);
+
+		hal_status = rtw_hal_get_edca(phl->hal,
+		                              rlink,
+		                              &edca_param);
+		if (hal_status != RTW_HAL_STATUS_SUCCESS)
+			ret = MDL_RET_FAIL;
+	}
+
+	if (hal_status != RTW_HAL_STATUS_SUCCESS)
+		edca_param.ac = 0xFF;
+
+	PHL_INFO("%s, custom_vr_edca_param rpt: ac(%d), param(0x%x)\n",
+	         __FUNCTION__,
+	         edca_param.ac,
+	         edca_param.param);
+exit:
+	phl_custom_prepare_evt_rpt(custom_ctx,
+	                           cmd->evt_id,
+	                           cmd->customer_id,
+	                           (u8*)&edca_param,
+	                           sizeof(struct rtw_edca_param));
+
+	return MDL_RET_SUCCESS;
+}
+
+enum phl_mdl_ret_code
+_phl_custom_vr_sr_cfg(void* custom_ctx,
+                       struct _custom_vr_ctx* vr_ctx,
+                       struct phl_msg* msg)
+{
+	enum phl_mdl_ret_code ret = MDL_RET_FAIL;
+	enum rtw_hal_status hal_status = RTW_HAL_STATUS_FAILURE;
+	struct phl_info_t *phl = phl_custom_get_phl_info(custom_ctx);
+	struct rtw_custom_decrpt *cmd = (struct rtw_custom_decrpt *)(msg->inbuf);
+	u32 size = sizeof(u8);
+	u8 sr_enable = false;
+
+	ret = _is_vr_mode_valid(custom_ctx, vr_ctx, msg, size);
+	if (ret != MDL_RET_SUCCESS) {
+		goto exit;
+	}
+
+	sr_enable = *(u8*)(cmd->data);
+	PHL_INFO("%s, sr_enable(%d)\n", __FUNCTION__, sr_enable);
+
+	hal_status = rtw_hal_set_spatial_reuse_en(phl->hal, (bool)sr_enable);
+	if (hal_status != RTW_HAL_STATUS_SUCCESS)
+		ret = MDL_RET_FAIL;
+
+exit:
+	phl_custom_prepare_evt_rpt(custom_ctx,
+	                           cmd->evt_id,
+	                           cmd->customer_id,
+	                           (u8*)&ret,
+	                           sizeof(u8));
+
+	return ret;
+}
+
+enum phl_mdl_ret_code
+_phl_custom_vr_sr_query(void* custom_ctx,
+                         struct _custom_vr_ctx* vr_ctx,
+                         struct phl_msg* msg)
+{
+	enum phl_mdl_ret_code ret = MDL_RET_FAIL;
+	struct phl_info_t *phl = phl_custom_get_phl_info(custom_ctx);
+	struct rtw_custom_decrpt *cmd = (struct rtw_custom_decrpt *)(msg->inbuf);
+	u32 size = sizeof(u8);
+	u8 sr_enable = 0xff;
+
+	ret = _is_vr_mode_valid(custom_ctx, vr_ctx, msg, size);
+	if (ret != MDL_RET_SUCCESS){
+		goto exit;
+	}
+
+	sr_enable = rtw_hal_is_spatial_reuse_en(phl->hal);
+	PHL_INFO("%s, sr_en(%d)\n", __FUNCTION__, sr_enable);
+exit:
+	phl_custom_prepare_evt_rpt(custom_ctx,
+	                           cmd->evt_id,
+	                           cmd->customer_id,
+	                           &sr_enable,
+	                            sizeof(u8));
+
+	return ret;
+}
+
+enum phl_mdl_ret_code _phl_custom_vr_rf_scramble(void *custom_ctx,
+						 struct _custom_vr_ctx *vr_ctx,
+						 struct phl_msg *msg)
+{
+	enum phl_mdl_ret_code ret = MDL_RET_FAIL;
+	enum rtw_hal_status hal_status = RTW_HAL_STATUS_FAILURE;
+	struct phl_info_t *phl = phl_custom_get_phl_info(custom_ctx);
+	void *d = phl_to_drvpriv(phl);
+	struct rtw_custom_decrpt *cmd =
+	    (struct rtw_custom_decrpt *)(msg->inbuf);
+	struct _vr_rf_scrmb *val = (struct _vr_rf_scrmb *)(cmd->data);
+	u32 size = sizeof(struct _vr_rf_scrmb);
+
+	ret = _is_vr_mode_valid(custom_ctx, vr_ctx, msg, size);
+	if (ret != MDL_RET_SUCCESS) {
+		val->status = RTW_HAL_STATUS_FAILURE;
+		goto exit;
+	}
+
+	PHL_INFO("%s: scramble cmd(%s)\n", __func__,
+		 (val->is_set) ? "Set_scrmb" : "Get_scrmb");
+	if (val->is_set) {
+		hal_status = rtw_hal_set_usr_frame_to_act(
+		    phl->hal, val->mode, val->to_thr, val->trigger_cnt,
+		    val->sw_def_bmp);
+		val->status = (u8)hal_status;
+		if (hal_status == RTW_HAL_STATUS_SUCCESS)
+			_os_mem_cpy(d, &vr_ctx->cur_scrmb_param, val, size);
+	} else {
+		_os_mem_cpy(d, val, &vr_ctx->cur_scrmb_param, size);
+	}
+
+exit:
+	phl_custom_prepare_evt_rpt(custom_ctx, cmd->evt_id, cmd->customer_id,
+				   (u8 *)val, sizeof(struct _vr_rf_scrmb));
+
+	return ret;
+}
+
+struct custom_vr_perf_metrics_rlink {
+	u8 mac_addr[MAC_ALEN];
+	u8 rssi;
+	char tx_rate_str[32];
+	char rx_rate_str[32];
+	u8 clm_ratio;
+	u8 nhm_ratio;
+	u8 snr_avg;
+};
+
+struct custom_vr_perf_metrics {
+	u8 rlink_num;
+	struct custom_vr_perf_metrics_rlink perf_metrics_rlink[RTW_RLINK_MAX];
+};
+
+enum phl_mdl_ret_code
+_phl_custom_vr_perf_mertics_query(void* custom_ctx,
+                                 struct _custom_vr_ctx* vr_ctx,
+                                 struct phl_msg* msg) {
+	enum phl_mdl_ret_code ret = MDL_RET_FAIL;
+	struct phl_info_t *phl = phl_custom_get_phl_info(custom_ctx);
+	void *drv = phl_to_drvpriv(phl);
+	struct rtw_custom_decrpt *cmd = (struct rtw_custom_decrpt *)(msg->inbuf);
+	struct custom_vr_perf_metrics perf_metrics = {0};
+	struct custom_vr_perf_metrics_rlink *curr = NULL;
+	struct rtw_wifi_role_t *wrole = NULL;
+	struct rtw_wifi_role_link_t *rlink = NULL;
+	struct rtw_phl_stainfo_t *n, *psta;
+	struct rtw_hal_com_t *hal_com = rtw_hal_get_halcom(phl->hal);
+	struct rtw_env_report env_rpt = {0};
+	u8 idx = 0;
+
+	PHL_INFO("Enter %s\n", __func__);
+
+	ret = _is_vr_mode_valid(custom_ctx, vr_ctx, msg, sizeof(u8));
+	if (ret != MDL_RET_SUCCESS)
+		goto exit;
+
+	wrole = vr_ctx->init.wifi_role;
+	perf_metrics.rlink_num = wrole->rlink_num;
+	PHL_INFO("%s(): rlink_num = %d\n", __func__, perf_metrics.rlink_num);
+	for (idx = 0; idx < wrole->rlink_num; idx++) {
+		rlink = get_rlink(wrole, idx);
+		curr = &perf_metrics.perf_metrics_rlink[idx];
+		_os_spinlock(drv, &rlink->assoc_sta_queue.lock, _bh, NULL);
+		phl_list_for_loop_safe(psta, n, struct rtw_phl_stainfo_t,
+		       &rlink->assoc_sta_queue.queue, list) {
+			_os_mem_cpy(drv, curr->mac_addr, psta->mac_addr, MAC_ALEN);
+			PHL_INFO("mac addr %02x-%02x-%02x-%02x-%02x-%02x\n",
+			         curr->mac_addr[0], curr->mac_addr[1],
+			         curr->mac_addr[2], curr->mac_addr[3],
+			         curr->mac_addr[4], curr->mac_addr[5]);
+
+			PHL_INFO("WROLE-IDX:%d RLINK-IDX:%d wlan_mode:0x%02x, chan:%d, bw:%d, rlink_state:%s\n",
+			         psta->wrole->id,
+			         psta->rlink->id,
+			         psta->wmode,
+			         psta->chandef.chan,
+			         psta->chandef.bw,
+			         rlink->mstate?((rlink->mstate & MLME_LINKING)?"Linking":"Linked Up"):"No Link");
+
+			curr->rssi = psta->hal_sta->rssi_stat.ma_rssi;
+			PHL_INFO("[Stats] MA RSSI:%d(dBm)\n",
+			         curr->rssi - PHL_MAX_RSSI);
+
+			convert_tx_rate(psta->hal_sta->ra_info.rpt_rt_i.mode,
+			                 psta->hal_sta->ra_info.rpt_rt_i.mcs_ss_idx,
+			                 curr->tx_rate_str, 32);
+			PHL_INFO("[Stats] Tx Rate:%s\n", curr->tx_rate_str);
+
+			convert_rx_rate(psta->stats.rx_rate, curr->rx_rate_str,
+			                 32);
+			PHL_INFO("[Stats] Rx Rate:%s\n", curr->rx_rate_str);
+		}
+		_os_spinunlock(drv, &rlink->assoc_sta_queue.lock, _bh, NULL);
+
+		rtw_hal_env_rpt(hal_com, &env_rpt, rlink->hw_band);
+		curr->clm_ratio = env_rpt.clm_ratio;
+		curr->nhm_ratio = env_rpt.nhm_ratio;
+		PHL_INFO("[Stats] clm_ratio = %d\n", curr->clm_ratio);
+		PHL_INFO("[Stats] nhm_ratio = %d\n", curr->nhm_ratio);
+
+		rtw_hal_query_snr_avg(hal_com, &curr->snr_avg, rlink->hw_band);
+		PHL_INFO("[Stats] snr_avg = %d\n", curr->snr_avg);
+	}
+
+exit:
+	phl_custom_prepare_evt_rpt(custom_ctx,
+	                           cmd->evt_id,
+	                           cmd->customer_id,
+	                           (u8*)&perf_metrics,
+	                           sizeof(struct custom_vr_perf_metrics));
+
+	PHL_INFO("Leave %s\n", __func__);
+	return MDL_RET_SUCCESS;
+}
+
+enum phl_mdl_ret_code _phl_custom_vr_set_ant_switch(
+    void *custom_ctx, struct _custom_vr_ctx *vr_ctx, struct phl_msg *msg)
+{
+	enum phl_mdl_ret_code ret = MDL_RET_FAIL;
+	struct phl_info_t *phl = phl_custom_get_phl_info(custom_ctx);
+	struct rtw_custom_decrpt *cmd =
+	    (struct rtw_custom_decrpt *)(msg->inbuf);
+	u32 path = *(u32 *)(cmd->data);
+	u32 size = sizeof(u32);
+
+	ret = _is_vr_mode_valid(custom_ctx, vr_ctx, msg, size);
+	if (ret != MDL_RET_SUCCESS) {
+		goto exit;
+	}
+
+	PHL_INFO("%s: set rf path(%d)\n", __func__, path);
+
+	switch (path) {
+	case RF_PATH_AC:
+		if ((rtw_hal_sw_gpio_ctrl(phl->phl_com, phl->hal, 0, 12) !=
+		     RTW_HAL_STATUS_SUCCESS) ||
+		    (rtw_hal_sw_gpio_ctrl(phl->phl_com, phl->hal, 0, 14) !=
+		     RTW_HAL_STATUS_SUCCESS))
+			ret = MDL_RET_FAIL;
+		PHL_INFO("%s: set path to AC\n", __func__);
+		break;
+	case RF_PATH_AD:
+		if ((rtw_hal_sw_gpio_ctrl(phl->phl_com, phl->hal, 0, 12) !=
+		     RTW_HAL_STATUS_SUCCESS) ||
+		    (rtw_hal_sw_gpio_ctrl(phl->phl_com, phl->hal, 1, 14) !=
+		     RTW_HAL_STATUS_SUCCESS))
+			ret = MDL_RET_FAIL;
+		PHL_INFO("%s: set path to AD\n", __func__);
+		break;
+	case RF_PATH_BC:
+		if ((rtw_hal_sw_gpio_ctrl(phl->phl_com, phl->hal, 1, 12) !=
+		     RTW_HAL_STATUS_SUCCESS) ||
+		    (rtw_hal_sw_gpio_ctrl(phl->phl_com, phl->hal, 0, 14) !=
+		     RTW_HAL_STATUS_SUCCESS))
+			ret = MDL_RET_FAIL;
+		PHL_INFO("%s: set path to BC\n", __func__);
+		break;
+	case RF_PATH_BD:
+		if ((rtw_hal_sw_gpio_ctrl(phl->phl_com, phl->hal, 1, 12) !=
+		     RTW_HAL_STATUS_SUCCESS) ||
+		    (rtw_hal_sw_gpio_ctrl(phl->phl_com, phl->hal, 1, 14) !=
+		     RTW_HAL_STATUS_SUCCESS))
+			ret = MDL_RET_FAIL;
+		PHL_INFO("%s: set path to BD\n", __func__);
+		break;
+	default:
+		PHL_INFO("%s: unexpected rf path!\n", __func__);
+		break;
+	}
+
+exit:
+	phl_custom_prepare_evt_rpt(custom_ctx, cmd->evt_id, cmd->customer_id,
+				   (u8 *)&ret, sizeof(u32));
+
+	return ret;
+}
+
+#ifdef CONFIG_PHL_CHANNEL_INFO_VR
+enum phl_mdl_ret_code
+_phl_custom_vr_csi_cfg(void* custom_ctx,
+                       struct _custom_vr_ctx* vr_ctx,
+                       struct phl_msg* msg) {
+	enum phl_mdl_ret_code ret = MDL_RET_FAIL;
+	struct rtw_custom_decrpt *cmd = (struct rtw_custom_decrpt *)(msg->inbuf);
+	u32 size = sizeof(u8);
+	u8 csi_enable = false;
+
+	ret = _is_vr_mode_valid(custom_ctx, vr_ctx, msg, size);
+	if (ret != MDL_RET_SUCCESS) {
+		goto exit;
+	}
+
+	csi_enable = *(u8*)(cmd->data);
+	PHL_INFO("%s, csi_enable(%d)\n", __FUNCTION__, csi_enable);
+
+	if (csi_enable) {
+		struct rtw_wifi_role_t *wrole = NULL;
+		struct rtw_wifi_role_link_t *rlink = NULL;
+
+		wrole = vr_ctx->init.wifi_role;
+		rlink = get_rlink(wrole, RTW_RLINK_PRIMARY);
+		ret = rtw_phl_custom_csi_start(custom_ctx,
+		                               &vr_ctx->csi_ctrl,
+		                               rlink);
+	} else {
+		ret = rtw_phl_custom_csi_stop(custom_ctx, &vr_ctx->csi_ctrl);
+	}
+
+exit:
+	phl_custom_prepare_evt_rpt(custom_ctx,
+	                           cmd->evt_id,
+	                           cmd->customer_id,
+	                           (u8*)&ret,
+	                           sizeof(u8));
+
+	return ret;
+}
+
+/*
+ * custom_vr_csi - channel state information,
+ * @len: length of channel info buffer
+ * @buf: channel info buffer
+ *       buf size is limited by minumim of MAX_DATA_SIZE (VR command data size)
+ *       and CHAN_INFO_MAX_SIZE.
+ */
+struct custom_vr_csi {
+	u32 len;
+	u8 buf[MAX_DATA_SIZE - sizeof(u32)];
+	/* u8 buf[CHAN_INFO_MAX_SIZE]; */
+};
+
+enum phl_mdl_ret_code
+_phl_custom_vr_csi_query(void* custom_ctx,
+                         struct _custom_vr_ctx* vr_ctx,
+                         struct phl_msg* msg) {
+	enum phl_mdl_ret_code ret = MDL_RET_FAIL;
+	struct rtw_custom_decrpt *cmd = (struct rtw_custom_decrpt *)(msg->inbuf);
+	struct custom_vr_csi vr_csi = {0};
+	u32 size = sizeof(struct custom_vr_csi);
+	u32 i = 0, print_len = 0;
+	u64 *buff_tmp = NULL;
+
+	PHL_INFO("%s\n", __func__);
+
+	ret = _is_vr_mode_valid(custom_ctx, vr_ctx, msg, size);
+	if (ret != MDL_RET_SUCCESS)
+		goto exit;
+
+	ret = rtw_phl_custom_csi_rslt_query(custom_ctx,
+	                                    (u8 *)vr_csi.buf,
+	                                    &vr_csi.len);
+
+	print_len = vr_csi.len >> 3;
+	if (vr_csi.len % 8)
+		print_len++;
+	buff_tmp = (u64 *)vr_csi.buf;
+	PHL_TRACE(COMP_PHL_CHINFO, _PHL_INFO_, "%s, CSI raw data: len = %d\n",
+	          __func__, vr_csi.len);
+	for (i = 0; i < print_len; i++)
+		PHL_TRACE(COMP_PHL_CHINFO, _PHL_INFO_, "[%02d]0x%016llx\n",
+		          i, buff_tmp[i]);
+
+exit:
+	phl_custom_prepare_evt_rpt(custom_ctx,
+	                           cmd->evt_id,
+	                           cmd->customer_id,
+	                           (u8*)&vr_csi,
+	                           sizeof(struct custom_vr_csi));
+
+	return MDL_RET_SUCCESS;
+}
+#endif /* CONFIG_PHL_CHANNEL_INFO_VR */
+
+enum phl_mdl_ret_code
 phl_custom_hdl_vr_evt(void* dispr,
                       void* custom_ctx,
                       struct _custom_vr_ctx* vr_ctx,
@@ -593,6 +1010,9 @@ phl_custom_hdl_vr_evt(void* dispr,
 			break;
 		case MSG_EVT_CUSTOME_TESTMODE_PARAM:
 			ret = _phl_custom_vr_testmode_param(custom_ctx, vr_ctx, msg);
+			break;
+		case MSG_EVT_EDCA_QUERY:
+			ret = _phl_custom_vr_edca_query(custom_ctx, vr_ctx, msg);
 			break;
 		case MSG_EVT_AMPDU_CFG:
 			ret = _phl_custom_vr_ampdu_cfg(custom_ctx, vr_ctx, msg);
@@ -624,6 +1044,30 @@ phl_custom_hdl_vr_evt(void* dispr,
 		case MSG_EVT_GET_TX_RATE_RTY_TBL:
 			ret = _phl_custom_vr_get_tx_rate_rty_tbl(custom_ctx, vr_ctx, msg);
 			break;
+		case MSG_EVT_GET_PERF_METRICS:
+			ret = _phl_custom_vr_perf_mertics_query(custom_ctx, vr_ctx, msg);
+			break;
+		case MSG_EVT_SET_SPATIAL_REUSE:
+			ret = _phl_custom_vr_sr_cfg(custom_ctx, vr_ctx, msg);
+			break;
+		case MSG_EVT_GET_SPATIAL_REUSE:
+			ret = _phl_custom_vr_sr_query(custom_ctx, vr_ctx, msg);
+			break;
+		case MSG_EVT_RF_SCRAMBLE:
+			ret = _phl_custom_vr_rf_scramble(custom_ctx, vr_ctx, msg);
+			break;
+		case MSG_EVT_SET_ANT_SWITCH:
+			ret = _phl_custom_vr_set_ant_switch(custom_ctx, vr_ctx,
+							    msg);
+			break;
+#ifdef CONFIG_PHL_CHANNEL_INFO_VR
+		case MSG_EVT_SET_CSI:
+			ret = _phl_custom_vr_csi_cfg(custom_ctx, vr_ctx, msg);
+			break;
+		case MSG_EVT_GET_CSI:
+			ret = _phl_custom_vr_csi_query(custom_ctx, vr_ctx, msg);
+			break;
+#endif /* CONFIG_PHL_CHANNEL_INFO_VR */
 		default:
 			ret = MDL_RET_SUCCESS;
 			break;

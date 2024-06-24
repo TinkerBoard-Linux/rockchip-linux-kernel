@@ -56,7 +56,7 @@ void halbb_fwofld_set_gain_error_8852c(struct bb_info *bb, u8 central_ch,
 				       enum band_type band_type,
 				       enum rf_path path);
 void halbb_fwofld_set_gain_cr_init_8852c(struct bb_info *bb);
-void halbb_fwofld_set_rxsc_rpl_comp_8852c(struct bb_info *bb, u8 central_ch);
+void halbb_fwofld_set_rxsc_rpl_comp_8852c(struct bb_info *bb, u8 central_ch, enum band_type band_type);
 #endif
 #endif
 #endif

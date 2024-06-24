@@ -691,6 +691,20 @@ struct hv_ax_sta_len {
 };
 
 /**
+ * @struct hv_freq_band_cfg
+ * @brief hv_freq_band_cfg
+ *
+ * @var hv_freq_band_cfg::band_sel
+ * Please Place Description here.
+ * @var hv_freq_band_cfg::band_type
+ * Please Place Description here.
+ */
+struct hv_freq_band_cfg {
+	u8 band_sel;
+	enum band_type freq_band;
+};
+
+/**
  * @struct hv_aggregator_t
  * @brief hv_aggregator_t
  *
@@ -1079,6 +1093,8 @@ struct hv_ax_ops {
 	u32 (*write_lte)(struct mac_ax_adapter *adapter,
 			 const u32 offset, u32 val);
 	u32 (*c2h_log_test)(struct mac_ax_adapter *adapter, u32 len);
+	u32 (*set_band_mode)(struct mac_ax_adapter *adapter,
+			     struct hv_freq_band_cfg *band_cfg);
 };
 
 #endif

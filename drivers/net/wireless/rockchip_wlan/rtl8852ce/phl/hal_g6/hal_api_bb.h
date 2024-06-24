@@ -14,7 +14,7 @@
  *****************************************************************************/
 #ifndef _HAL_API_BB_H_
 #define _HAL_API_BB_H_
-void rtw_hal_bb_bb_reset_cmn(struct hal_info_t *hal_info,bool en, enum phl_phy_idx phy_idx);
+void rtw_hal_bb_bb_reset_cmn(struct rtw_hal_com_t *hal, bool en, enum phl_phy_idx phy_idx);
 void rtw_hal_bb_dfs_en(struct hal_info_t *hal_info, bool en);
 void rtw_hal_bb_tssi_cont_en(struct hal_info_t *hal_info, bool en, enum rf_path path);
 void rtw_hal_bb_adc_en(struct hal_info_t *hal_info,bool en, enum phl_phy_idx phy_idx);
@@ -64,6 +64,8 @@ u32 rtw_hal_bb_init(struct rtw_phl_com_t *phl_com,
 
 void rtw_hal_bb_deinit(struct rtw_phl_com_t *phl_com,
 			struct hal_info_t *hal_info);
+
+void rtw_hal_init_bb_early_init(struct hal_info_t *hal_info);
 
 void rtw_hal_init_bb_reg(struct hal_info_t *hal_info);
 
@@ -128,10 +130,6 @@ rtw_hal_bb_set_ch_bw(struct hal_info_t *hal_info,
 		      		u8 central_ch_seg1,
 					enum band_type band,
 					enum channel_width bw);
-#ifdef CONFIG_FW_IO_OFLD_SUPPORT
-bool
-rtw_hal_bb_fw_delay(struct hal_info_t *hal_info, u32 val);
-#endif
 
 #ifdef CONFIG_PHL_CUSTOM_FEATURE
 enum rtw_hal_status
@@ -156,6 +154,12 @@ void
 rtw_hal_bb_set_tx_rate_rty_tbl(struct hal_info_t *hal_info,
                                bool en,
                                u8 *rty_rate_tbl);
+
+enum rtw_hal_status
+rtw_hal_bb_set_spatial_reuse_en(struct hal_info_t *hal_info, bool en);
+
+bool
+rtw_hal_bb_is_spatial_reuse_en(struct hal_info_t *hal_info);
 #endif
 #ifdef CONFIG_RTW_ACS
 void rtw_hal_bb_acs_mntr_trigger(struct hal_info_t *hal_info,
@@ -165,7 +169,7 @@ enum rtw_hal_status rtw_hal_bb_acs_mntr_result(struct hal_info_t *hal_info,
 #endif /* CONFIG_RTW_ACS */
 #ifdef CONFIG_PHL_DFS
 enum rtw_hal_status
-rtw_hal_bb_dfs_rpt_cfg(struct hal_info_t *hal_info, bool dfs_en);
+rtw_hal_bb_dfs_rpt_cfg(struct rtw_hal_com_t *hal_com, enum phl_phy_idx phy_idx, bool dfs_en);
 bool
 rtw_hal_bb_radar_detect(struct hal_info_t *hal_info,
 			struct hal_dfs_rpt *hal_dfs);
@@ -213,8 +217,11 @@ enum rtw_hal_status rtw_hal_bb_set_pwr_index(void *hal, u16 pwr_idx, enum rf_pat
 enum rtw_hal_status rtw_hal_bb_get_pwr_index(void *hal, u16 *pwr_idx, enum rf_path tx_path, bool is_cck);
 
 enum rtw_hal_status
-rtw_hal_bb_parse_phy_sts(void *hal, void *ppdu_sts,
-			 struct rtw_phl_rx_pkt *phl_rx, u8 is_su);
+rtw_hal_bb_parse_phy_sts(void *hal,
+			 void *ppdu_sts,
+			 struct rtw_phl_rx_pkt *phl_rx,
+			 u8 is_su,
+			 bool sniffer_mode);
 
 enum rtw_hal_status rtw_hal_bb_get_tx_ok(void *hal, u8 cur_phy_idx, u32 *tx_ok);
 enum rtw_hal_status rtw_hal_bb_dump_tx_sts(struct hal_info_t *hal_info, bool en, u8 phy_idx);
@@ -332,4 +339,27 @@ rtw_hal_bb_mcc_start(struct hal_info_t *hal_info,
                      struct rtw_phl_mcc_role *m_role1,
                      struct rtw_phl_mcc_role *m_role2);
 #endif
+
+u8 rtw_hal_bb_decode_chidx(struct rtw_hal_com_t *hal_com, u8 chan_idx, enum band_type *band);
+
+void rtw_hal_bb_snif_mode_ctrl(struct hal_info_t *hal_info, bool en);
+
+bool
+rtw_hal_bb_adc_cfg(struct rtw_hal_com_t *hal_com,
+                   enum channel_width bw,
+                   enum rf_path path,
+                   enum phl_phy_idx phy_idx);
+
+enum rtw_hal_status
+rtw_hal_bb_antdiv_fix_ant(struct rtw_hal_com_t *hal_com, u8 antIndex);
+
+void
+rtw_hal_bb_pwr_ctrl_ability_set(struct hal_info_t *hal_info, bool enable);
+
+void rtw_hal_bb_auto_debug_en_phy_util(struct rtw_hal_com_t *hal_com, bool en);
+
+void rtw_hal_bb_query_snr_avg(struct rtw_hal_com_t *hal_com,
+                              u8 *info,
+                              enum phl_phy_idx phy_idx);
+
 #endif /*_HAL_API_BB_H_*/

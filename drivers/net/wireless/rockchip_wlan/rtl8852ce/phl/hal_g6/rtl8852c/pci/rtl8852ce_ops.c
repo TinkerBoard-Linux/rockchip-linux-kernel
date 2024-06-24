@@ -25,10 +25,13 @@ void hal_set_ops_8852ce(struct rtw_phl_com_t *phl_com,
 
 	ops->init_hal_spec = init_hal_spec_8852ce;
 	ops->hal_get_efuse = hal_get_efuse_8852ce;
+	ops->hal_fast_start = hal_fast_start_8852ce;
+	ops->hal_fast_stop = hal_fast_stop_8852ce;
 	ops->hal_init = hal_init_8852ce;
 	ops->hal_deinit = hal_deinit_8852ce;
 	ops->hal_start = hal_start_8852ce;
 	ops->hal_stop = hal_stop_8852ce;
+	ops->hal_set_pcicfg = hal_set_pcicfg_8852ce;
 #ifdef CONFIG_WOWLAN
 	ops->hal_wow_init = hal_wow_init_8852ce;
 	ops->hal_wow_deinit = hal_wow_deinit_8852ce;
@@ -48,6 +51,7 @@ void hal_set_ops_8852ce(struct rtw_phl_com_t *phl_com,
 	ops->interrupt_handler = hal_int_hdler_8852ce;
 	ops->restore_interrupt = hal_restore_int_8852ce;
 	ops->restore_rx_interrupt = hal_rx_int_restore_8852ce;
+	ops->get_pcicfg = hal_get_pcicfg_8852ce;
 #ifdef PHL_RXSC_ISR
 	ops->check_rpq_isr = hal_rx_rpq_int_check_8852ce;
 #endif

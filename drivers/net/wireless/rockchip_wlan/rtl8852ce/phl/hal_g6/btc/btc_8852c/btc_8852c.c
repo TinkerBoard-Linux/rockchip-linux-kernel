@@ -18,7 +18,7 @@
 #include "../hal_btc.h"
 
 #ifdef CONFIG_BTCOEX
-#ifdef CONFIG_RTL8852C
+#if defined (CONFIG_RTL8852C) || defined (CONFIG_RTL8842A)
 
 #include "btc_8852c.h"
 
@@ -28,17 +28,35 @@
  * array size limit by BTC_BT_RSSI_THMAX
  */
 static const u8 btc_8852c_wl_rssi_thres[BTC_WL_RSSI_THMAX] = {60, 50, 40, 30};
-static const u8 btc_8852c_bt_rssi_thres[BTC_BT_RSSI_THMAX] = {40, 36, 31, 28};
+static const u8 btc_8852c_bt_rssi_thres[BTC_BT_RSSI_THMAX] = {50, 40, 30, 20};
+/* for WL LNA2/TIA Level0/1 setup  */
+static const struct btc_rf_cfg btc_8852c_rf_0[] = {
+	{0xef, 0x1000}, {0x33, 0x0},  {0x3f, 0x15}, {0x33, 0x1},  {0x3f, 0x17},
+	{0x33, 0x2}, 	{0x3f, 0x15}, {0x33, 0x3},  {0x3f, 0x17}, {0xef, 0x0},
+	{0xef, 0x4000}, {0x33, 0x7},  {0x3e, 0x0},  {0x3f, 0x700},{0x33, 0x6},
+	{0x3e, 0x0},    {0x3f, 0x700},{0x33, 0xf},  {0x3e, 0x0},  {0x3f, 0x700},
+	{0x33, 0xe},    {0x3e, 0x0},  {0x3f, 0x700},{0x33, 0x17}, {0x3e, 0x0},
+	{0x3f, 0x700}, 	{0x33, 0x16}, {0x3e, 0x0},  {0x3f, 0x700},{0xef, 0x0},
+	{0xee, 0x10}, 	{0x33, 0x0},  {0x3f, 0x3},  {0x33, 0x1},  {0x3f, 0x3},
+	{0x33, 0x2}, 	{0x3f, 0x3},  {0xee, 0x0}};
+static const struct btc_rf_cfg btc_8852c_rf_1[] = {
+	{0xef, 0x1000}, {0x33, 0x0},  {0x3f, 0x15}, {0x33, 0x1},    {0x3f, 0x5},
+	{0x33, 0x2}, 	{0x3f, 0x15}, {0x33, 0x3},  {0x3f, 0x5},    {0xef, 0x0},
+	{0xef, 0x4000}, {0x33, 0x7},  {0x3e, 0x0},  {0x3f, 0xa0700},{0x33, 0x6},
+	{0x3e, 0x0}, {0x3f, 0xa0700}, {0x33, 0xf},  {0x3e, 0x0},{0x3f, 0xa0700},
+	{0x33, 0xe},    {0x3e, 0x0},  {0x3f, 0xa0700},{0x33, 0x17}, {0x3e, 0x0},
+	{0x3f, 0xa0700},{0x33, 0x16}, {0x3e, 0x0},  {0x3f, 0xa0700},{0xef, 0x0},
+	{0xee, 0x10}, 	{0x33, 0x0},  {0x3f, 0x2},  {0x33, 0x1},    {0x3f, 0x2},
+	{0x33, 0x2}, 	{0x3f, 0x2},  {0xee, 0x0}};
 
 static struct btc_chip_ops btc_8852c_ops = {
 	_8852c_rfe_type,
 	_8852c_init_cfg,
-	_8852c_wl_pri,
 	_8852c_wl_tx_power,
 	_8852c_wl_rx_gain,
 	_8852c_wl_btg_standby,
 	_8852c_wl_req_mac,
-	_8852c_update_bt_cnt,
+	_8852c_get_reg_status,
 	_8852c_bt_rssi
 };
 
@@ -107,11 +125,33 @@ struct btc_rf_trx_para btc_8852c_rf_dl[] = {
 	{15, 1, 0, 7}
 };
 
+const struct btc_chip chip_8842a = {
+	0x8842A, /* chip id */
+	0x7, /* chip HW feature/parameter, refer to enum btc_chip_feature */
+	0x7, /* desired bt_ver */
+	0x070d0000, /* desired wl_fw btc ver */
+	0x1, /* scoreboard version */
+	0x1, /* mailbox version*/
+	BTC_COEX_RTK_MODE, /* pta_mode */
+	BTC_COEX_INNER, /* pta_direction */
+	6, /* afh_guard_ch */
+	btc_8852c_wl_rssi_thres, /* wl rssi threshold level */
+	btc_8852c_bt_rssi_thres, /* bt rssi threshold level */
+	(u8)2, /* rssi tolerance */
+	&btc_8852c_ops, /* chip-dependent function */
+	ARRAY_SIZE(btc_8852c_mon_reg),
+	btc_8852c_mon_reg, /* wl moniter register */
+	ARRAY_SIZE(btc_8852c_rf_ul),
+	btc_8852c_rf_ul,
+	ARRAY_SIZE(btc_8852c_rf_dl),
+	btc_8852c_rf_dl
+};
+
 const struct btc_chip chip_8852c = {
 	0x8852C, /* chip id */
-	0x3, /* chip HW feature/parameter */
+	0x7, /* chip HW feature/parameter, refer to enum btc_chip_feature */
 	0x7, /* desired bt_ver */
-	0x07060000, /* desired wl_fw btc ver */
+	0x070d0000, /* desired wl_fw btc ver */
 	0x1, /* scoreboard version */
 	0x1, /* mailbox version*/
 	BTC_COEX_RTK_MODE, /* pta_mode */
@@ -137,21 +177,29 @@ void _8852c_rfe_type(struct btc_t *btc)
 
 	PHL_TRACE(COMP_PHL_BTC, _PHL_DEBUG_, "[BTC], %s !! \n", __FUNCTION__);
 
-	module->rfe_type = p->dev_cap.rfe_type;/* get from final capability of device  */
+	/* get from final capability of device  */
+	module->rfe_type = p->dev_cap.rfe_type;
 	module->kt_ver = h->cv;
 	module->bt_solo = 0;
 	module->switch_type = BTC_SWITCH_INTERNAL;
+	module->wa_type = 0;
 
-#if BTC_NON_SHARED_ANT_FREERUN
-	module->ant.num = 3;
-#else
-	if (module->rfe_type > 0)
-		module->ant.num = (module->rfe_type % 2?  2 : 3);
-	else
-		module->ant.num = 2;
-#endif
-	module->ant.diversity = 0;
+	module->ant.type = BTC_ANT_SHARED;
+	module->ant.num = 2;
 	module->ant.isolation = 10;
+	module->ant.diversity = 0;
+	/* WL 1-stream+1-Ant is located at 0:s0(path-A) or 1:s1(path-B) */
+	module->ant.single_pos = RF_PATH_A;
+	module->ant.btg_pos = RF_PATH_B;
+	module->ant.stream_cnt = 2;
+
+	if (module->rfe_type == 0) {
+		btc->dm.error |= BTC_DMERR_RFE_TYPE0;
+		return;
+	}
+
+	/*rfe_type odd: 2-Ant(shared), even: 3-Ant(non-shared)*/
+	module->ant.num = (module->rfe_type % 2)?  2 : 3;
 
 	if (module->ant.num == 3) {
 		module->ant.type = BTC_ANT_DEDICATED;
@@ -162,44 +210,113 @@ void _8852c_rfe_type(struct btc_t *btc)
 	}
 }
 
+void _8852c_get_reg_status(struct btc_t *btc, u8 type, void *status)
+{
+	struct btc_module *md = &btc->mdinfo;
+	struct fbtc_mreg_val *pmreg = NULL;
+	u8 *pos = (u8*)status;
+	u32 *val = (u32*)status;
+	u8 i = 0;
+	u32 reg_val;
+	u32 pre_agc_addr = R_BTC_BB_PRE_AGC_S1;
+
+	switch (type) {
+	case BTC_CSTATUS_TXDIV_POS:
+		if (md->switch_type == BTC_SWITCH_INTERNAL) {
+			*pos = BTC_ANT_DIV_MAIN;
+			break;
+		}
+
+		break;
+	case BTC_CSTATUS_RXDIV_POS:
+		if (md->switch_type == BTC_SWITCH_INTERNAL) {
+			*pos = BTC_ANT_DIV_MAIN;
+			break;
+		}
+
+		break;
+	case BTC_CSTATUS_BB_GNT_MUX:
+		reg_val = hal_read32(btc->hal, R_BTC_BB_BTG_RX | 0x10000);
+		*val = (reg_val & B_BTC_BB_GNT_MUX) == 0? 1 : 0;
+		break;
+	case BTC_CSTATUS_BB_GNT_MUX_MON:
+		if (!btc->fwinfo.rpt_fbtc_mregval.cinfo.valid)
+			return;
+		pmreg = &btc->fwinfo.rpt_fbtc_mregval.finfo;
+		/*  Check BB reg 0x10980 setup from period reg-mon*/
+		for (i = 0; i < pmreg->reg_num; i++) {
+			if (btc->chip->mon_reg[i].type == REG_BB &&
+			    btc->chip->mon_reg[i].offset == R_BTC_BB_BTG_RX) {
+				reg_val = pmreg->mreg_val[i];
+			     	*val = (reg_val & B_BTC_BB_GNT_MUX) == 0? 1 : 0;
+				break;
+			} else if (i == pmreg->reg_num - 1) {
+				*val = BTC_BB_GNT_NOTFOUND;
+				return;
+			}
+		}
+		break;
+	case BTC_CSTATUS_BB_PRE_AGC:
+		reg_val = hal_read32(btc->hal, pre_agc_addr | 0x10000);
+		reg_val &= B_BTC_BB_PRE_AGC_MASK;
+		*val = (reg_val == B_BTC_BB_PRE_AGC_VAL)? 1 : 0;
+		break;
+	case BTC_CSTATUS_BB_PRE_AGC_MON:
+		if (!btc->fwinfo.rpt_fbtc_mregval.cinfo.valid)
+			return;
+		pmreg = &btc->fwinfo.rpt_fbtc_mregval.finfo;
+		/*  Check BB reg Pre-AGC setup from period reg-mon*/
+		for (i = 0; i < pmreg->reg_num; i++) {
+			if (btc->chip->mon_reg[i].type == REG_BB &&
+			    btc->chip->mon_reg[i].offset == pre_agc_addr) {
+				break; /* found */
+			} else if (i == pmreg->reg_num - 1) {
+				*val = BTC_BB_PRE_AGC_NOTFOUND;
+				return;
+			}
+		}
+
+		reg_val = pmreg->mreg_val[i] & B_BTC_BB_PRE_AGC_MASK;
+		*val = (reg_val == B_BTC_BB_PRE_AGC_VAL)? 1 : 0;
+		break;
+	}
+}
+
 void _8852c_wl_tx_power(struct btc_t *btc, u32 level)
 {
 	/*
-	* =========== All-Time WL Tx power control ===========
-    	* (ex: all-time fix WL Tx 10dBm , don¡¦t care GNT _BT and GNT _LTE)
-	* Turn off per-packet power control
-	* 0xD220[1] = 0, 0xD220[2] = 0;
-	*
-	* disable using related power table
-	* 0xd208[20] = 0, 0xd208[21] = 0, 0xd21c[17] = 0, 0xd20c[29] = 0;
-	*
-	* enable force tx power mode and value
-	* 0xD200[9] = 1;
-	* 0xD200[8:0] = 0x28; S(9,2): 1step= 0.25dB, i.e. 40*0.25 = 10 dBm
-	* =======================================================
-	*
-	* =========== per-packet Tx power control ===========
-	* (ex: GNT_BT = 1 -> 5dBm,  GNT _BT = 0 -> 10dBm)
-	* Turn on per-packet power control
-	* 0xD220[1] = 1, 0xD220[2] = 0;
-	* 0xD220[11:3] = 0x14; S(9,2): 1step = 0.25dB, i.e. 20*0.25 = 5 dBm
-	*
-	* disable using related power table
-	* 0xd208[20] = 0, 0xd208[21] = 0, 0xd21c[17] = 0, 0xd20c[29] = 0;
-	*
-	* enable force tx power mode and value
-	* 0xD200[9] = 1;
-	* 0xD200[8:0] = 0x28;  S(9,2), sign, 1 step = 0.25dB, i.e. 40*0.25 = 10 dBm
-	* =========================================================================
-	*
-	* level define:
-	*    if level = 255 -> back to original (btc don't control)
-	*    else in dBm --> bit7->signed bit, ex: 0xa-> +10dBm, 0x85-> -5dBm
-	* pwr_val define:
-	      bit15~0  --> All-time (GNT_BT = 0) Tx power control
-	      bit31~16 --> Per-Packet (GNT_BT = 1) Tx power control
-	*/
-	u32 pwr_val = bMASKDW;
+	 * =========== All-Time WL Tx power control ==========
+	 * (ex: all-time fix WL Tx 10dBm , don't care GNT _BT and GNT _LTE)
+	 * Turn off per-packet power control
+	 * 0xD220[1] = 0, 0xD220[2] = 0;
+	 *
+	 * disable using related power table
+	 * 0xd208[20] = 0, 0xd208[21] = 0, 0xd21c[17] = 0, 0xd20c[29] = 0;
+	 *
+	 * enable force tx power mode and value
+	 * 0xD200[9] = 1;
+	 * 0xD200[8:0] = 0x28; S(9,2): 1step= 0.25dB, i.e. 40*0.25 = 10 dBm
+	 * =========== per-packet Tx power control ===========
+	 * (ex: GNT_BT = 1 -> 5dBm,  GNT _BT = 0 -> 10dBm)
+	 * Turn on per-packet power control
+	 * 0xD220[1] = 1, 0xD220[2] = 0;
+	 * 0xD220[11:3] = 0x14; S(9,2): 1step = 0.25dB, i.e. 20*0.25 = 5 dBm
+	 *
+	 * disable using related power table
+	 * 0xd208[20] = 0, 0xd208[21] = 0, 0xd21c[17] = 0, 0xd20c[29] = 0;
+	 *
+	 * enable force tx power mode and value
+	 * 0xD200[9] = 1;
+	 * 0xD200[8:0] = 0x28; S(9,2): 1 step = 0.25dB, i.e. 40*0.25 = 10 dBm
+	 * ===================================================================
+	 * level define:
+	 *    if level = 255 -> back to original (btc don't control)
+	 *    else in dBm --> bit7->signed bit, ex: 0xa-> +10dBm, 0x85-> -5dBm
+	 * pwr_val define:
+	 *     bit15~0  --> All-time (GNT_BT = 0) Tx power control
+	 *     bit31~16 --> Per-Packet (GNT_BT = 1) Tx power control
+	 */
+	u32 pwr_val = bMASKDW, phi_idx = HW_PHY_0;
 	bool en = false;
 
 	if ((level & 0x7f) < BTC_WL_DEF_TX_PWR) { /* back to original */
@@ -211,117 +328,27 @@ void _8852c_wl_tx_power(struct btc_t *btc, u32 level)
 		en = true;
 	}
 
-	/* rtw_hal_rf_wl_tx_power_control(btc->hal, pwr_val); */
-	rtw_hal_rf_wlan_tx_power_control(btc->hal, HW_PHY_0, ALL_TIME_CTRL,
+	if (btc->hal->dbcc_en)
+		phi_idx = btc->cx.wl.pta_req_mac;
+
+	rtw_hal_rf_wlan_tx_power_control(btc->hal, phi_idx, ALL_TIME_CTRL,
 					 pwr_val, en);
-}
-
-void _8852c_set_wl_lna2(struct btc_t *btc, u8 level)
-{
-	/* level=0 Default: TIA 1/0= (LNA2,TIAN6) = (7,1)/(5,1) = 21dB/12dB
-         * level=1 Fix LNA2=5: TIA 1/0= (LNA2,TIAN6) = (5,0)/(5,1) = 18dB/12dB
-         * To improve BT ACI in co-rx
-         */
-	u32 srcpath = RF_PATH_B << 8 | RTW_MAC_RF_CMD_OFLD;
-
-
-	switch (level) {
-	case 0: /* default */
-		_btc_io_w(btc, srcpath, 0xef, bMASKRF, 0x1000, false);
-		_btc_io_w(btc, srcpath, 0x33, bMASKRF, 0x0, false);
-		_btc_io_w(btc, srcpath, 0x3f, bMASKRF, 0x15, false);
-		_btc_io_w(btc, srcpath, 0x33, bMASKRF, 0x1, false);
-		_btc_io_w(btc, srcpath, 0x3f, bMASKRF, 0x17, false);
-		_btc_io_w(btc, srcpath, 0x33, bMASKRF, 0x2, false);
-		_btc_io_w(btc, srcpath, 0x3f, bMASKRF, 0x15, false);
-		_btc_io_w(btc, srcpath, 0x33, bMASKRF, 0x3, false);
-		_btc_io_w(btc, srcpath, 0x3f, bMASKRF, 0x17, false);
-		_btc_io_w(btc, srcpath, 0xef, bMASKRF, 0x0, false);
-		/* LNA6 default */
-		_btc_io_w(btc, srcpath, 0xef, bMASKRF, 0x4000, false);
-		_btc_io_w(btc, srcpath, 0x33, bMASKRF, 0x7, false);
-		_btc_io_w(btc, srcpath, 0x3e, bMASKRF, 0x0, false);
-		_btc_io_w(btc, srcpath, 0x3f, bMASKRF, 0x700, false);
-		_btc_io_w(btc, srcpath, 0x33, bMASKRF, 0x6, false);
-		_btc_io_w(btc, srcpath, 0x3e, bMASKRF, 0x0, false);
-		_btc_io_w(btc, srcpath, 0x3f, bMASKRF, 0x700, false);
-		_btc_io_w(btc, srcpath, 0x33, bMASKRF, 0xf, false);
-		_btc_io_w(btc, srcpath, 0x3e, bMASKRF, 0x0, false);
-		_btc_io_w(btc, srcpath, 0x3f, bMASKRF, 0x700, false);
-		_btc_io_w(btc, srcpath, 0x33, bMASKRF, 0xe, false);
-		_btc_io_w(btc, srcpath, 0x3e, bMASKRF, 0x0, false);
-		_btc_io_w(btc, srcpath, 0x3f, bMASKRF, 0x700, false);
-		_btc_io_w(btc, srcpath, 0x33, bMASKRF, 0x17, false);
-		_btc_io_w(btc, srcpath, 0x3e, bMASKRF, 0x0, false);
-		_btc_io_w(btc, srcpath, 0x3f, bMASKRF, 0x700, false);
-		_btc_io_w(btc, srcpath, 0x33, bMASKRF, 0x16, false);
-		_btc_io_w(btc, srcpath, 0x3e, bMASKRF, 0x0, false);
-		_btc_io_w(btc, srcpath, 0x3f, bMASKRF, 0x700, false);
-		_btc_io_w(btc, srcpath, 0xef, bMASKRF, 0x0, false);
-		_btc_io_w(btc, srcpath, 0xee, bMASKRF, 0x10, false);
-		_btc_io_w(btc, srcpath, 0x33, bMASKRF, 0x0, false);
-		_btc_io_w(btc, srcpath, 0x3f, bMASKRF, 0x3, false);
-		_btc_io_w(btc, srcpath, 0x33, bMASKRF, 0x1, false);
-		_btc_io_w(btc, srcpath, 0x3f, bMASKRF, 0x3, false);
-		_btc_io_w(btc, srcpath, 0x33, bMASKRF, 0x2, false);
-		_btc_io_w(btc, srcpath, 0x3f, bMASKRF, 0x3, false);
-		_btc_io_w(btc, srcpath, 0xee, bMASKRF, 0x0, true);
-		break;
-	case 1: /* Fix LNA2=5  */
-		_btc_io_w(btc, srcpath, 0xef, bMASKRF, 0x1000, false);
-		_btc_io_w(btc, srcpath, 0x33, bMASKRF, 0x0, false);
-		_btc_io_w(btc, srcpath, 0x3f, bMASKRF, 0x15, false);
-		_btc_io_w(btc, srcpath, 0x33, bMASKRF, 0x1, false);
-		_btc_io_w(btc, srcpath, 0x3f, bMASKRF, 0x5, false);
-		_btc_io_w(btc, srcpath, 0x33, bMASKRF, 0x2, false);
-		_btc_io_w(btc, srcpath, 0x3f, bMASKRF, 0x15, false);
-		_btc_io_w(btc, srcpath, 0x33, bMASKRF, 0x3, false);
-		_btc_io_w(btc, srcpath, 0x3f, bMASKRF, 0x5, false);
-		_btc_io_w(btc, srcpath, 0xef, bMASKRF, 0x0, true);
-		/* LNA6 default */
-		_btc_io_w(btc, srcpath, 0xef, bMASKRF, 0x4000, false);
-		_btc_io_w(btc, srcpath, 0x33, bMASKRF, 0x7, false);
-		_btc_io_w(btc, srcpath, 0x3e, bMASKRF, 0x0, false);
-		_btc_io_w(btc, srcpath, 0x3f, bMASKRF, 0xa0700, false);
-		_btc_io_w(btc, srcpath, 0x33, bMASKRF, 0x6, false);
-		_btc_io_w(btc, srcpath, 0x3e, bMASKRF, 0x0, false);
-		_btc_io_w(btc, srcpath, 0x3f, bMASKRF, 0xa0700, false);
-		_btc_io_w(btc, srcpath, 0x33, bMASKRF, 0xf, false);
-		_btc_io_w(btc, srcpath, 0x3e, bMASKRF, 0x0, false);
-		_btc_io_w(btc, srcpath, 0x3f, bMASKRF, 0xa0700, false);
-		_btc_io_w(btc, srcpath, 0x33, bMASKRF, 0xe, false);
-		_btc_io_w(btc, srcpath, 0x3e, bMASKRF, 0x0, false);
-		_btc_io_w(btc, srcpath, 0x3f, bMASKRF, 0xa0700, false);
-		_btc_io_w(btc, srcpath, 0x33, bMASKRF, 0x17, false);
-		_btc_io_w(btc, srcpath, 0x3e, bMASKRF, 0x0, false);
-		_btc_io_w(btc, srcpath, 0x3f, bMASKRF, 0xa0700, false);
-		_btc_io_w(btc, srcpath, 0x33, bMASKRF, 0x16, false);
-		_btc_io_w(btc, srcpath, 0x3e, bMASKRF, 0x0, false);
-		_btc_io_w(btc, srcpath, 0x3f, bMASKRF, 0xa0700, false);
-		_btc_io_w(btc, srcpath, 0xef, bMASKRF, 0x0, false);
-		_btc_io_w(btc, srcpath, 0xee, bMASKRF, 0x10, false);
-		_btc_io_w(btc, srcpath, 0x33, bMASKRF, 0x0, false);
-		_btc_io_w(btc, srcpath, 0x3f, bMASKRF, 0x2, false);
-		_btc_io_w(btc, srcpath, 0x33, bMASKRF, 0x1, false);
-		_btc_io_w(btc, srcpath, 0x3f, bMASKRF, 0x2, false);
-		_btc_io_w(btc, srcpath, 0x33, bMASKRF, 0x2, false);
-		_btc_io_w(btc, srcpath, 0x3f, bMASKRF, 0x2, false);
-		_btc_io_w(btc, srcpath, 0xee, bMASKRF, 0x0, true);
-		break;
-	default:
-		break;
-	}
 }
 
 void _8852c_wl_rx_gain(struct btc_t *btc, u32 level)
 {
-	/* wl bb setting for FDD -> rtw_hal_bb_ctrl_btc_preagc()
-	 * OP1db Back-off(no LNA6) +  Fixed TIA corner + RX_BB Back-off +
-	 * DFIR Type 3
-	*/
+	/* To improve BT ACI in co-rx
+	 * level=0 Default: TIA 1/0= (LNA2,TIAN6) = (7,1)/(5,1) = 21dB/12dB
+	 * level=1 Fix LNA2=5: TIA 1/0= (LNA2,TIAN6) = (5,0)/(5,1) = 18dB/12dB
+	 */
+	u32 mask = bMASKRF, n = 0, i = 0, val = 0;
+	u32 type = (btc->mdinfo.ant.btg_pos << 8) | RTW_MAC_RF_CMD_OFLD;
+	const struct btc_rf_cfg *rf = NULL;
+	bool en;
 
 	switch (level) {
 	case 0: /* original */
+	default:
 		btc->dm.wl_lna2 = 0;
 		break;
 	case 1: /* for FDD free-run */
@@ -332,7 +359,29 @@ void _8852c_wl_rx_gain(struct btc_t *btc, u32 level)
 		break;
 	}
 
-	_8852c_set_wl_lna2(btc, btc->dm.wl_lna2);
+	if (btc->dm.wl_lna2 == 0) {
+		rf = btc_8852c_rf_0;
+		n = ARRAY_SIZE(btc_8852c_rf_0);
+	} else {
+		rf = btc_8852c_rf_1;
+		n = ARRAY_SIZE(btc_8852c_rf_1);
+	}
+
+	while (1) {
+		en = (i == n-1) ? true : false;
+
+		val = rf->val;
+		/* bit[10] = 1 if non-shared-ant for 8851b */
+		if (btc->hal->chip_id == CHIP_WIFI6_8851B &&
+		    btc->mdinfo.ant.type == BTC_ANT_DEDICATED)
+			val |= 0x4;
+
+		_btc_io_w(btc, type, rf->addr, mask, val, en);
+		i++;
+		if (i > n-1)
+			break;
+		rf++;
+	}
 }
 
 u8 _8852c_bt_rssi(struct btc_t *btc, u8 val)
@@ -346,38 +395,30 @@ u8 _8852c_bt_rssi(struct btc_t *btc, u8 val)
 	return (val);
 }
 
-void _8852c_set_wl_trx_mask(struct btc_t *btc, u8 path, u8 group, u32 val)
+void _8852c_wl_trx_mask(struct btc_t *btc, u32 type, u8 group, u32 val)
 {
-	u32 srcpath = path << 8 | RTW_MAC_RF_CMD_OFLD;
-
-	_btc_io_w(btc, srcpath, 0xef, bMASKRF, BIT(17), false);
-	_btc_io_w(btc, srcpath, 0x33, bMASKRF, group, false);
-	_btc_io_w(btc, srcpath, 0x3f, bMASKRF, val, false);
-	_btc_io_w(btc, srcpath, 0xef, bMASKRF, 0x0, false);
+	_btc_io_w(btc, type, R_BTC_RF_LUT_WA, bMASKRF, group, false);
+	_btc_io_w(btc, type, R_BTC_RF_LUT_WD0, bMASKRF, val, false);
 }
 
 void _8852c_wl_btg_standby(struct btc_t *btc, u32 state)
 {
-	u32 srcpath = RF_PATH_B << 8 | RTW_MAC_RF_CMD_OFLD;
-
-	_btc_io_w(btc, srcpath, 0xef, bMASKRF, 0x80000, false);
-	_btc_io_w(btc, srcpath, 0x33, bMASKRF, 0x1, false);
-	_btc_io_w(btc, srcpath, 0x3e, bMASKRF, 0x620, false);
+	u32 data = (state == 1) ? 0x179c : 0x208;
+	u32 type = (btc->mdinfo.ant.btg_pos << 8) | RTW_MAC_RF_CMD_OFLD;
 
 	/* set WL standby = Rx for GNT_BT_Tx = 1->0 settle issue */
-	if (state == 1)
-		_btc_io_w(btc, srcpath, 0x3f, bMASKRF, 0x179c, false);
-	else
-		_btc_io_w(btc, srcpath, 0x3f, bMASKRF, 0x208, false);
-
-	_btc_io_w(btc, srcpath, 0xef, bMASKRF, 0x0, true);
+	_btc_io_w(btc, type, R_BTC_RF_LUT_EN, bMASKRF, BIT(19), false);
+	_btc_io_w(btc, type, R_BTC_RF_LUT_WA, bMASKRF, 0x1, false);
+	_btc_io_w(btc, type, R_BTC_RF_LUT_WD1, bMASKRF, 0x620, false);
+	_btc_io_w(btc, type, R_BTC_RF_LUT_WD0, bMASKRF, data, false);
+	_btc_io_w(btc, type, R_BTC_RF_LUT_EN, bMASKRF, 0x0, true);
 }
 
 void _8852c_wl_req_mac(struct btc_t *btc, u8 mac_id)
 {
 	u32 val1;
 
-	val1 = _read_cx_reg(btc, R_BTC_CFG);
+	_read_cx_reg(btc, R_BTC_CFG, &val1);
 
 	if (mac_id == HW_PHY_0)
 		val1 = val1 & (~B_BTC_WL_SRC);
@@ -387,80 +428,7 @@ void _8852c_wl_req_mac(struct btc_t *btc, u8 mac_id)
 	_write_cx_reg(btc, R_BTC_CFG, val1);
 }
 
-void _8852c_update_bt_cnt(struct btc_t *btc)
-{
-#if 0
-	struct btc_cx *cx = &btc->cx;
-	u32 val, val1;
-
-	val = _read_cx_reg(btc, R_BTC_BT_CNT_HIGH);
-	cx->cnt_bt[BTC_BCNT_HIPRI_TX] = val & bMASKLW;
-	cx->cnt_bt[BTC_BCNT_HIPRI_RX] = (val & bMASKHW) >> 16;
-
-	val = _read_cx_reg(btc, R_BTC_BT_CNT_LOW);
-	cx->cnt_bt[BTC_BCNT_LOPRI_TX] = val & bMASKLW;
-	cx->cnt_bt[BTC_BCNT_LOPRI_RX] = (val & bMASKHW) >> 16;
-
-	/* clock-gate off before reset counter*/
-	val1 = _read_cx_reg(btc, R_BTC_CFG);
-	_write_cx_reg(btc, R_BTC_CFG, val1 | B_BTC_DIS_BTC_CLK_G);
-
-	val = _read_cx_reg(btc, R_BTC_BT_CNT_CFG);
-	_write_cx_reg(btc, R_BTC_BT_CNT_CFG, val & (~B_BTC_BT_CNT_RST_V1));
-	_write_cx_reg(btc, R_BTC_BT_CNT_CFG, val | B_BTC_BT_CNT_RST_V1);
-
-	_write_cx_reg(btc, R_BTC_CFG, val1 & (~B_BTC_DIS_BTC_CLK_G));
-#endif
-}
-
-void _8852c_init_cfg(struct btc_t *btc)
-{
-	struct rtw_hal_com_t *h = btc->hal;
-	struct btc_module *module = &btc->mdinfo;
-
-	PHL_INFO("[BTC], %s !! \n", __FUNCTION__);
-
-	/* PTA init  */
-	rtw_hal_mac_coex_init(h, btc->chip->pta_mode, btc->chip->pta_direction);
-
-	/* set WL Tx response = Hi-Pri */
-	btc->chip->ops->wl_pri(btc, BTC_PRI_MASK_TX_RESP, true);
-
-	/* set WL Tx beacon = Hi-Pri */
-	btc->chip->ops->wl_pri(btc, BTC_PRI_MASK_BEACON, true);
-
-	/* set WL Tx trigger frame = Hi-Pri */
-	btc->chip->ops->wl_pri(btc, BTC_PRI_MASK_TX_TRIG, true);
-
-	_btc_io_w(btc, 0x1, 0x2, bMASKRF, 0x0, false); /* s0 */
-	_btc_io_w(btc, 0x101, 0x2, bMASKRF, 0x0, false); /* s1 */
-
-	/* set WL Tx thru in TRX mask table if GNT_WL=0 && BT_S1=ss group */
-	if (module->ant.type == BTC_ANT_SHARED) {
-		_8852c_set_wl_trx_mask(btc, RF_PATH_A, BTC_BT_SS_GROUP, 0x5ff);
-		_8852c_set_wl_trx_mask(btc, RF_PATH_B, BTC_BT_SS_GROUP, 0x5ff);
-		/* set path-A(S0) Tx/Rx no-mask if GNT_WL=0 && BT_S1=tx group */
-		_8852c_set_wl_trx_mask(btc, RF_PATH_A, BTC_BT_TX_GROUP, 0x5ff);
-		_8852c_set_wl_trx_mask(btc, RF_PATH_B, BTC_BT_TX_GROUP, 0x55f);
-	} else { /* set WL Tx stb if GNT_WL = 0 && BT_S1 = ss group for 3-ant */
-		_8852c_set_wl_trx_mask(btc, RF_PATH_A, BTC_BT_SS_GROUP, 0x5ff);
-		_8852c_set_wl_trx_mask(btc, RF_PATH_B, BTC_BT_SS_GROUP, 0x5ff);
-
-		_8852c_set_wl_trx_mask(btc, RF_PATH_A, BTC_BT_TX_GROUP, 0x5ff);
-		_8852c_set_wl_trx_mask(btc, RF_PATH_B, BTC_BT_TX_GROUP, 0x5ff);
-	}
-
-	/* set PTA break table */
-	_btc_io_w(btc, RTW_MAC_MAC_CMD_OFLD, R_BTC_BREAK_TABLE, bMASKDW,
-		  0xf0ffffff, false);
-
-	/* enable BT counter 0xda10[1:0] = 2b'11 */
-	_btc_io_w(btc, RTW_MAC_MAC_CMD_OFLD, R_BTC_BT_CNT_CFG,
-		  B_BTC_BT_CNT_EN | B_BTC_BT_CNT_RST_V1,
-		  B_BTC_BT_CNT_EN | B_BTC_BT_CNT_RST_V1, true);
-}
-
-void _8852c_wl_pri (struct btc_t *btc, u8 map, bool state)
+void _8852c_wl_pri(struct btc_t *btc, u8 map, bool state)
 {
 	u32 bitmap = 0;
 	u32 reg = R_BTC_COEX_WL_REQ;
@@ -485,6 +453,81 @@ void _8852c_wl_pri (struct btc_t *btc, u8 map, bool state)
 	}
 
 	_btc_io_w(btc, RTW_MAC_MAC_CMD_OFLD, reg, bitmap, state, false);
+}
+
+void _8852c_init_cfg(struct btc_t *btc)
+{
+	struct rtw_hal_com_t *h = btc->hal;
+	struct btc_ant_info *ant = &btc->mdinfo.ant;
+	struct btc_dm *dm = &btc->dm;
+	u32 path, type, path_min, path_max;
+
+	PHL_INFO("[BTC], %s !! \n", __FUNCTION__);
+
+	/* PTA init  */
+	rtw_hal_mac_coex_init(h, btc->chip->pta_mode, btc->chip->pta_direction);
+
+	/* set WL Tx response = Hi-Pri */
+	_8852c_wl_pri(btc, BTC_PRI_MASK_TX_RESP, true);
+
+	/* set WL Tx beacon = Hi-Pri */
+	_8852c_wl_pri(btc, BTC_PRI_MASK_BEACON, true);
+
+	/* set WL Tx trigger frame = Hi-Pri */
+	_8852c_wl_pri(btc, BTC_PRI_MASK_TX_TRIG, true);
+
+	/* for 1-Ant && 1-ss case: only 1-path */
+	if (ant->stream_cnt == 1) {
+		path_min = ant->single_pos;
+		path_max = path_min;
+	} else {
+		path_min = RF_PATH_A;
+		path_max = RF_PATH_B;
+	}
+
+	path = path_min;
+
+	while (1) {
+		type = (path << 8) | RTW_MAC_RF_CMD_OFLD;
+
+		/* set rf gnt-debug off when init*/
+		if (dm->btc_initing)
+			_btc_io_w(btc, type, R_BTC_RF_BTG_CTRL, bMASKRF, 0x0, false);
+
+
+		/* set DEBUG_LUT_RFMODE_MASK = 1 to start trx-mask-setup */
+		_btc_io_w(btc, type, R_BTC_RF_LUT_EN, bMASKRF, BIT(17), false);
+
+		/* if GNT_WL=0 && BT=SS_group --> WL Tx/Rx = THRU  */
+		_8852c_wl_trx_mask(btc, type, BTC_BT_SS_GROUP, 0x5ff);
+
+		/* if GNT_WL=0 && BT=Rx_group --> WL-Rx = THRU + WL-Tx = MASK */
+		_8852c_wl_trx_mask(btc, type, BTC_BT_RX_GROUP, 0x5df);
+
+		/* if GNT_WL = 0 && BT = Tx_group -->
+		 * Shared-Ant && BTG-path:WL mask(0x55f), others:WL THRU(0x5ff)
+		 */
+		if (ant->type == BTC_ANT_SHARED && ant->btg_pos == path)
+			_8852c_wl_trx_mask(btc, type, BTC_BT_TX_GROUP, 0x55f);
+		else
+			_8852c_wl_trx_mask(btc, type, BTC_BT_TX_GROUP, 0x5ff);
+
+		/* set DEBUG_LUT_RFMODE_MASK = 0 to stop trx-mask-setup */
+		_btc_io_w(btc, type, R_BTC_RF_LUT_EN, bMASKRF, 0, false);
+
+		path++;
+		if (path > path_max)
+			break;
+	}
+
+	/* set PTA break table */
+	_btc_io_w(btc, RTW_MAC_MAC_CMD_OFLD, R_BTC_BREAK_TABLE, bMASKDW,
+		  0xf0ffffff, false);
+
+	/* enable BT counter 0xda10[1:0] = 2b'11 */
+	_btc_io_w(btc, RTW_MAC_MAC_CMD_OFLD, R_BTC_BT_CNT_CFG,
+		  B_BTC_BT_CNT_EN | B_BTC_BT_CNT_RST_V1,
+		  B_BTC_BT_CNT_EN | B_BTC_BT_CNT_RST_V1, true);
 }
 
 #endif /* CONFIG_RTL8852C */

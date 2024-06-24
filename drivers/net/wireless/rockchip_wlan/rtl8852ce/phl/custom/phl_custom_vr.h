@@ -16,6 +16,7 @@
 #define _PHL_CUSTOM_VR_H_
 
 #ifdef CONFIG_PHL_CUSTOM_FEATURE_VR
+#include "phl_custom_vr_csi.h"
 
 struct _vr_init_param {
 	u32 enable;
@@ -29,9 +30,22 @@ struct _vr_tx_rty_param {
 	u8 rty_rate_tbl[24]; /* 1SS MCS0 to 2SS MCS11 */
 };
 
+struct _vr_rf_scrmb {
+	u8 is_set;
+	u8 status;
+	enum rtw_mac_usr_frame_to_act_mode mode;
+	u32 to_thr;
+	u8 trigger_cnt;
+	u16 sw_def_bmp; /* enum mac_ax_wd_sw_def_bmp */
+};
+
 struct _custom_vr_ctx {
 	struct _vr_init_param init;
-        struct _vr_tx_rty_param tx_rty_param;
+	struct _vr_tx_rty_param tx_rty_param;
+	struct _vr_rf_scrmb cur_scrmb_param;
+#ifdef CONFIG_PHL_CHANNEL_INFO_VR
+	struct custom_csi_ctrl csi_ctrl;
+#endif /* CONFIG_PHL_CHANNEL_INFO_VR */
 };
 
 enum phl_mdl_ret_code

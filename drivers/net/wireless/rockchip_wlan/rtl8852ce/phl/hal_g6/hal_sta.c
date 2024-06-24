@@ -123,9 +123,9 @@ static enum rtw_hal_status
 _hal_update_cctrl_tbl(struct hal_info_t *hal_info,
 			    struct rtw_phl_stainfo_t *sta)
 {
-	struct rtw_wifi_role_t *wrole = sta->wrole;
-	struct rtw_wifi_role_link_t *rlink = sta->rlink;
-	struct role_link_cap_t *cap = &rlink->cap;
+	struct rtw_wifi_role_t *wrole = NULL;
+	struct rtw_wifi_role_link_t *rlink = NULL;
+	struct role_link_cap_t *cap = NULL;
 	enum rtw_hal_status sts = RTW_HAL_STATUS_FAILURE;
 	struct rtw_hal_mac_ax_cctl_info cctrl, cctl_info_mask;
 #ifdef DBG_DBCC_MONITOR_TIME
@@ -138,6 +138,9 @@ _hal_update_cctrl_tbl(struct hal_info_t *hal_info,
 
 	if (NULL == sta)
 		goto out;
+	wrole = sta->wrole;
+	rlink = sta->rlink;
+	cap = &rlink->cap;
 
 	sts = rtw_hal_bb_cfg_config_cmac_tbl(hal_info, sta, &cctrl,
 						&cctl_info_mask);
@@ -322,7 +325,7 @@ _hal_update_cctrl_tbl(struct hal_info_t *hal_info,
 
 out:
 #ifdef DBG_DBCC_MONITOR_TIME
-	phl_fun_monitor_end(&start_t, __FUNCTION__);
+	phl_fun_monitor_end(hal_info->phl_com, &start_t, __FUNCTION__);
 #endif /* DBG_DBCC_MONITOR_TIME */
 	return sts;
 }
@@ -369,9 +372,6 @@ rtw_hal_cfg_rsc(void *hal, struct rtw_phl_stainfo_t *sta, u8 rsc_cfg)
 
 	hsts = rtw_hal_mac_set_rsc_cfg(hal_info->hal_com, rsc_cfg, rlink->hw_band);
 
-	if (RTW_HAL_STATUS_SUCCESS != hsts)
-		goto out;
-out:
 	return hsts;
 }
 
@@ -385,9 +385,6 @@ rtw_hal_cfg_rrsr_ref_rate_sel(void *hal, struct rtw_phl_stainfo_t *sta, bool ref
 
 	hsts = rtw_hal_mac_set_rrsr_ref_rate_sel(hal_info->hal_com, ref_rate_sel, sta->rlink->hw_band);
 
-	if (RTW_HAL_STATUS_SUCCESS != hsts)
-		goto out;
-out:
 	return hsts;
 }
 
@@ -461,7 +458,7 @@ _hal_update_dctrl_tbl(struct hal_info_t *hal_info,
 #endif
 #endif
 
-#ifdef CONFIG_PHL_CSUM_OFFLOAD_RX
+#if defined(CONFIG_PHL_CSUM_OFFLOAD_RX) || defined(CONFIG_PHL_CSUM_OFFLOAD_TX)
 	dctrl.chksum_offload_en = 1;
 	dctl_info_mask.chksum_offload_en = 1;
 	dctrl.with_llc = 1;
@@ -472,7 +469,7 @@ _hal_update_dctrl_tbl(struct hal_info_t *hal_info,
 
 out:
 #ifdef DBG_DBCC_MONITOR_TIME
-	phl_fun_monitor_end(&start_t, __FUNCTION__);
+	phl_fun_monitor_end(hal_info->phl_com, &start_t, __FUNCTION__);
 #endif /* DBG_DBCC_MONITOR_TIME */
 	return sts;
 }
@@ -718,17 +715,11 @@ rtw_hal_stainfo_init(void *hal, struct rtw_phl_stainfo_t *sta)
 		goto error_rpt_stats;
 	}
 #endif
-	sta->hal_sta->hw_cfg_tab =
-		_os_mem_alloc(drv, sizeof(struct rtw_hw_cfg_tab));
-	if (sta->hal_sta->hw_cfg_tab == NULL) {
-		PHL_ERR("alloc hw_cfg_tab failed\n");
-		goto error_hsta_mem;
-	}
 
 	hal_status = rtw_hal_bb_stainfo_init(hal_info, sta);
 	if (hal_status != RTW_HAL_STATUS_SUCCESS) {
 		PHL_ERR("alloc bb_stainfo failed\n");
-		goto error_hw_cfg_tab;
+		goto error_hsta_mem;
 	}
 	/* Init lock for tx statistics */
 	_os_spinlock_init(drv, &sta->hal_sta->trx_stat.tx_sts_lock);
@@ -736,13 +727,6 @@ rtw_hal_stainfo_init(void *hal, struct rtw_phl_stainfo_t *sta)
 	_hal_sta_rssi_init(sta);
 
 	return hal_status;
-
-error_hw_cfg_tab :
-	if (sta->hal_sta->hw_cfg_tab) {
-		_os_mem_free(drv, sta->hal_sta->hw_cfg_tab,
-				sizeof(struct rtw_hw_cfg_tab));
-		sta->hal_sta->hw_cfg_tab = NULL;
-	}
 error_hsta_mem :
 #if defined(CONFIG_PHL_RELEASE_RPT_ENABLE) || defined(CONFIG_PCI_HCI)
 	if (sta->hal_sta->trx_stat.wp_rpt_stats) {
@@ -783,12 +767,6 @@ rtw_hal_stainfo_deinit(void *hal, struct rtw_phl_stainfo_t *sta)
 		hal_status = rtw_hal_bb_stainfo_deinit(hal_info, sta);
 		if (hal_status != RTW_HAL_STATUS_SUCCESS)
 			PHL_ERR("bb_stainfo deinit failed\n");
-
-		if (sta->hal_sta->hw_cfg_tab) {
-			_os_mem_free(drv, sta->hal_sta->hw_cfg_tab,
-					sizeof(struct rtw_hw_cfg_tab));
-			sta->hal_sta->hw_cfg_tab = NULL;
-		}
 
 		_os_mem_free(drv, sta->hal_sta,
 				sizeof(struct rtw_hal_stainfo_t));
@@ -1084,7 +1062,7 @@ rtw_hal_change_sta_entry(void *hal, struct rtw_phl_stainfo_t *sta,
 #ifdef DBG_DBCC_MONITOR_TIME
 	u32 start_t = 0;
 
-	phl_fun_monitor_start(&start_t, true, __FUNCTION__);
+	PHL_FUN_MON_START(&start_t);
 #endif /* DBG_DBCC_MONITOR_TIME */
 	PHL_TRACE(COMP_PHL_DBG, _PHL_INFO_, "%s: sta->macid(0x%X), mode(%d)\n",
 		__FUNCTION__, sta->macid , mode);
@@ -1106,7 +1084,7 @@ rtw_hal_change_sta_entry(void *hal, struct rtw_phl_stainfo_t *sta,
 	if (hal_status != RTW_HAL_STATUS_SUCCESS)
 		PHL_ERR("rtw_hal_bb_ra_update failed\n");
 #ifdef DBG_DBCC_MONITOR_TIME
-	phl_fun_monitor_end(&start_t, __FUNCTION__);
+	PHL_FUNC_MON_END(hal_info->phl_com, &start_t, TIME_PHL_MAX);
 #endif /* DBG_DBCC_MONITOR_TIME */
 	return hal_status;
 }

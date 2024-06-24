@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2019 - 2021 Realtek Corporation.
+ * Copyright(c) 2019 - 2023 Realtek Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -15,6 +15,14 @@
 #define _RTW_PHL_C_
 #include <drv_types.h>
 
+static enum phl_cmd_type rtw_cmdf_to_phl_cmd_type(u8 flag)
+{
+	if (flag == RTW_CMDF_DIRECTLY)
+		return PHL_CMD_DIRECTLY;
+	if (flag == RTW_CMDF_WAIT_ACK)
+		return PHL_CMD_WAIT;
+	return PHL_CMD_NO_WAIT;
+}
 
 /***************** export API to osdep/core*****************/
 
@@ -39,6 +47,7 @@ static const char *const _proto_cap_str[] = {
 	/* BIT1 */"g",
 	/* BIT2 */"n",
 	/* BIT3 */"ac",
+	/* BIT4 */"ax",
 };
 
 static const char *const _wl_func_str[] = {
@@ -112,6 +121,9 @@ void rtw_hw_dump_hal_spec(void *sel, struct dvobj_priv *dvobj)
 void rtw_dump_phl_sta_info(void *sel, struct sta_info *sta)
 {	
 	struct rtw_phl_stainfo_t *phl_sta = sta->phl_sta;
+
+	if (!phl_sta)
+		return;
 
 	RTW_PRINT_SEL(sel, "[PHL STA]- role-idx: %d\n", phl_sta->wrole->id);
 
@@ -422,6 +434,382 @@ void rtw_ctrl_and_backup_assoc_cap_rx_nss(_adapter *adapter, struct sta_info *st
 }
 
 #ifdef CONFIG_DBCC_SUPPORT
+#ifdef CONFIG_DBCC_P2P_BG_LISTEN
+bool rtw_dbcc_b0_sta_chan_chk(struct _ADAPTER *a)
+{
+	bool rst = false;
+	struct dvobj_priv *dvobj = adapter_to_dvobj(a);
+	struct _ADAPTER_LINK *alink = GET_PRIMARY_LINK(a);
+	struct rtw_wifi_role_link_t *rlink = alink->wrlink;
+	struct rtw_chan_def *chdef = &rlink->chandef;
+	enum mr_op_mode cur_op_mode = MR_OP_MAX;
+
+	if (!rtw_is_adapter_up(a)) {
+		RTW_ERR(FUNC_ADPT_FMT " is inavailable ......\n",
+					FUNC_ADPT_ARG(a));
+		rtw_warn_on(1);
+		return rst;
+	}
+
+	if (!is_client_associated_to_ap(a))
+		return rst;
+
+	if (MLME_IS_GC(a))
+		return rst;
+
+	cur_op_mode = rtw_phl_mr_get_opmode(dvobj->phl, a->phl_role, rlink);
+	if (cur_op_mode != MR_OP_SWR)
+		return rst;
+
+	if (BAND_5GHZ(chdef->band)) {
+		if (CH_5GHZ_BAND2(chdef->chan) || CH_5GHZ_BAND3(chdef->chan))
+			rst = true;
+#ifdef CONFIG_DBCC_P2P_BG_LISTEN_SIM
+		if (adapter_to_regsty(a)->dbcc_lg_sim && a->iface_id == 0)
+			rst = true;
+#endif
+
+	} else if (BAND_6GHZ(chdef->band)) {
+		/*do something*/
+		rst = true;
+#ifdef CONFIG_DBCC_P2P_BG_LISTEN_SIM
+		if (adapter_to_regsty(a)->dbcc_lg_sim && a->iface_id == 0)
+			rst = true;
+#endif
+	}
+
+	return rst;
+}
+
+#define DBG_DBCC_LG_SCENARIO
+enum dbcc_rtype {
+	DBCC_RTYPE_STATION,
+	DBCC_RTYPE_P2P /*P2P_DEVICE, P2P_GO, P2P_GC*/
+};
+
+static struct _ADAPTER *
+_search_adapter_by_rtype(struct _ADAPTER *a, u8 band_idx, enum dbcc_rtype rtype)
+{
+	int i;
+	_adapter *iface = NULL;
+	_adapter *tg_apt = NULL;
+	struct _ADAPTER_LINK *tg_alink = NULL;
+	struct dvobj_priv *dvobj = adapter_to_dvobj(a);
+
+	if (0 && (!rtw_is_adapter_up(a))) {
+		RTW_ERR(FUNC_ADPT_FMT " is inavailable ......\n",
+					FUNC_ADPT_ARG(a));
+		rtw_warn_on(1);
+		goto _exit;
+	}
+
+	for (i = 0; i < dvobj->iface_nums; i++) {
+		iface = dvobj->padapters[i];
+		if (!iface || !rtw_is_adapter_up(iface))
+			continue;
+
+		tg_alink = GET_PRIMARY_LINK(iface);
+
+		if (rtype == DBCC_RTYPE_P2P) {
+			if((tg_alink->wrlink->hw_band == band_idx) &&
+			   (MLME_IS_PD(iface) || MLME_IS_GO(iface) ||   MLME_IS_GC(iface))) {
+			   tg_apt = iface;
+			   break;
+			   }
+			#ifdef CONFIG_DBCC_P2P_BG_LISTEN_SIM
+			if (adapter_to_regsty(a)->dbcc_lg_sim) {
+				if ((iface != a) && (tg_alink->wrlink->hw_band == band_idx) && (iface->iface_id == 1)) {
+				       tg_apt = iface;
+				       break;
+			       }
+		    	}
+		    	#endif
+		}
+		else if (rtype == DBCC_RTYPE_STATION) {
+			if ((tg_alink->wrlink->hw_band == band_idx) && (MLME_IS_STA(iface))) {
+				tg_apt = iface;
+				break;
+			  }
+		}
+	}
+
+#ifdef DBG_DBCC_LG_SCENARIO
+	RTW_INFO("[%s]--$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\n", __func__);
+	if (tg_apt) {
+		if (rtype == DBCC_RTYPE_P2P) {
+			RTW_INFO(FUNC_ADPT_FMT " is P2P-Device at Band-%d......\n",
+				FUNC_ADPT_ARG(tg_apt), tg_alink->wrlink->hw_band);
+		} else if (rtype == DBCC_RTYPE_STATION) {
+			RTW_INFO(FUNC_ADPT_FMT " is STA at Band-%d......\n",
+				FUNC_ADPT_ARG(tg_apt), tg_alink->wrlink->hw_band);
+		}
+	} else {
+		if (rtype == DBCC_RTYPE_P2P)
+			RTW_ERR("%s cannot find P2P on HW_B(%d)\n", __func__, band_idx);
+		else if (rtype == DBCC_RTYPE_STATION)
+			RTW_ERR("%s cannot find STA on HW_B(%d)\n", __func__, band_idx);
+		rtw_warn_on(1);
+	}
+	RTW_INFO("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$--[%s]\n", __func__);
+#endif
+_exit:
+	return tg_apt;
+}
+
+bool rtw_dbcc_chk_enable_hdl(_adapter *adapter,
+					enum phl_cmd_type cmd_type,
+					enum dbcc_chk_pcd chk_pcd)
+{
+	struct dvobj_priv *dvobj = adapter_to_dvobj(adapter);
+	struct _ADAPTER_LINK *alink = GET_PRIMARY_LINK(adapter);
+	struct rtw_wifi_role_link_t *rlink = alink->wrlink;
+	bool enable_dbcc = false;
+
+	if (rtw_phl_mr_is_db(dvobj->phl))
+		return enable_dbcc;
+
+#ifdef DBG_DBCC_LG_SCENARIO
+RTW_INFO("[%s]-- $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\n", __func__);
+#endif
+	switch (chk_pcd) {
+	case DBCC_CHK_STA_CON:
+	case DBCC_CHK_AP_START:
+	{
+
+		#ifdef DBG_DBCC_LG_SCENARIO
+		if (chk_pcd == DBCC_CHK_STA_CON) {
+			RTW_INFO(FUNC_ADPT_FMT" HW_B(%d)- STA_CONNCTION\n",
+				FUNC_ADPT_ARG(adapter),
+				rlink->hw_band);
+		} else {
+			RTW_INFO(FUNC_ADPT_FMT" HW_B(%d)- START AP\n",
+				FUNC_ADPT_ARG(adapter),
+				rlink->hw_band);
+		}
+		#endif
+	}
+	break;
+
+	case DBCC_CHK_STA_DIS:
+	case DBCC_CHK_AP_STOP:
+	{
+		_adapter *sta_adp = NULL;
+
+		#ifdef DBG_DBCC_LG_SCENARIO
+		if (chk_pcd == DBCC_CHK_STA_DIS)
+			RTW_INFO(FUNC_ADPT_FMT" HW_B(%d)- EVT: STA_DISCON\n",
+				FUNC_ADPT_ARG(adapter),
+				rlink->hw_band);
+		else
+			RTW_INFO(FUNC_ADPT_FMT" HW_B(%d)- EVT: STOP AP\n",
+				FUNC_ADPT_ARG(adapter),
+				rlink->hw_band);
+		#endif
+		/*B0 GC,GO*/
+		if (((dvobj->iface_nums == 2) || (dvobj->iface_nums == 3)) &&
+		    (rlink->hw_band == HW_BAND_0) &&
+		    #ifdef CONFIG_DBCC_P2P_BG_LISTEN_SIM
+		    (adapter_to_regsty(adapter)->dbcc_lg_sim)
+		    #else
+		    (MLME_IS_PD(adapter) || MLME_IS_GO(adapter) || MLME_IS_GC(adapter))
+		    #endif
+		) {
+			sta_adp = _search_adapter_by_rtype(adapter, HW_BAND_0, DBCC_RTYPE_STATION);
+			if (sta_adp) {
+				if (rtw_dbcc_b0_sta_chan_chk(sta_adp)) {
+					enable_dbcc = true;
+					RTW_INFO("B0 STA is stady in DFS/6G CH\n");
+				}
+				else {
+					RTW_INFO("B0 STA is not stady in DFS/6G CH\n");
+				}
+			} else {
+				RTW_ERR("F-%s L-%d cannot find B0 STA\n", __FUNCTION__, __LINE__);
+			}
+		}
+	}
+	break;
+	}
+
+#ifdef DBG_DBCC_LG_SCENARIO
+	RTW_INFO("enable_dbcc:%d\n", enable_dbcc);
+	RTW_INFO("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$ --[%s]\n", __func__);
+#endif
+	return enable_dbcc;
+}
+
+bool rtw_dbcc_chk_disable_hdl(_adapter *adapter,
+					struct rtw_chan_def *new_chdef,
+					enum phl_cmd_type cmd_type,
+					enum dbcc_chk_pcd chk_pcd)
+{
+	struct dvobj_priv *dvobj = adapter_to_dvobj(adapter);
+	struct _ADAPTER_LINK *alink = GET_PRIMARY_LINK(adapter);
+	struct rtw_wifi_role_link_t *rlink = alink->wrlink;
+
+	bool disable_dbcc = false;
+
+	if (!rtw_phl_mr_is_db(dvobj->phl))
+		return disable_dbcc;
+
+#ifdef DBG_DBCC_LG_SCENARIO
+RTW_INFO("[%s] -- $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\n", __func__);
+#endif
+	switch (chk_pcd) {
+	case DBCC_CHK_STA_CON:
+	case DBCC_CHK_AP_START:
+	{
+		struct rtw_mr_chctx_info mr_cc_info = {0};
+
+		disable_dbcc = false;
+#ifdef DBG_DBCC_LG_SCENARIO
+		if (chk_pcd == DBCC_CHK_STA_CON) {
+			RTW_INFO(FUNC_ADPT_FMT" HW_B(%d)- STA_CONNCTION\n",
+				FUNC_ADPT_ARG(adapter),
+				rlink->hw_band);
+		} else {
+			RTW_INFO(FUNC_ADPT_FMT" HW_B(%d)- START AP\n",
+				FUNC_ADPT_ARG(adapter),
+				rlink->hw_band);
+		}
+#endif
+
+		if ((dvobj->iface_nums == 2) && (rlink->hw_band == HW_BAND_1) &&
+			(MLME_IS_GO(adapter) || MLME_IS_GC(adapter))) {/*B1 GC,GO*/
+			if (rtw_phl_chanctx_chk_by_band(dvobj->phl, HW_BAND_0, new_chdef, &mr_cc_info)) {
+				/*SCC or MCC*/
+				rtw_phl_cmd_dbcc_disable(adapter->phl_role, rlink->hw_band, cmd_type, 0);
+				disable_dbcc = true;
+			}
+		}
+		else if ((dvobj->iface_nums == 3) && (rlink->hw_band == HW_BAND_0) &&
+			(MLME_IS_GO(adapter) || MLME_IS_GC(adapter)
+			#ifdef CONFIG_DBCC_P2P_BG_LISTEN_SIM
+			|| (adapter_to_regsty(adapter)->dbcc_lg_sim)
+			#endif
+			)) {/*B0 GC,GO*/
+			if (rtw_phl_chanctx_chk_by_band(dvobj->phl, HW_BAND_0, new_chdef, &mr_cc_info)) {
+				_adapter *pd_adp = NULL;
+				struct _ADAPTER_LINK *pd_alink;
+				struct rtw_wifi_role_link_t *pd_rlink;
+
+				#ifdef DBG_DBCC_LG_SCENARIO
+				RTW_INFO("execute rtw_phl_cmd_dbcc_disable\n");
+				#endif
+				pd_adp = _search_adapter_by_rtype(adapter, HW_BAND_1, DBCC_RTYPE_P2P);
+				if (pd_adp) {
+					#ifdef DBG_DBCC_LG_SCENARIO
+					RTW_INFO("F-%s L-%d : Find B1 P2P-PD\n", __FUNCTION__, __LINE__);
+					#endif
+					pd_alink = GET_PRIMARY_LINK(pd_adp);
+					pd_rlink = pd_alink->wrlink;
+					rtw_phl_cmd_dbcc_disable(pd_adp->phl_role, pd_rlink->hw_band, cmd_type, 0);
+					disable_dbcc = true;
+				} else {
+					#ifdef DBG_DBCC_LG_SCENARIO
+					RTW_ERR("F-%s L-%d : Cannot find B1 P2P-PD\n", __FUNCTION__, __LINE__);
+					rtw_warn_on(1);
+					#endif
+				}
+			} else {
+				//pause  B0 GC,GO - trx
+				//reallocate B0 GC,GO to B1
+				#ifdef DBG_DBCC_LG_SCENARIO
+				RTW_INFO(FUNC_ADPT_FMT" on HW_B(%d)\n",
+					FUNC_ADPT_ARG(adapter),
+					rlink->hw_band);
+				#endif
+				rtw_phl_wifi_role_realloc_band(dvobj->phl, adapter->phl_role, rlink);
+				#ifdef DBG_DBCC_LG_SCENARIO
+				RTW_INFO("execute rtw_phl_wifi_role_realloc_band\n");
+				RTW_INFO(FUNC_ADPT_FMT" on HW_B(%d)\n",
+					FUNC_ADPT_ARG(adapter),
+					rlink->hw_band);
+				#endif
+			}
+		}
+	}
+		break;
+
+	case DBCC_CHK_STA_DIS:
+	case DBCC_CHK_AP_STOP:
+	{
+		_adapter *sta_adp = NULL;
+
+		disable_dbcc = true;
+
+		#ifdef DBG_DBCC_LG_SCENARIO
+		if (chk_pcd == DBCC_CHK_STA_DIS)
+			RTW_INFO(FUNC_ADPT_FMT" HW_B(%d)- EVT: STA_DISCON\n",
+				FUNC_ADPT_ARG(adapter),
+				rlink->hw_band);
+		else
+			RTW_INFO(FUNC_ADPT_FMT" HW_B(%d)- EVT: STOP AP\n",
+				FUNC_ADPT_ARG(adapter),
+				rlink->hw_band);
+		#endif
+		/*B1 GC,GO*/
+		if (((dvobj->iface_nums == 2) || (dvobj->iface_nums == 3)) &&
+		    (rlink->hw_band == HW_BAND_1) &&
+		    (MLME_IS_PD(adapter) || MLME_IS_GO(adapter) || MLME_IS_GC(adapter)
+			#ifdef CONFIG_DBCC_P2P_BG_LISTEN_SIM
+			|| (adapter_to_regsty(adapter)->dbcc_lg_sim)
+			#endif
+		    )
+		) {
+			sta_adp = _search_adapter_by_rtype(adapter, HW_BAND_0, DBCC_RTYPE_STATION);
+			if (sta_adp) {
+				if (rtw_dbcc_b0_sta_chan_chk(sta_adp)) {
+					disable_dbcc = false;
+					RTW_INFO("B0 STA is stady in DFS/6G CH\n");
+				}
+				else {
+					RTW_INFO("B0 STA is not stady in DFS/6G CH\n");
+				}
+			} else {
+				RTW_ERR("F-%s L-%d cannot find B0 STA\n", __FUNCTION__, __LINE__);
+			}
+
+		}
+	}
+		break;
+	}
+
+#ifdef DBG_DBCC_LG_SCENARIO
+	RTW_INFO("disable_dbcc:%d\n", disable_dbcc);
+	RTW_INFO("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$--[%s]\n", __func__);
+#endif
+
+	return disable_dbcc;
+}
+
+enum rtw_phl_status
+rtw_discon_end_dbcc_en_notify(struct _ADAPTER *a, enum phl_module_id mdl_id)
+{
+	struct dvobj_priv *d = adapter_to_dvobj(a);
+	struct phl_msg msg = {0};
+	struct phl_msg_attribute attr = {0};
+	struct rtw_wifi_role_t *wrole = a->phl_role;
+	enum rtw_phl_status status;
+
+	SET_MSG_MDL_ID_FIELD(msg.msg_id, mdl_id);
+	SET_MSG_EVT_ID_FIELD(msg.msg_id, MSG_EVT_DISCONNECT_END_DBCC_EN);
+
+	if (mdl_id == PHL_FG_MDL_DISCONNECT)
+		msg.band_idx = a->disconnect_bidx;
+	else if (mdl_id == PHL_FG_MDL_AP_STOP)
+		msg.band_idx = a->ap_stop_cmd_bidx;
+
+	msg.inbuf = (u8 *)wrole;
+
+	status = rtw_phl_send_msg_to_dispr(GET_PHL_INFO(d), &msg, &attr, NULL);
+	if (status != RTW_PHL_STATUS_SUCCESS)
+		RTW_ERR(FUNC_ADPT_FMT ": send MSG_EVT_DISCONNECT_END_DBCC_EN fail(0x%x)!\n",
+			FUNC_ADPT_ARG(a), status);
+
+	return status;
+}
+#endif /*CONFIG_DBCC_P2P_BG_LISTEN*/
 static void _dbcc_proto_go(_adapter *adapter, u8 dbcc_en)
 {
 	struct sta_priv *stapriv = NULL;
@@ -450,7 +838,7 @@ static void _dbcc_proto_go(_adapter *adapter, u8 dbcc_en)
 	if (!mlmeinfo->HT_caps_enable)
 			return;
 
-	_rtw_spinlock_bh(&stapriv->asoc_list_lock);
+	rtw_stapriv_asoc_list_lock(stapriv);
 
 	phead = &stapriv->asoc_list;
 	plist = get_next(phead);
@@ -465,7 +853,7 @@ static void _dbcc_proto_go(_adapter *adapter, u8 dbcc_en)
 		continue;
 	}
 
-	_rtw_spinunlock_bh(&stapriv->asoc_list_lock);
+	rtw_stapriv_asoc_list_unlock(stapriv);
 
 
 	/* issue SMPS */
@@ -601,6 +989,10 @@ u8 core_dbcc_protocol_hdl(void *drv, enum phl_band_idx band_idx,
 
 
 	if (dbcc_proto->dbcc_en) {
+		#ifdef CONFIG_DBCC_P2P_BG_LISTEN
+		_adapter *sta_adp = NULL;
+		#endif
+
 		RTW_INFO(FUNC_ADPT_FMT " DBCC enable ......\n",
 				FUNC_ADPT_ARG(adapter));
 		/* loop adapter
@@ -612,6 +1004,27 @@ u8 core_dbcc_protocol_hdl(void *drv, enum phl_band_idx band_idx,
 		*/
 		rtw_phl_mr_process_by_band(dvobj->phl, HW_BAND_0, dbcc_proto,
 							_rtw_dbcc_proto_hdl);
+		#ifdef CONFIG_DBCC_P2P_BG_LISTEN
+		sta_adp = _search_adapter_by_rtype(adapter, HW_BAND_0, DBCC_RTYPE_STATION);
+
+		if (sta_adp && rtw_dbcc_b0_sta_chan_chk(sta_adp)) {
+			_adapter *pd_adp = _search_adapter_by_rtype(adapter, HW_BAND_0, DBCC_RTYPE_P2P);
+
+			if (pd_adp) {
+				wrole = pd_adp->phl_role;
+				#ifdef DBG_DBCC_LG_SCENARIO
+				RTW_INFO("F-%s L-%d : Find B0 P2P\n", __FUNCTION__, __LINE__);
+				#endif
+			} else {
+				#ifdef DBG_DBCC_LG_SCENARIO
+				RTW_ERR("F-%s L-%d : Cannot find B0 P2P\n", __FUNCTION__, __LINE__);
+				rtw_warn_on(1);
+				#endif
+			}
+		}
+
+		if (!dbcc_proto->dbcc_cmd_direct)
+		#endif
 		rtw_phl_mr_dbcc_enable(dvobj->phl, band_idx, wrole);
 	}
 	else { /*dbcc disable*/
@@ -626,6 +1039,9 @@ u8 core_dbcc_protocol_hdl(void *drv, enum phl_band_idx band_idx,
 		*/
 		rtw_phl_mr_process_by_band(dvobj->phl, HW_BAND_0, dbcc_proto,
 							_rtw_dbcc_proto_hdl);
+		#ifdef CONFIG_DBCC_P2P_BG_LISTEN
+		if (!dbcc_proto->dbcc_cmd_direct)
+		#endif
 		rtw_phl_mr_dbcc_disable(dvobj->phl, band_idx, wrole);
 	}
 	return _SUCCESS;
@@ -650,6 +1066,38 @@ static void phl_radar_detect_msg_hdl(struct dvobj_priv *dvobj, struct phl_msg *m
 	}
 }
 #endif /* CONFIG_DFS_MASTER */
+
+/* handling msg hub event with PHL_MDL_POWER_MGNT as module id */
+static void rtw_msg_hub_power_mgnt_evt_hdlr(struct dvobj_priv *dvobj, u16 evt_id, u8 *buf, u32 len, enum rtw_rf_state *ori_rf_state)
+{
+	_adapter *adapter = dvobj_get_primary_adapter(dvobj);
+	struct wiphy *wiphy = adapter_to_wiphy(adapter);
+	enum rtw_rf_state *new_rf_state = NULL;
+
+	if (buf == NULL) {
+		RTW_WARN("%s : Msg info buffer is NULL!\n", __func__);
+		return;
+	}
+
+	if (len != sizeof(*new_rf_state)) {
+		RTW_WARN("%s : Msg info len does not match!\n", __func__);
+		return;
+	}
+
+	new_rf_state = (enum rtw_rf_state *)buf;
+
+	switch (evt_id) {
+	case MSG_EVT_HW_RF_CHG:
+		if (*ori_rf_state != *new_rf_state) {
+			rtw_wiphy_rfkill_set_hw_state(wiphy, (*new_rf_state == RTW_RF_OFF ? 1 : 0));
+			RTW_INFO("%s : [%s] evt_id %d.\n", __func__, (*new_rf_state == RTW_RF_OFF ? "RTW_RF_OFF" : "RTW_RF_ON"), evt_id);
+			*ori_rf_state = *new_rf_state;
+		}
+		break;
+	default:
+		break;
+	}
+}
 
 void core_handler_phl_msg(void *drv_priv, struct phl_msg *msg)
 {
@@ -715,6 +1163,28 @@ void core_handler_phl_msg(void *drv_priv, struct phl_msg *msg)
 		else if (evt_id == MSG_EVT_DFS_RD_IS_DETECTING)
 			phl_radar_detect_msg_hdl(dvobj, msg);
 		#endif
+		else if (evt_id == MSG_EVT_BCN_EARLY_REPORT) {
+			struct rtw_wifi_role_t *wrole = NULL;
+			struct rtw_bcn_early_rpt *bcn_rpt = NULL;
+			bcn_rpt = (struct rtw_bcn_early_rpt *)msg->inbuf;
+			if (bcn_rpt == NULL) {
+				RTW_ERR("%s get bcn_rpt failed\n", __func__);
+				rtw_warn_on(1);
+				break;
+			}
+			#ifdef CONFIG_TDLS
+			#ifdef CONFIG_TDLS_CH_SW
+			wrole = rtw_phl_get_role_by_band_port(GET_PHL_INFO(dvobj), bcn_rpt->band, bcn_rpt->port);
+			if (wrole) {
+				iface = dvobj->padapters[wrole->id];
+				if (ATOMIC_READ(&iface->tdlsinfo.chsw_info.chsw_on) == _TRUE) {
+					iface->tdlsinfo.chsw_info.ch_sw_state |= TDLS_WAIT_CH_SW_LAUNCH_STATE;
+					rtw_tdls_ch_sw_back_to_base_chnl(iface);
+				}
+			}
+			#endif
+			#endif
+		}
 	}
 	break;
 	case PHL_MDL_SER:
@@ -734,6 +1204,13 @@ void core_handler_phl_msg(void *drv_priv, struct phl_msg *msg)
 
 	}
 	break;
+	case PHL_MDL_POWER_MGNT:
+	{
+		_adapter *adapter = dvobj_get_primary_adapter(dvobj);
+		struct pwrctrl_priv *pwrpriv = adapter_to_pwrctl(adapter);
+		rtw_msg_hub_power_mgnt_evt_hdlr(dvobj, evt_id, msg->inbuf, msg->inlen, &pwrpriv->rfkill_state);
+	}
+		break;
 	default:
 		RTW_ERR("%s mdl_id :%d not support\n", __func__, mdl_id);
 		break;
@@ -743,7 +1220,7 @@ void core_handler_phl_msg(void *drv_priv, struct phl_msg *msg)
 u8 rtw_core_register_phl_msg(struct dvobj_priv *dvobj)
 {
 	struct phl_msg_receiver ctx = {0};
-	u8 imr[] = {PHL_MDL_RX, PHL_MDL_SER, PHL_MDL_WOW, PHL_MDL_MRC};
+	u8 imr[] = {PHL_MDL_RX, PHL_MDL_SER, PHL_MDL_WOW, PHL_MDL_MRC, PHL_MDL_POWER_MGNT};
 	enum rtw_phl_status psts = RTW_PHL_STATUS_FAILURE;
 
 	ctx.incoming_evt_notify = core_handler_phl_msg;
@@ -978,9 +1455,22 @@ static void rtw_core_tx_power_tbl_loaded(void *drv_priv, bool target_loaded, boo
 
 	if (target_loaded)
 		;
+#if CONFIG_TXPWR_LIMIT
 	if (limit_loaded)
 		rtw_txpwr_update_cur_lmt_regs(dvobj, true);
+#endif
 }
+
+#ifdef CONFIG_TDLS
+static void rtw_core_set_tdls_ops(struct dvobj_priv *d)
+{
+	struct rtw_phl_tdls_ops ops = {0};
+
+	ops.priv = (void *)d;
+	ops.check_tdls_frame = rtw_check_tdls_frame;
+	rtw_phl_tdls_init_ops(GET_PHL_INFO(d), &ops);
+}
+#endif
 
 static void rtw_core_set_phl_ops(struct dvobj_priv *dvobj)
 {
@@ -1070,12 +1560,18 @@ u8 rtw_hw_init(struct dvobj_priv *dvobj)
 	#ifdef CONFIG_ECSA_PHL
 	rtw_core_set_ecsa_ops(dvobj);
 	#endif
+	#ifdef CONFIG_TDLS
+	rtw_core_set_tdls_ops(dvobj);
+	#endif
 
 	rtw_dump_rfe_type(dvobj);
 
 	rtw_phl_watchdog_init(dvobj->phl,
 				0,
 				rtw_core_watchdog_sw_hdlr,
+				#ifdef CONFIG_POST_CORE_KEEP_ALIVE
+				rtw_core_keep_alive_post_hdlr,
+				#endif
 				rtw_core_watchdog_hw_hdlr,
 				rtw_core_watchdog_sw_post_hdlr);
 
@@ -1138,9 +1634,6 @@ void rtw_hw_cap_init(struct dvobj_priv *dvobj)
 #ifdef DIRTY_FOR_WORK
 	dvobj->phl_com->rf_path_num = hal_spec->rf_reg_path_num; /*GET_HAL_RFPATH_NUM*/
 	dvobj->phl_com->rf_type = RF_2T2R; /*GET_HAL_RFPATH*/
-
-	dvobj->cam_ctl.sec_cap = hal_spec->sec_cap;
-	dvobj->cam_ctl.num = rtw_min(hal_spec->sec_cam_ent_num, SEC_CAM_ENT_NUM_SW_LIMIT);
 #endif
 }
 
@@ -1174,7 +1667,8 @@ static enum chan_offset _ch_offset_drv2phl(u8 ch_offset)
  * Return 0 for success, otherwise fail
  */
 int rtw_hw_set_ch_bw(struct _ADAPTER *a, struct _ADAPTER_LINK *alink,
-			enum band_type band, u8 ch, enum channel_width bw, u8 offset, u8 do_rfk)
+			enum band_type band, u8 ch, enum channel_width bw, u8 offset,
+			enum rfk_tri_type rt_type)
 {
 	enum rtw_phl_status status = RTW_PHL_STATUS_SUCCESS;
 	struct dvobj_priv *dvobj = adapter_to_dvobj(a);
@@ -1207,7 +1701,7 @@ int rtw_hw_set_ch_bw(struct _ADAPTER *a, struct _ADAPTER_LINK *alink,
 	}
 #endif
 	status = rtw_phl_cmd_set_ch_bw(a->phl_role, alink->wrlink,
-					&chdef, do_rfk, cmd_type, cmd_timeout);
+					&chdef, rt_type, cmd_type, cmd_timeout);
 
 	if (status == RTW_PHL_STATUS_SUCCESS) {
 		if (a->bNotifyChannelChange)
@@ -1225,8 +1719,29 @@ int rtw_hw_set_ch_bw(struct _ADAPTER *a, struct _ADAPTER_LINK *alink,
 	return err;
 }
 
+void rtw_update_roch_chan_def(struct _ADAPTER_LINK *adapter_link,
+				u8 remain_ch, enum channel_width remain_bw,
+				enum chan_offset offset,
+				enum band_type band)
+{
+	struct link_mlme_ext_priv *mlmeext = &(adapter_link->mlmeextpriv);
+	/*update chan_def*/
+	mlmeext->chandef.chan = remain_ch;
+	mlmeext->chandef.bw = remain_bw;
+	mlmeext->chandef.band = band;
+	mlmeext->chandef.offset = offset;
+	RTW_DBG("%s: ch(%u) bw(%u) band(%u)\n",
+			__func__,
+			mlmeext->chandef.chan,
+			mlmeext->chandef.bw,
+			mlmeext->chandef.band);
+}
+
+
 void rtw_hw_update_chan_def(_adapter *adapter, struct _ADAPTER_LINK *adapter_link)
 {
+	struct rf_ctl_t *rfctl = adapter_to_rfctl(adapter);
+	struct rtw_chset *chset = &rfctl->chset;
 	struct link_mlme_ext_priv *mlmeext = &(adapter_link->mlmeextpriv);
 	struct rtw_wifi_role_link_t *rlink = adapter_link->wrlink;
 	struct rtw_phl_stainfo_t *phl_sta_self = NULL;
@@ -1238,6 +1753,12 @@ void rtw_hw_update_chan_def(_adapter *adapter, struct _ADAPTER_LINK *adapter_lin
 	rlink->chandef.offset = mlmeext->chandef.offset;
 	rlink->chandef.center_ch = rtw_phl_get_center_ch(&mlmeext->chandef);
 	/* ToDo: 80+80 BW & 160 BW */
+
+	rlink->chandef.is_dfs = rtw_chset_is_dfs_bchbw(chset
+		, rlink->chandef.band
+		, rlink->chandef.chan
+		, rlink->chandef.bw
+		, rlink->chandef.offset);
 
 	phl_sta_self = rtw_phl_get_stainfo_self(adapter_to_dvobj(adapter)->phl, rlink);
 	_rtw_memcpy(&phl_sta_self->chandef, &rlink->chandef, sizeof(struct rtw_chan_def));
@@ -1355,8 +1876,10 @@ u8 rtw_hw_iface_init(_adapter *adapter)
 #endif
 
 #ifdef CONFIG_HW_RTS
+#if !defined (RTW_WKARD_TX_DROP) || !defined (RTW_WKARD_TX_DROP_EN_HWCTS) 
 	/* Disable HW CTS2self */
 	rtw_phl_hw_cts2self_cfg(GET_PHL_INFO(dvobj), HW_BAND_0, 0, 0, 0);
+#endif
 #endif
 
 	return rst;
@@ -1456,6 +1979,17 @@ u8 rtw_hw_iface_type_change(_adapter *adapter, u8 iface_type)
 	return _SUCCESS;
 }
 
+/*
+ * Terminate every phl(wifi) role related works before phl role gone.
+ */
+static void _phl_role_free_prepare(struct _ADAPTER *adapter)
+{
+#ifdef CONFIG_STA_CMD_DISPR
+	rtw_connect_abort_wait(adapter);
+	BUG_ON(rtw_disconnect_abort_wait(adapter) < 0);
+#endif /* CONFIG_STA_CMD_DISPR */
+}
+
 void rtw_hw_iface_deinit(_adapter *adapter)
 {
 	struct dvobj_priv *dvobj = adapter_to_dvobj(adapter);
@@ -1465,6 +1999,7 @@ void rtw_hw_iface_deinit(_adapter *adapter)
 	rtw_phl_ps_set_rt_cap(GET_PHL_INFO(dvobj), HW_BAND_0, ps_allow, PS_RT_CORE_INIT);
 #endif
 	if (adapter->phl_role) {
+		_phl_role_free_prepare(adapter);
 		rtw_free_self_stainfo(adapter);
 		rtw_phl_wifi_role_free(GET_PHL_INFO(dvobj), adapter->phl_role->id);
 		adapter->phl_role = NULL;
@@ -1707,6 +2242,11 @@ int rtw_hw_add_key(struct _ADAPTER *a, struct sta_info *sta,
 	crypt.spp = spp;
 	_sec_algo_drv2phl(keyalgo, &crypt.enc_type, &crypt.key_len);
 
+	if (sta->phl_sta == NULL) {
+		RTW_ERR("%s: Fail sta->phl_sta = NULL\n", __func__);
+		return -1;
+	}
+
 	/* delete key before adding key */
 	rtw_phl_cmd_del_key(phl, sta->phl_sta, &crypt, cmd_type, cmd_timeout);
 	status = rtw_phl_cmd_add_key(phl, sta->phl_sta, &crypt, key, cmd_type, cmd_timeout);
@@ -1882,8 +2422,7 @@ int rtw_hw_connect_abort(struct _ADAPTER *a)
 			continue;
 		sta = rtw_get_stainfo(&(a->stapriv), alink->mlmeextpriv.mlmext_info.network.MacAddress);
 		if (!sta) {
-			RTW_ERR(FUNC_ADPT_FMT ": drv sta_info(" MAC_FMT ") not exist!\n",
-				FUNC_ADPT_ARG(a), MAC_ARG(sta->phl_sta->mac_addr));
+			RTW_ERR(FUNC_ADPT_FMT ": drv sta_info not exist!\n", FUNC_ADPT_ARG(a));
 			return -1;
 		}
 		rtw_hw_del_all_key(a, sta, PHL_CMD_DIRECTLY, 0);
@@ -2004,7 +2543,6 @@ static void update_phl_sta_cap_ht(struct _ADAPTER *a, struct sta_info *sta,
 	ht = &sta->htpriv;
 	ampdu_priv = &sta->ampdu_priv;
 
-	cap->num_ampdu = 0xFF;	/* Set to MAX */
 
 	cap->ampdu_density = ampdu_priv->rx_ampdu_min_spacing;
 	cap->ampdu_len_exp = GET_HT_CAP_ELE_MAX_AMPDU_LEN_EXP(&ht->ht_cap);
@@ -2024,6 +2562,20 @@ static void update_phl_sta_cap_ht(struct _ADAPTER *a, struct sta_info *sta,
 		_rtw_memcpy(cap->ht_basic_mcs, info->HT_info.MCS_rate, 4);
 }
 #endif /* CONFIG_80211N_HT */
+
+static u16 _get_default_num_ampdu(struct _ADAPTER *a, struct sta_info *sta,
+		struct protocol_cap_t *cap)
+{
+	struct dvobj_priv *dvobj = adapter_to_dvobj(a);
+	struct rtw_phl_com_t *phl_com = GET_PHL_COM(dvobj);
+	struct rtw_wifi_role_link_t *rlink = sta->phl_sta->rlink;
+	struct protocol_cap_t       *rlink_cap = &(rlink->protocol_cap);
+	u8 band_idx = rlink->hw_band;
+
+	return rlink_cap->num_ampdu > phl_com->phy_cap[band_idx].txagg_num ?
+		phl_com->phy_cap[band_idx].txagg_num : rlink_cap->num_ampdu;
+
+}
 
 void rtw_update_phl_sta_cap(struct _ADAPTER *a, struct sta_info *sta,
 			    struct protocol_cap_t *cap)
@@ -2139,6 +2691,11 @@ void rtw_update_phl_sta_cap(struct _ADAPTER *a, struct sta_info *sta,
 			update_phl_sta_cap_vht(a, sta, cap);;
 #endif /* CONFIG_80211AC_VHT */
 	}
+	/* Set A-MPDU number to default cap as it is resolved
+	   by ADDBA req/resp handshaking */
+	cap->num_ampdu = _get_default_num_ampdu(a, sta, cap);
+	RTW_PRINT("Updated A-MPDU number to %u as default for "MAC_FMT"\n",
+	          cap->num_ampdu, MAC_ARG(sta->phl_sta->mac_addr));
 #endif /* CONFIG_80211N_HT */
 }
 
@@ -2246,10 +2803,7 @@ int rtw_hw_connected(struct _ADAPTER *a)
 		}
 #endif
 
-		status = rtw_phl_cmd_update_media_status(phl, sta->phl_sta,
-					sta->phl_sta->mac_addr, true,
-					PHL_CMD_DIRECTLY, 0);
-		if (status != RTW_PHL_STATUS_SUCCESS)
+		if (rtw_sta_hal_media_status_rpt_cmd(a, sta, true, RTW_CMDF_DIRECTLY) != _SUCCESS)
 			return -1;
 		rtw_dump_phl_sta_info(RTW_DBGDUMP, sta);
 
@@ -2289,10 +2843,6 @@ int rtw_hw_connected(struct _ADAPTER *a)
 	/* Todo: Set Data rate and RA */
 #if 0
 	set_sta_rate(a, psta);
-#endif
-	/* Todo: Firmware media status report */
-#if 0
-	rtw_sta_media_status_rpt(a, psta, 1);
 #endif
 	/* Todo: IC specific hardware setting */
 #if 0
@@ -2389,14 +2939,64 @@ int rtw_hw_connected_apmode(struct _ADAPTER *a, struct sta_info *sta)
 	update_sta_ra_info(a, sta);
 	rtw_update_phl_sta_cap(a, sta, &sta->phl_sta->asoc_cap);
 
-	if (RTW_PHL_STATUS_SUCCESS != rtw_phl_cmd_update_media_status(
-		phl, sta->phl_sta, sta->phl_sta->mac_addr, true,
-		PHL_CMD_DIRECTLY, 0))
+	if (_SUCCESS != rtw_sta_hal_media_status_rpt_cmd(a, sta, true, RTW_CMDF_DIRECTLY))
 		return -1;
 
 	rtw_dump_phl_sta_info(RTW_DBGDUMP, sta);
 
 	return 0;
+}
+
+#ifdef PHL_USE_RA_BW_MODE
+#define RTW_SET_PHL_STA_TX_BW_MODE(phl_sta, bw_mode) (phl_sta)->tx_bw_mode = (bw_mode)
+#else
+#define RTW_SET_PHL_STA_TX_BW_MODE(phl_sta, bw_mode) do {} while (0)
+#endif
+
+u8 rtw_sta_hal_media_status_rpt_cmd(_adapter *a, struct sta_info *sta, bool connected, u8 flag)
+{
+	enum phl_cmd_type cmd_type = rtw_cmdf_to_phl_cmd_type(flag);
+	u8 *addr = NULL;
+	enum rtw_phl_status status;
+
+	if (connected) {
+		addr = sta->phl_sta->mac_addr;
+		RTW_SET_PHL_STA_TX_BW_MODE(sta->phl_sta, rtw_get_tx_bw_mode(a, sta));
+	}
+
+	status = rtw_phl_cmd_update_media_status(GET_PHL_INFO(adapter_to_dvobj(a))
+		, sta->phl_sta, connected ? addr : NULL, connected, cmd_type, 0);
+
+	return status == RTW_PHL_STATUS_SUCCESS ? _SUCCESS : _FAIL;
+}
+
+u8 rtw_sta_hal_ra_mask_update_cmd(_adapter *a, struct sta_info *sta, u8 flag)
+{
+	enum phl_cmd_type cmd_type = rtw_cmdf_to_phl_cmd_type(flag);
+	enum rtw_phl_status status;
+
+	RTW_SET_PHL_STA_TX_BW_MODE(sta->phl_sta, rtw_get_tx_bw_mode(a, sta));
+
+	status = rtw_phl_cmd_change_stainfo(GET_PHL_INFO(adapter_to_dvobj(a))
+		, sta->phl_sta, STA_CHG_RAMASK, NULL, 0, cmd_type, 0);
+
+	return status == RTW_PHL_STATUS_SUCCESS ? _SUCCESS : _FAIL;
+}
+
+u8 rtw_link_hal_core_stop_beacon(struct _ADAPTER_LINK *alink, bool stop, u8 flag)
+{
+#if 1 /* enabled after PHL ready */
+	struct dvobj_priv *dvobj = adapter_to_dvobj(alink->adapter);
+	enum phl_cmd_type cmd_type = rtw_cmdf_to_phl_cmd_type(flag);
+	enum rtw_phl_status status;
+
+	status = rtw_phl_cmd_core_stop_beacon(GET_PHL_INFO(dvobj), alink->wrlink
+		, stop, cmd_type, 0);
+
+	return status == RTW_PHL_STATUS_SUCCESS ? _SUCCESS : _FAIL;
+#else
+	return _SUCCESS;
+#endif
 }
 
 u8 rtw_hal_get_def_var(struct _ADAPTER *a, struct _ADAPTER_LINK *alink,
@@ -2602,8 +3202,10 @@ s8 rtw_acs_get_noise_dbm(struct _ADAPTER *a, enum band_type band, u8 ch)
 	parm.idx = rtw_phl_get_acs_chnl_tbl_idx(d->phl, band, ch);
 	rtn = rtw_phl_get_acs_info(d->phl, &parm);
 
-	if (rtn == RTW_PHL_STATUS_SUCCESS)
+	if (rtn == RTW_PHL_STATUS_SUCCESS) {
+		parm.rpt.nhm_pwr -= 110; /* to dBm */
 		return parm.rpt.nhm_pwr;
+	}
 
 	return -110;
 }
@@ -2639,6 +3241,76 @@ void rtw_dump_env_rpt(struct _ADAPTER *a, void *sel)
 	RTW_PRINT_SEL(sel, "nhm_ratio:%d (%%)\n", rpt.nhm_ratio);
 }
 
+#ifdef DBG_RX_DFRAME_RAW_DATA
+void rtw_dump_rx_dframe_info(struct _ADAPTER *padapter, void *sel)
+{
+#define DBG_RX_DFRAME_RAW_DATA_UC	0
+#define DBG_RX_DFRAME_RAW_DATA_BMC	1
+#define DBG_RX_DFRAME_RAW_DATA_TYPES	2
+
+	struct dvobj_priv *devob = adapter_to_dvobj(padapter);
+	struct recv_info *recvinfo = &padapter->recvinfo;
+	struct sta_priv *pstapriv = &padapter->stapriv;
+	struct sta_info *psta;
+	struct sta_recv_dframe_info *psta_dframe_info;
+	_list *plist, *phead;
+	u8 isCCKrate, rf_path;
+	int i, j;
+	u8 bc_addr[ETH_ALEN] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
+	u8 null_addr[ETH_ALEN] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+
+	if (recvinfo->store_law_data_flag) {
+
+		_rtw_spinlock_bh(&pstapriv->sta_hash_lock);
+		for (i = 0; i < NUM_STA; i++) {
+			phead = &(pstapriv->sta_hash[i]);
+			plist = get_next(phead);
+
+			while ((rtw_end_of_queue_search(phead, plist)) == _FALSE) {
+				psta = LIST_CONTAINOR(plist, struct sta_info, hash_list);
+				plist = get_next(plist);
+
+				if (psta && psta->phl_sta) {
+					if ((_rtw_memcmp(psta->phl_sta->mac_addr, bc_addr, ETH_ALEN)  !=   _TRUE)
+					    && (_rtw_memcmp(psta->phl_sta->mac_addr, null_addr, ETH_ALEN)  !=  _TRUE)
+					    && (_rtw_memcmp(psta->phl_sta->mac_addr, adapter_mac_addr(padapter), ETH_ALEN)  !=  _TRUE)) {
+
+						RTW_PRINT_SEL(sel, "==============================\n");
+						RTW_PRINT_SEL(sel, "macaddr = "MAC_FMT"\n", MAC_ARG(psta->phl_sta->mac_addr));
+
+						for (j = 0; j < DBG_RX_DFRAME_RAW_DATA_TYPES; j++) {
+							if (j == DBG_RX_DFRAME_RAW_DATA_UC) {
+								psta_dframe_info = &psta->sta_dframe_info;
+								RTW_PRINT_SEL(sel, "\n");
+								RTW_PRINT_SEL(sel, "Unicast:\n");
+							} else if (j == DBG_RX_DFRAME_RAW_DATA_BMC) {
+								psta_dframe_info = &psta->sta_dframe_info_bmc;
+								RTW_PRINT_SEL(sel, "\n");
+								RTW_PRINT_SEL(sel, "Broadcast/Multicast:\n");
+							}
+
+							isCCKrate = (psta_dframe_info->sta_data_rate <= DESC_RATE11M) ? _TRUE : _FALSE;
+
+							RTW_PRINT_SEL(sel, "BW=%s, sgi =%d\n", ch_width_str(psta_dframe_info->sta_bw_mode), psta_dframe_info->sta_sgi);
+							RTW_PRINT_SEL(sel, "Rx_Data_Rate = %s\n", HDATA_RATE(psta_dframe_info->sta_data_rate));
+
+							for (rf_path = 0; rf_path < GET_HAL_RFPATH_NUM(devob); rf_path++) {
+								if (!isCCKrate) {
+									RTW_PRINT_SEL(sel , "RF_PATH_%d RSSI:%d(dBm)", rf_path, psta_dframe_info->sta_RxPwr[rf_path]);
+									RTW_PRINT_SEL(sel, "\nrx_ofdm_snr:%d(dB)\n", psta_dframe_info->sta_ofdm_snr[rf_path]);
+								} else
+									RTW_PRINT_SEL(sel , "RF_PATH_%d RSSI:%d(dBm)\n", rf_path, (psta_dframe_info->sta_mimo_signal_strength[rf_path]));
+							}
+						}
+					}
+				}
+			}
+		}
+		_rtw_spinunlock_bh(&pstapriv->sta_hash_lock);
+	}
+}
+#endif
+
 void rtw_dump_rfe_type(struct dvobj_priv *d)
 {
 	struct rtw_phl_com_t *phl_com = GET_PHL_COM(d);
@@ -2660,23 +3332,25 @@ static u8 _cfg_keep_alive_info(struct _ADAPTER *a, u8 enable)
 
 	_rtw_memset(&info, 0, sizeof(struct rtw_keep_alive_info));
 
-	info.keep_alive_en = enable;
-	info.keep_alive_period = check_period;
+	if (enable) {
+		info.keep_alive_en = enable;
+		info.keep_alive_period = check_period;
 #ifdef CONFIG_ARP_KEEP_ALIVE
-	/* Require arp_en = 1 in _cfg_arp_ofld_info() */
-	info.keep_alive_pkt_type = PKT_TYPE_ARP_RSP;
+		/* Require arp_en = 1 in _cfg_arp_ofld_info() */
+		info.keep_alive_pkt_type = PKT_TYPE_ARP_RSP;
 #else
-	info.keep_alive_pkt_type = PKT_TYPE_NULL_DATA;
+		info.keep_alive_pkt_type = PKT_TYPE_NULL_DATA;
 #endif
 
-	RTW_INFO("%s: keep_alive_en=%d, keep_alive_period=%d, keep_alive_pkt_type=%d\n",
-		 __func__, info.keep_alive_en, info.keep_alive_period,
-		 info.keep_alive_pkt_type);
+		RTW_INFO("%s: keep_alive_en=%d, keep_alive_period=%d, keep_alive_pkt_type=%d\n",
+			 __func__, info.keep_alive_en, info.keep_alive_period,
+			 info.keep_alive_pkt_type);
 
-	status = rtw_phl_cfg_keep_alive_info(phl, &info);
-	if (status != RTW_PHL_STATUS_SUCCESS) {
-		RTW_INFO("%s fail(%d)\n", __func__, status);
-		return _FAIL;
+		status = rtw_phl_cfg_keep_alive_info(phl, &info);
+		if (status != RTW_PHL_STATUS_SUCCESS) {
+			RTW_INFO("%s fail(%d)\n", __func__, status);
+			return _FAIL;
+		}
 	}
 
 	return _SUCCESS;
@@ -2963,6 +3637,52 @@ static u8 _cfg_wow_wake(struct _ADAPTER *a, u8 wow_en)
 	return _SUCCESS;
 }
 
+#ifdef CONFIG_PNO_SUPPORT
+static u8 _cfg_nlo_info(struct _ADAPTER *a)
+{
+	struct dvobj_priv *d;
+	struct wow_priv *wowpriv;
+	void *phl;
+
+	d = adapter_to_dvobj(a);
+	phl = GET_PHL_INFO(d);
+	wowpriv = adapter_to_wowlan(a);
+
+	rtw_phl_cfg_nlo_info(phl, &wowpriv->wow_nlo);
+
+	return _SUCCESS;
+}
+#endif
+
+static u8 _cfg_wow_wake_no_link(struct _ADAPTER *a)
+{
+	struct dvobj_priv *d;
+	void *phl;
+	enum rtw_phl_status status;
+	struct rtw_wow_wake_info wow_wake_event = {0};
+	struct registry_priv  *registry_par = &a->registrypriv;
+
+	d = adapter_to_dvobj(a);
+	phl = GET_PHL_INFO(d);
+
+	wow_wake_event.wow_en = _TRUE;
+#ifdef CONFIG_WRC_WOW_MAGIC
+	/* wake up by magic packet */
+	if (registry_par->wakeup_event & BIT(0))
+		wow_wake_event.magic_pkt_en = _TRUE;
+	else
+		wow_wake_event.magic_pkt_en = _FALSE;
+#endif
+
+	status = rtw_phl_cfg_wow_wake(phl, &wow_wake_event);
+	if (status != RTW_PHL_STATUS_SUCCESS) {
+		RTW_INFO("%s fail(%d)\n", __func__, status);
+		return _FAIL;
+	}
+
+	return _SUCCESS;
+}
+
 static u8 _cfg_wow_gpio(struct _ADAPTER *a)
 {
 	struct rtw_wow_wake_info info = {0};
@@ -3008,6 +3728,9 @@ static u8 _cfg_wow_gpio(struct _ADAPTER *a)
 	/* two halmac implementation. FW and halmac need to refine */
 	wow_gpio->dev2hst_gpio = WAKEUP_GPIO_IDX;
 	d2h_gpio_info->gpio_num = WAKEUP_GPIO_IDX;
+#if defined(CONFIG_USB_HCI) && !defined(CONFIG_USB_INBAND)
+	d2h_gpio_info->disable_inband = _TRUE;
+#endif
 
 	status = rtw_phl_cfg_gpio_wake_pulse(phl, wow_gpio);
 	if (status != RTW_PHL_STATUS_SUCCESS) {
@@ -3018,47 +3741,8 @@ static u8 _cfg_wow_gpio(struct _ADAPTER *a)
 	return _SUCCESS;
 }
 
-static u8 _wow_cfg(struct _ADAPTER *a, u8 wow_en)
-{
-	struct dvobj_priv *d;
-	void *phl;
-	struct rtw_phl_stainfo_t *phl_sta;
-	enum rtw_phl_status status;
-
-	d = adapter_to_dvobj(a);
-	phl = GET_PHL_INFO(d);
-
-	if (!_cfg_keep_alive_info(a, wow_en))
-		return _FAIL;
-
-	if(!_cfg_disc_det_info(a, wow_en))
-		return _FAIL;
-
-	if (!_cfg_arp_ofld_info(a))
-		return _FAIL;
-
-	if (!_cfg_ndp_ofld_info(a))
-		return _FAIL;
-
-#ifdef CONFIG_GTK_OL
-	if (!_cfg_gtk_ofld_info(a))
-		return _FAIL;
-#endif
-
-	if (!_cfg_realwow_info(a))
-		return _FAIL;
-
-	if (!_cfg_wow_wake(a, wow_en))
-		return _FAIL;
-
-	if(!_cfg_wow_gpio(a))
-		return _FAIL;
-
-	return _SUCCESS;
-}
-
-#ifdef CONFIG_PNO_SUPPORT
-static u8 _cfg_nlo_info(struct _ADAPTER *a)
+#ifdef CONFIG_WOW_PERIODIC_WAKE
+static u8 _cfg_periodic_wake(struct _ADAPTER *a)
 {
 	struct dvobj_priv *d;
 	struct wow_priv *wowpriv;
@@ -3068,52 +3752,67 @@ static u8 _cfg_nlo_info(struct _ADAPTER *a)
 	phl = GET_PHL_INFO(d);
 	wowpriv = adapter_to_wowlan(a);
 
-	rtw_phl_cfg_nlo_info(phl, &wowpriv->wow_nlo);
+	/* wake_period and wake_duration are initialized in rtw_init_wow() */
+	wowpriv->wow_periodic_wake.periodic_wake_en = _TRUE;
 
-	return _SUCCESS;
-}
-
-static u8 _cfg_wow_nlo_wake(struct _ADAPTER *a)
-{
-	struct dvobj_priv *d;
-	void *phl;
-	enum rtw_phl_status status;
-	struct rtw_wow_wake_info wow_wake_event = {0};
-	struct registry_priv  *registry_par = &a->registrypriv;
-
-	d = adapter_to_dvobj(a);
-	phl = GET_PHL_INFO(d);
-
-	wow_wake_event.wow_en = _TRUE;
-	/* wake up by magic packet */
-	if (registry_par->wakeup_event & BIT(0))
-		wow_wake_event.magic_pkt_en = _TRUE;
-	else
-		wow_wake_event.magic_pkt_en = _FALSE;
-
-	status = rtw_phl_cfg_wow_wake(phl, &wow_wake_event);
-	if (status != RTW_PHL_STATUS_SUCCESS) {
-		RTW_INFO("%s fail(%d)\n", __func__, status);
-		return _FAIL;
-	}
-
-	return _SUCCESS;
-}
-
-static u8 _wow_nlo_cfg(struct _ADAPTER *a)
-{
-	if (!_cfg_nlo_info(a))
-		return _FAIL;
-
-	if (!_cfg_wow_nlo_wake(a))
-		return _FAIL;
-
-	if(!_cfg_wow_gpio(a))
-		return _FAIL;
+	rtw_phl_cfg_periodic_wake_info(phl, &wowpriv->wow_periodic_wake);
 
 	return _SUCCESS;
 }
 #endif
+
+static u8 _wow_cfg(struct _ADAPTER *a, u8 wow_en, u8 no_link_mode)
+{
+	struct dvobj_priv *d;
+	void *phl;
+	struct rtw_phl_stainfo_t *phl_sta;
+	enum rtw_phl_status status;
+
+	d = adapter_to_dvobj(a);
+	phl = GET_PHL_INFO(d);
+
+	if (!no_link_mode) {
+		if (!_cfg_keep_alive_info(a, wow_en))
+			return _FAIL;
+
+		if(!_cfg_disc_det_info(a, wow_en))
+			return _FAIL;
+
+		if (!_cfg_arp_ofld_info(a))
+			return _FAIL;
+
+		if (!_cfg_ndp_ofld_info(a))
+			return _FAIL;
+
+#ifdef CONFIG_GTK_OL
+		if (!_cfg_gtk_ofld_info(a))
+			return _FAIL;
+#endif
+
+		if (!_cfg_realwow_info(a))
+			return _FAIL;
+
+		if (!_cfg_wow_wake(a, wow_en))
+			return _FAIL;
+	} else {
+#ifdef CONFIG_PNO_SUPPORT
+		if (!_cfg_nlo_info(a))
+			return _FAIL;
+#endif
+		if (!_cfg_wow_wake_no_link(a))
+			return _FAIL;
+	}
+
+	if(!_cfg_wow_gpio(a))
+		return _FAIL;
+
+#ifdef CONFIG_WOW_PERIODIC_WAKE
+	if (!_cfg_periodic_wake(a))
+		return _FAIL;
+#endif
+
+	return _SUCCESS;
+}
 
 u8 rtw_hw_wow(struct _ADAPTER *a, u8 wow_en)
 {
@@ -3129,16 +3828,10 @@ u8 rtw_hw_wow(struct _ADAPTER *a, u8 wow_en)
 	d = adapter_to_dvobj(a);
 	phl = GET_PHL_INFO(d);
 
-#ifdef CONFIG_PNO_SUPPORT
-	if (pwrpriv->wowlan_pno_enable) {
-		if (!_wow_nlo_cfg(a))
-			return _FAIL;
-	} else
-#endif
-	{
-		if (!_wow_cfg(a, wow_en))
-			return _FAIL;
-	}
+	if (!_wow_cfg(a, wow_en, pwrpriv->wowlan_no_link_mode))
+		return _FAIL;
+
+	rtw_phl_wow_set_no_link_mode(phl, pwrpriv->wowlan_no_link_mode);
 
 	phl_sta = rtw_phl_get_stainfo_self(phl, alink->wrlink);
 
@@ -3197,11 +3890,11 @@ int rtw_get_sta_tx_stat(_adapter *adapter, struct sta_info *psta)
 
 	pstats->tx_fail_cnt_sum += pstats->tx_fail_cnt;
 	pstats->tx_retry_cnt_sum += pstats->tx_retry_cnt;
-#else
-	RTW_INFO("%s() not support\n", __func__);
-#endif
 
-	return 0;
+	return _SUCCESS;
+#else
+	return RTW_NOT_SUPPORT;
+#endif
 }
 
 static enum rtw_edcca_mode rtw_edcca_mode_to_phl(enum rtw_edcca_mode_t mode)
@@ -3213,9 +3906,16 @@ static enum rtw_edcca_mode rtw_edcca_mode_to_phl(enum rtw_edcca_mode_t mode)
 		return RTW_EDCCA_ETSI;
 	case RTW_EDCCA_CS:
 		return RTW_EDCCA_JP;
+	case RTW_EDCCA_CBP:
+		return RTW_EDCCA_FCC;
 	default:
 		return RTW_EDCCA_MAX;
 	}
+}
+
+static bool rtw_edcca_hal_mode_supported(struct dvobj_priv* dvobj, enum rtw_edcca_mode_t mode)
+{
+	return rtw_edcca_mode_to_phl(mode) != RTW_EDCCA_MAX;
 }
 
 void rtw_edcca_hal_update(struct dvobj_priv *dvobj)
@@ -3255,12 +3955,13 @@ void rtw_edcca_hal_update(struct dvobj_priv *dvobj)
 	if (mode == RTW_EDCCA_MODE_NUM)
 		mode = RTW_EDCCA_NORM;
 
-	phl_mode = rtw_edcca_mode_to_phl(mode);
-	if (phl_mode == RTW_EDCCA_MAX) {
-		RTW_WARN("%s can't get valid phl mode from %s(%d)\n", __func__, rtw_edcca_mode_str(mode), mode);
-		rtw_warn_on(1);
-		return;
+	if (!rtw_edcca_hal_mode_supported(dvobj, mode)) {
+		RTW_WARN("%s edcca mode %s is not supported by HAL, set to %s\n", __func__
+			, rtw_edcca_mode_str(mode), rtw_edcca_mode_str(RTW_EDCCA_NORM));
+		mode = RTW_EDCCA_NORM;
 	}
+
+	phl_mode = rtw_edcca_mode_to_phl(mode);
 
 exit:
 	if (rtw_phl_get_edcca_mode(phl) != phl_mode)
@@ -3268,41 +3969,13 @@ exit:
 }
 
 #if CONFIG_TXPWR_LIMIT
-const char *const _txpwr_lmt_rs_str[] = {
-	[TXPWR_LMT_RS_CCK]	= "CCK",
-	[TXPWR_LMT_RS_OFDM]	= "OFDM",
-	[TXPWR_LMT_RS_HT]	= "HT",
-	[TXPWR_LMT_RS_VHT]	= "VHT",
-	[TXPWR_LMT_RS_HE]	= "HE",
-	[TXPWR_LMT_RS_NUM]	= "UNKNOWN",
-};
-
-u16 rtw_txpwr_lmt_rs_to_data_rate(int txpwr_lmt_rs)
+enum txpwr_lmt_reg_exc_match _rtw_txpwr_hal_lmt_reg_exc_search(struct dvobj_priv* dvobj
+	, enum band_type band, const char *country, u8 domain, const char **reg_name)
 {
-	u16 data_rate;
-	switch (txpwr_lmt_rs) {
-		case TXPWR_LMT_RS_CCK:
-			data_rate = RTW_DATA_RATE_CCK11;
-			break;
-		case TXPWR_LMT_RS_OFDM:
-			data_rate = RTW_DATA_RATE_OFDM54;
-			break;
-		case TXPWR_LMT_RS_HT:
-		case TXPWR_LMT_RS_VHT:
-		case TXPWR_LMT_RS_HE:
-			data_rate = RTW_DATA_RATE_HE_NSS1_MCS11;
-			break;
-		default:
-			data_rate = RTW_DATA_RATE_OFDM6;
-			break;
-	}
+	u8 hal_match;
 
-	return data_rate;
-}
-
-enum txpwr_lmt_reg_exc_match rtw_txpwr_hal_lmt_reg_exc_search(struct dvobj_priv* dvobj, const char *country, u8 domain, const char **reg_name)
-{
-	u8 hal_match = rtw_phl_ext_reg_codemap_search(GET_PHL_INFO(dvobj), domain, country, reg_name);
+	hal_match = rtw_phl_ext_reg_codemap_of_band_search(GET_PHL_INFO(dvobj)
+		, band, domain, country, reg_name);
 
 	if (hal_match & RTW_PHL_EXT_REG_MATCH_COUNTRY)
 		return TXPWR_LMT_REG_EXC_MATCH_COUNTRY;
@@ -3311,9 +3984,23 @@ enum txpwr_lmt_reg_exc_match rtw_txpwr_hal_lmt_reg_exc_search(struct dvobj_priv*
 	return TXPWR_LMT_REG_EXC_MATCH_NONE;
 }
 
+enum txpwr_lmt_reg_exc_match rtw_txpwr_hal_lmt_reg_exc_search(struct dvobj_priv* dvobj
+	, const char *country, u8 domain, const char **reg_name)
+{
+	return _rtw_txpwr_hal_lmt_reg_exc_search(dvobj, BAND_ON_24G, country, domain, reg_name);
+}
+
+#if CONFIG_IEEE80211_BAND_6GHZ
+enum txpwr_lmt_reg_exc_match rtw_txpwr_hal_lmt_reg_exc_6g_search(struct dvobj_priv* dvobj
+	, const char *country, u8 domain, const char **reg_name)
+{
+	return _rtw_txpwr_hal_lmt_reg_exc_search(dvobj, BAND_ON_6G, country, domain, reg_name);
+}
+#endif /* CONFIG_IEEE80211_BAND_6GHZ */
+
 bool rtw_txpwr_hal_lmt_reg_search(struct dvobj_priv* dvobj, enum band_type band, const char *name)
 {
-	int hal_regu = rtw_phl_get_pw_lmt_regu_type_from_str(GET_PHL_INFO(dvobj), name);
+	int hal_regu = rtw_phl_get_pw_lmt_regu_type_of_band_from_str(GET_PHL_INFO(dvobj), band, name);
 
 	if (hal_regu == -1)
 		return false;
@@ -3329,7 +4016,7 @@ void rtw_txpwr_hal_set_current_lmt_regs_by_name(struct dvobj_priv* dvobj, char *
 {
 	struct txpwr_regu_info_t hal_conf;
 	enum band_type band;
-	int hal_regu, hal_none_regu = rtw_phl_get_pw_lmt_regu_type_from_str(GET_PHL_INFO(dvobj), "NONE");
+	int hal_regu, hal_none_regu;
 	char *name;
 	u8 *regu;
 	u8 regu_num;
@@ -3341,6 +4028,7 @@ void rtw_txpwr_hal_set_current_lmt_regs_by_name(struct dvobj_priv* dvobj, char *
 		if (!names_of_band[band] || !names_len_of_band[band])
 			continue;
 
+		hal_none_regu = rtw_phl_get_pw_lmt_regu_type_of_band_from_str(GET_PHL_INFO(dvobj), band, "NONE");
 		regu_num = 0;
 		ustrs_for_each_str(names_of_band[band], names_len_of_band[band], name)
 				regu_num++;
@@ -3368,7 +4056,7 @@ void rtw_txpwr_hal_set_current_lmt_regs_by_name(struct dvobj_priv* dvobj, char *
 		regu_num = 0;
 		ustrs_for_each_str(names_of_band[band], names_len_of_band[band], name) {
 			if (rtw_txpwr_hal_lmt_reg_search(dvobj, band, name)) {
-				hal_regu = rtw_phl_get_pw_lmt_regu_type_from_str(GET_PHL_INFO(dvobj), name);
+				hal_regu = rtw_phl_get_pw_lmt_regu_type_of_band_from_str(GET_PHL_INFO(dvobj), band, name);
 				regu[regu_num++] = hal_regu >= 0 ? hal_regu : hal_none_regu;
 			} else
 				regu[regu_num++] = hal_none_regu;
@@ -3406,6 +4094,7 @@ void rtw_txpwr_hal_get_current_lmt_regs_name(struct dvobj_priv* dvobj, char *nam
 	}
 
 	for (band = 0; band < BAND_MAX; band++) {
+		reg_len = 0;
 		if (band == BAND_ON_24G) {
 			reg = hal_info->regu_2g;
 			reg_len = hal_info->regu_2g_len;
@@ -3415,11 +4104,10 @@ void rtw_txpwr_hal_get_current_lmt_regs_name(struct dvobj_priv* dvobj, char *nam
 		} else if (band == BAND_ON_6G) {
 			reg = hal_info->regu_6g;
 			reg_len = hal_info->regu_6g_len;
-		} else
-			continue;
+		}
 
 		for (i = 0; i < reg_len; i++) {
-			hal_name = rtw_phl_get_pw_lmt_regu_str_from_type(GET_PHL_INFO(dvobj), reg[i]);
+			hal_name = rtw_phl_get_pw_lmt_regu_str_from_type_of_band(GET_PHL_INFO(dvobj), band, reg[i]);
 			if (hal_name)
 				ustrs_add(&names_of_band[band], &names_len_of_band[band], hal_name);
 		}
@@ -3428,21 +4116,75 @@ void rtw_txpwr_hal_get_current_lmt_regs_name(struct dvobj_priv* dvobj, char *nam
 	rtw_phl_free_pw_lmt_regu_info(GET_PHL_INFO(dvobj), hal_info);
 }
 
+#define TXPWR_LMT_RS_CCK	0
+#define TXPWR_LMT_RS_OFDM	1
+#define TXPWR_LMT_RS_HT		2
+#define TXPWR_LMT_RS_VHT	3
+#define TXPWR_LMT_RS_HE		4
+#define TXPWR_LMT_RS_NUM	5
+
+#define TXPWR_LMT_MAX_BANDWIDTH_NUM	4 /* 20MHz ~ 160MHz */
+
+/* TXBF Capabilities */
+#define TXPWR_LMT_NO_TXBF	0
+#define TXPWR_LMT_TXBF		1
+#define TXPWR_LMT_TXBF_NUM	2
+
+static const char *const _txpwr_lmt_rs_str[] = {
+	[TXPWR_LMT_RS_CCK]	= "CCK",
+	[TXPWR_LMT_RS_OFDM]	= "OFDM",
+	[TXPWR_LMT_RS_HT]	= "HT",
+	[TXPWR_LMT_RS_VHT]	= "VHT",
+	[TXPWR_LMT_RS_HE]	= "HE",
+	[TXPWR_LMT_RS_NUM]	= "UNKNOWN",
+};
+
+#define txpwr_lmt_rs_str(rs) (((rs) >= TXPWR_LMT_RS_NUM) ? _txpwr_lmt_rs_str[TXPWR_LMT_RS_NUM] : _txpwr_lmt_rs_str[(rs)])
+
+static u16 rtw_txpwr_lmt_rs_to_data_rate(int txpwr_lmt_rs)
+{
+	u16 data_rate;
+	switch (txpwr_lmt_rs) {
+		case TXPWR_LMT_RS_CCK:
+			data_rate = RTW_DATA_RATE_CCK11;
+			break;
+		case TXPWR_LMT_RS_OFDM:
+			data_rate = RTW_DATA_RATE_OFDM54;
+			break;
+		case TXPWR_LMT_RS_HT:
+		case TXPWR_LMT_RS_VHT:
+		case TXPWR_LMT_RS_HE:
+			data_rate = RTW_DATA_RATE_HE_NSS1_MCS11;
+			break;
+		default:
+			data_rate = RTW_DATA_RATE_OFDM6;
+			break;
+	}
+
+	return data_rate;
+}
+
 void dump_txpwr_lmt(void *sel, _adapter *adapter)
 {
-#define TMP_STR_LEN 16
+#define TMP_STR_LEN 32
 	struct dvobj_priv *devob = adapter_to_dvobj(adapter);
-	struct hal_spec_t *hal_spec = GET_HAL_SPEC(devob);
 	int band, bw, ch_num, tlrs, ntx_idx, bf, regu;
 	const char *str;
 	char fmt[16];
 	char tmp_str[TMP_STR_LEN];
 	u8 ch, i;
+	u8 max_regd_num;
+	u8 txgi_pdbm, txgi_max;
+	s8 txgi_ww;
+
+	txgi_pdbm = rtw_phl_get_tx_tbl_to_tx_pwr_times(GET_PHL_INFO(devob));
+	txgi_max = rtw_phl_get_power_limit_value_na(GET_PHL_INFO(devob));
+	txgi_ww = rtw_phl_get_power_limit_value_ww(GET_PHL_INFO(devob));
 
 	for (band = BAND_ON_24G; band <= BAND_ON_6G; band++) {
-
 		if (!rtw_hw_is_band_support(devob, band))
 			continue;
+		max_regd_num = rtw_phl_get_regulation_max_num(GET_PHL_INFO(devob), band);
 
 		for (bw = 0; bw < TXPWR_LMT_MAX_BANDWIDTH_NUM; bw++) {
 			u8 (*center_chs)(u8, u8);
@@ -3470,7 +4212,7 @@ void dump_txpwr_lmt(void *sel, _adapter *adapter)
 
 				for (ntx_idx = RF_1TX; ntx_idx < RF_PATH_MAX; ntx_idx++) {
 
-					if (ntx_idx + 1 > hal_spec->max_tx_cnt)
+					if (ntx_idx + 1 > GET_TX_PATH_NUM(devob, HW_BAND_0))
 						continue;
 
 					for (bf = TXPWR_LMT_NO_TXBF; bf < TXPWR_LMT_TXBF_NUM; bf++) {
@@ -3489,10 +4231,10 @@ void dump_txpwr_lmt(void *sel, _adapter *adapter)
 						/* header for limit in dBm  */
 						RTW_PRINT_SEL(sel, "%3s ", "ch");
 
-						for (regu = 0; regu < TXPWR_LMT_MAX_REGULATION_NUM; regu++) {
+						for (regu = 0; regu < max_regd_num; regu++) {
 							if (rtw_phl_pw_lmt_regu_tbl_exist(GET_PHL_INFO(devob), band, regu)) {
-								str = rtw_phl_get_pw_lmt_regu_str_from_type(GET_PHL_INFO(devob), regu);
-								if (strcmp(str, "INTERSECT") == 0 || strcmp(str, "EXT") == 0)
+								str = rtw_phl_get_pw_lmt_regu_str_from_type_of_band(GET_PHL_INFO(devob), band, regu);
+								if (!str || strcmp(str, "INTERSECT") == 0 || strcmp(str, "EXT") == 0)
 									continue;
 								sprintf(fmt, "%%%zus%%s ", strlen(str) >= 6 ? 1 : 6 - strlen(str));
 								snprintf(tmp_str, TMP_STR_LEN, fmt
@@ -3512,18 +4254,15 @@ void dump_txpwr_lmt(void *sel, _adapter *adapter)
 
 							/* dump limit in dBm */
 							RTW_PRINT_SEL(sel, "%3u ", ch);
-							for (regu = 0 ; regu < TXPWR_LMT_MAX_REGULATION_NUM; regu++) {
+							for (regu = 0 ; regu < max_regd_num; regu++) {
 								if(rtw_phl_pw_lmt_regu_tbl_exist(GET_PHL_INFO(devob), band, regu)) {
-									str = rtw_phl_get_pw_lmt_regu_str_from_type(GET_PHL_INFO(devob), regu);
-									if (strcmp(str, "INTERSECT") == 0 || strcmp(str, "EXT") == 0)
+									str = rtw_phl_get_pw_lmt_regu_str_from_type_of_band(GET_PHL_INFO(devob), band, regu);
+									if (!str || strcmp(str, "INTERSECT") == 0 || strcmp(str, "EXT") == 0)
 										continue;
 									txpwr_idx_get_dbm_str(
 										rtw_phl_get_power_limit_option(GET_PHL_INFO(devob), HW_BAND_0,
-										RF_PATH_A, rtw_txpwr_lmt_rs_to_data_rate(tlrs), bw, bf,
-										ntx_idx, ch, band, regu),
-										127, -128,
-										rtw_phl_get_tx_tbl_to_tx_pwr_times(GET_PHL_INFO(devob)),
-										strlen(str), tmp_str, TMP_STR_LEN);
+											RF_PATH_A, rtw_txpwr_lmt_rs_to_data_rate(tlrs), bw, bf, ntx_idx, ch, band, regu),
+										txgi_max, txgi_ww, txgi_pdbm, strlen(str), tmp_str, TMP_STR_LEN);
 									_RTW_PRINT_SEL(sel, "%s ", tmp_str);
 								}
 							}
@@ -3536,7 +4275,175 @@ void dump_txpwr_lmt(void *sel, _adapter *adapter)
 		} /* loop for bandwidths */
 	} /* loop for bands */
 }
-#endif
+
+#ifdef CONFIG_80211AX_HE
+#define TXPWR_LMT_RU26		0
+#define TXPWR_LMT_RU52		1
+#define TXPWR_LMT_RU106		2
+#define TXPWR_LMT_RU_NUM	3
+
+static const char *const _txpwr_lmt_ru_str[] = {
+	[TXPWR_LMT_RU26]	= "RU26",
+	[TXPWR_LMT_RU52]	= "RU52",
+	[TXPWR_LMT_RU106]	= "RU106",
+	[TXPWR_LMT_RU_NUM]	= "RU_NUM",
+};
+
+#define txpwr_lmt_ru_str(ru) (((ru) >= TXPWR_LMT_RU_NUM) ? _txpwr_lmt_ru_str[TXPWR_LMT_RU_NUM] : _txpwr_lmt_ru_str[(ru)])
+
+void dump_txpwr_lmt_ru(void *sel, _adapter *adapter)
+{
+#define TMP_STR_LEN 32
+	struct dvobj_priv *devob = adapter_to_dvobj(adapter);
+	int band, bw, ch_num, tlrs, ntx_idx, regu;
+	const char *str;
+	char fmt[16];
+	char tmp_str[TMP_STR_LEN];
+	u8 ch, i;
+	u8 max_regd_num;
+	u8 txgi_pdbm, txgi_max;
+	s8 txgi_ww;
+
+	txgi_pdbm = rtw_phl_get_tx_tbl_to_tx_pwr_times(GET_PHL_INFO(devob));
+	txgi_max = rtw_phl_get_power_limit_value_na(GET_PHL_INFO(devob));
+	txgi_ww = rtw_phl_get_power_limit_value_ww(GET_PHL_INFO(devob));
+
+	for (band = BAND_ON_24G; band <= BAND_ON_6G; band++) {
+		if (!rtw_hw_is_band_support(devob, band))
+			continue;
+		max_regd_num = rtw_phl_get_regulation_max_num(GET_PHL_INFO(devob), band);
+
+		for (bw = 0; bw < TXPWR_LMT_RU_NUM; bw++) {
+			u8 (*center_chs)(u8, u8);
+
+			ch_num = center_chs_num_of_band[band](CHANNEL_WIDTH_20);
+			if (ch_num == 0) {
+				rtw_warn_on(1);
+				break;
+			}
+			center_chs = center_chs_of_band[band];
+
+			for (tlrs = TXPWR_LMT_RS_HE; tlrs < TXPWR_LMT_RS_NUM; tlrs++) {
+
+				for (ntx_idx = RF_1TX; ntx_idx < RF_PATH_MAX; ntx_idx++) {
+
+					if (ntx_idx + 1 > GET_TX_PATH_NUM(devob, HW_BAND_0))
+						continue;
+
+					RTW_PRINT_SEL(sel, "[%s][%s][%s][%uT]\n"
+						, band_str(band)
+						, txpwr_lmt_ru_str(bw)
+						, txpwr_lmt_rs_str(tlrs)
+						, ntx_idx + 1
+					);
+
+					/* header for limit in dBm  */
+					RTW_PRINT_SEL(sel, "%3s ", "ch");
+
+					for (regu = 0; regu < max_regd_num; regu++) {
+						if (rtw_phl_pw_lmt_regu_tbl_exist(GET_PHL_INFO(devob), band, regu)) {
+							str = rtw_phl_get_pw_lmt_regu_str_from_type_of_band(GET_PHL_INFO(devob), band, regu);
+							if (!str || strcmp(str, "INTERSECT") == 0 || strcmp(str, "EXT") == 0)
+								continue;
+							sprintf(fmt, "%%%zus%%s ", strlen(str) >= 6 ? 1 : 6 - strlen(str));
+							snprintf(tmp_str, TMP_STR_LEN, fmt
+								, rtw_phl_is_current_pwr_lmt_regu(GET_PHL_INFO(devob), band, regu) ? "*" : ""
+								, str);
+							_RTW_PRINT_SEL(sel, "%s", tmp_str);
+						}
+					}
+					_RTW_PRINT_SEL(sel, "\n");
+
+					for (i = 0; i < ch_num; i++) {
+						ch = center_chs(CHANNEL_WIDTH_20, i);
+						if (ch == 0) {
+							rtw_warn_on(1);
+							break;
+						}
+
+						/* dump limit in dBm */
+						RTW_PRINT_SEL(sel, "%3u ", ch);
+						for (regu = 0 ; regu < max_regd_num; regu++) {
+							if(rtw_phl_pw_lmt_regu_tbl_exist(GET_PHL_INFO(devob), band, regu)) {
+								str = rtw_phl_get_pw_lmt_regu_str_from_type_of_band(GET_PHL_INFO(devob), band, regu);
+								if (!str || strcmp(str, "INTERSECT") == 0 || strcmp(str, "EXT") == 0)
+									continue;
+								txpwr_idx_get_dbm_str(
+									rtw_phl_get_power_limit_ru_option(GET_PHL_INFO(devob), HW_BAND_0, RF_PATH_A,
+										rtw_txpwr_lmt_rs_to_data_rate(tlrs), bw, ntx_idx, ch, band, regu),
+									txgi_max, txgi_ww, txgi_pdbm, strlen(str), tmp_str, TMP_STR_LEN);
+								_RTW_PRINT_SEL(sel, "%s ", tmp_str);
+							}
+						}
+						_RTW_PRINT_SEL(sel, "\n");
+					}
+					RTW_PRINT_SEL(sel, "\n");
+				}/* loop for tx_num */
+			} /* loop for rate sections */
+		} /* loop for rus */
+	} /* loop for bands */
+}
+#endif /* CONFIG_80211AX_HE */
+#endif /* CONFIG_TXPWR_LIMIT */
+
+extern enum rtw_data_rate _rate_mrate2phl(enum MGN_RATE mrate);
+void dump_txpwr_by_rate(void *sel, _adapter *adapter)
+{
+	struct dvobj_priv *devob = adapter_to_dvobj(adapter);
+	int band, rs, tx_num, n, i;
+	u8 rate_num, ratio, value;
+	ratio = rtw_phl_get_tx_tbl_to_tx_pwr_times(GET_PHL_INFO(devob));
+
+	for (band = BAND_ON_24G; band <= BAND_ON_6G; band++) {
+		if (!rtw_hw_is_band_support(devob, band))
+			continue;
+
+		RTW_PRINT_SEL(sel, "[%s]\n", band_str(band));
+
+		for (rs = 0; rs < RATE_SECTION_NUM; rs++) {
+			tx_num = rate_section_to_tx_num(rs);
+			if (tx_num >= GET_PHY_TX_NSS_BY_BAND(adapter_to_dvobj(adapter), HW_BAND_0))
+				continue;
+
+			if (band != BAND_ON_24G && IS_CCK_RATE_SECTION(rs))
+				continue;
+
+			rate_num = rate_section_rate_num(rs);
+
+			RTW_PRINT_SEL(sel, "%7s: ", rate_section_str(rs));
+
+			/* dump power by rate in db */
+			for (n = rate_num - 1; n >= 0; n--) {
+				value = rtw_phl_get_power_by_rate_band(GET_PHL_INFO(devob), HW_BAND_0,
+								       _rate_mrate2phl(rates_by_sections[rs].rates[n]),
+								       IS_DCM_RATE_SECTION(rs) ? 1 : 0, 0, band);
+
+				if (value % ratio) {
+					_RTW_PRINT_SEL(sel, "%2d.%d ", value / ratio
+							, (value % ratio) * 100 / ratio);
+				} else
+					_RTW_PRINT_SEL(sel, "%5d ", value / ratio);
+			}
+			RTW_PRINT_SEL(sel, "\n");
+		}
+
+		/* dump offset */
+		RTW_PRINT_SEL(sel, "%7s: ", "Offset");
+		for (i = 0; i < 5; i++) {
+			if (band != BAND_ON_24G && IS_CCK_RATE(mgn_rates_offset[i]))
+				continue;
+
+			value = rtw_phl_get_power_by_rate_band(GET_PHL_INFO(devob), HW_BAND_0,
+							       _rate_mrate2phl(mgn_rates_offset[i]),
+							       0, 1, band);
+			if (value % ratio) {
+				_RTW_PRINT_SEL(sel, "%2d.%d ", value / ratio, (value % ratio) * 100 / ratio);
+			} else
+				_RTW_PRINT_SEL(sel, "%5d ", value / ratio);
+		}
+		RTW_PRINT_SEL(sel, "\n");
+	}
+}
 
 #ifdef CONFIG_DFS_MASTER
 void rtw_dfs_hal_radar_detect_disable(struct dvobj_priv *dvobj, u8 band_idx)
@@ -3572,7 +4479,8 @@ static const enum dfs_regd_t _rtw_dfs_regd_to_phl[RTW_DFS_REGD_NUM] = {
 
 bool rtw_dfs_hal_region_supported(struct dvobj_priv* dvobj, enum rtw_dfs_regd domain)
 {
-	return rtw_dfs_regd_to_phl(domain) != DFS_REGD_UNKNOWN;
+	return domain == RTW_DFS_REGD_NONE
+		|| rtw_dfs_regd_to_phl(domain) != DFS_REGD_UNKNOWN;
 }
 
 void rtw_dfs_hal_update_region(struct dvobj_priv *dvobj, u8 band_idx, enum rtw_dfs_regd domain)
@@ -3587,6 +4495,20 @@ u8 rtw_dfs_hal_radar_detect_polling_int_ms(struct dvobj_priv *dvobj)
 	return 100;
 }
 #endif /* CONFIG_DFS_MASTER */
+
+bool rtw_txpwr_hal_is_txpwr_limit_needed(struct dvobj_priv *dvobj)
+{
+#if CONFIG_TXPWR_LIMIT
+	struct rtw_phl_com_t *phl_com = GET_PHL_COM(dvobj);
+	enum rtw_pwr_limit_type type = phl_com->dev_cap.pwrlmt_type;
+	u8 efuse_regulatory = phl_com->dev_cap.rf_board_opt & 0x3;
+
+	if (type == RTW_PWBYRATE_AND_PWLMT
+		|| (type == RTW_PWLMT_BY_EFUSE && efuse_regulatory == 1))
+		return true;
+#endif
+	return false;
+}
 
 bool rtw_txpwr_hal_get_pwr_lmt_en(struct dvobj_priv *dvobj)
 {
@@ -3635,11 +4557,98 @@ bool rtw_txpwr_hal_get_ext_info(struct dvobj_priv *dvobj, struct tx_power_ext_in
 	return true;
 }
 
+/*
+* check if user specified mbm is valid
+*/
+bool phy_is_txpwr_user_mbm_valid(_adapter *adapter, s16 mbm)
+{
+	return 1;
+}
+
+bool phy_is_txpwr_user_lmt_specified(struct dvobj_priv *dvobj)
+{
+	s16 total_mbm = UNSPECIFIED_MBM;
+
+#ifdef CONFIG_IOCTL_CFG80211
+	total_mbm = rtw_cfg80211_dev_get_total_txpwr_lmt_mbm(dvobj);
+#endif
+
+	return total_mbm != UNSPECIFIED_MBM;
+}
+
+/*
+* Return value in unit of TX Gain Index
+* hal_spec.txgi_max means unspecified
+*/
+static s8 phy_get_txpwr_user_lmt(struct dvobj_priv *dvobj, u8 ntx_idx)
+{
+	struct rf_ctl_t *rfctl = dvobj_to_rfctl(dvobj);
+	void *phl_info = GET_PHL_INFO(dvobj);
+	s16 total_mbm = UNSPECIFIED_MBM;
+	s8 lmt;
+
+#ifdef CONFIG_IOCTL_CFG80211
+	total_mbm = rtw_cfg80211_dev_get_total_txpwr_lmt_mbm(dvobj);
+#endif
+	if (total_mbm != UNSPECIFIED_MBM) {
+		/* TODO: consider antenna_gain */
+		lmt = txpwr_mbm_to_txgi_s8_with_max(total_mbm - mb_of_ntx(ntx_idx + 1)
+			, rtw_phl_get_power_limit_value_na(phl_info)
+			, rtw_phl_get_tx_tbl_to_tx_pwr_times(phl_info));
+	} else
+		lmt = rtw_phl_get_power_limit_value_na(phl_info);
+
+	return lmt;
+}
+
+static void rtw_set_ext_pwr_lmt_into(struct dvobj_priv *dvobj, struct rtw_phl_ext_pwr_lmt_info *ext_pwr_lmt_info)
+{
+	int i = 0;
+	s8 pwr_lmt;
+
+	for (i = 0; i <= RF_PATH_B; i++){
+		pwr_lmt = phy_get_txpwr_user_lmt(dvobj, i);
+		ext_pwr_lmt_info->ext_pwr_lmt_2_4g[i] = pwr_lmt;
+		ext_pwr_lmt_info->ext_pwr_lmt_5g_band1[i] = pwr_lmt;
+		ext_pwr_lmt_info->ext_pwr_lmt_5g_band2[i] = pwr_lmt;
+		ext_pwr_lmt_info->ext_pwr_lmt_5g_band3[i] = pwr_lmt;
+		ext_pwr_lmt_info->ext_pwr_lmt_5g_band4[i] = pwr_lmt;
+		ext_pwr_lmt_info->ext_pwr_lmt_6g_unii_5_1[i] = pwr_lmt;
+		ext_pwr_lmt_info->ext_pwr_lmt_6g_unii_5_2[i] = pwr_lmt;
+		ext_pwr_lmt_info->ext_pwr_lmt_6g_unii_6[i] = pwr_lmt;
+		ext_pwr_lmt_info->ext_pwr_lmt_6g_unii_7_1[i] = pwr_lmt;
+		ext_pwr_lmt_info->ext_pwr_lmt_6g_unii_7_2[i] = pwr_lmt;
+		ext_pwr_lmt_info->ext_pwr_lmt_6g_unii_8[i] = pwr_lmt;
+		ext_pwr_lmt_info->ext_pwr_lmt_ant_2_4g[i]= 0;
+		ext_pwr_lmt_info->ext_pwr_lmt_ant_5g_band1[i] = 0;
+		ext_pwr_lmt_info->ext_pwr_lmt_ant_5g_band2[i] = 0;
+		ext_pwr_lmt_info->ext_pwr_lmt_ant_5g_band3[i] = 0;
+		ext_pwr_lmt_info->ext_pwr_lmt_ant_5g_band4[i] = 0;
+		ext_pwr_lmt_info->ext_pwr_lmt_ant_6g_unii_5_1[i] = 0;
+		ext_pwr_lmt_info->ext_pwr_lmt_ant_6g_unii_5_2[i] = 0;
+		ext_pwr_lmt_info->ext_pwr_lmt_ant_6g_unii_6[i] = 0;
+		ext_pwr_lmt_info->ext_pwr_lmt_ant_6g_unii_7_1[i] = 0;
+		ext_pwr_lmt_info->ext_pwr_lmt_ant_6g_unii_7_2[i] = 0;
+		ext_pwr_lmt_info->ext_pwr_lmt_ant_6g_unii_8[i] = 0;
+	}
+}
+
 void rtw_txpwr_hal_update_pwr(struct dvobj_priv *dvobj, enum phl_band_idx band_idx)
 {
 	struct rf_ctl_t *rfctl = dvobj_to_rfctl(dvobj);
+	void *phl_info = GET_PHL_INFO(dvobj);
 	struct txpwr_ctl_param args;
+	struct rtw_phl_ext_pwr_lmt_info ext_pwr_lmt_info;
 	int i;
+
+	/* ext_pwr_lmt is for all hwband here */
+	rtw_set_ext_pwr_lmt_into(dvobj, &ext_pwr_lmt_info);
+	if (phy_is_txpwr_user_lmt_specified(dvobj)) {
+		rtw_phl_set_ext_pwr_lmt_en(phl_info, true);
+		for (i = HW_BAND_0; i < HW_BAND_MAX; i++)
+			rtw_phl_enable_ext_pwr_lmt(phl_info, i, &ext_pwr_lmt_info);
+	} else
+		rtw_phl_set_ext_pwr_lmt_en(phl_info, false);
 
 	txpwr_ctl_param_init(&args);
 	args.force_write_txpwr = true;
@@ -3649,7 +4658,7 @@ void rtw_txpwr_hal_update_pwr(struct dvobj_priv *dvobj, enum phl_band_idx band_i
 		if (band_idx < HW_BAND_MAX && band_idx != i)
 			continue;
 		args.band_idx = i;
-		rtw_phl_cmd_txpwr_ctl(GET_PHL_INFO(dvobj), &args, PHL_CMD_DIRECTLY, 0);
+		rtw_phl_cmd_txpwr_ctl(phl_info, &args, PHL_CMD_DIRECTLY, 0);
 	}
 }
 
@@ -3658,7 +4667,7 @@ inline u8 get_phy_tx_nss(_adapter *adapter, struct _ADAPTER_LINK *adapter_link)
 	u8 txss = 0;
 
 	if (adapter_link->wrlink)
-		txss = GET_PHY_TX_NSS_BY_BAND(adapter, adapter_link->wrlink->hw_band);
+		txss = GET_PHY_TX_NSS_BY_BAND(adapter_to_dvobj(adapter), adapter_link->wrlink->hw_band);
 	else
 		rtw_warn_on(1);
 
@@ -3670,7 +4679,7 @@ inline u8 get_phy_rx_nss(_adapter *adapter, struct _ADAPTER_LINK *adapter_link)
 	u8 rxss = 0;
 
 	if (adapter_link->wrlink)
-		rxss = GET_PHY_RX_NSS_BY_BAND(adapter, adapter_link->wrlink->hw_band);
+		rxss = GET_PHY_RX_NSS_BY_BAND(adapter_to_dvobj(adapter), adapter_link->wrlink->hw_band);
 	else
 		rtw_warn_on(1);
 

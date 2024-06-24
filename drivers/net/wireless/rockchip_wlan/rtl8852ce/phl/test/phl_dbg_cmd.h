@@ -51,6 +51,12 @@ struct phl_dbg_cmd_info {
 enum rtw_phl_status
 rtw_phl_dbg_core_cmd(struct phl_info_t *phl_info, struct rtw_proc_cmd *incmd, char *output, u32 out_len);
 
+void convert_tx_rate(enum rtw_rate_mode mode,
+                     u8 mcs_ss_idx,
+                     char *str,
+                     u32 str_len);
+void convert_rx_rate(u32 rx_rate, char *str, u32 str_len);
+
 #ifdef CONFIG_PHL_TEST_SUITE
 
 enum PHL_DBG_CMD_ID {
@@ -78,6 +84,9 @@ enum PHL_DBG_CMD_ID {
 	PHL_DBG_ECSA,
 	PHL_DBG_MCC,
 	PHL_DBG_LTR,
+#ifdef CONFIG_PCI_HCI
+	PHL_DBG_PCIE_CFGSPC,
+#endif
 	PHL_DBG_PHY_STATS,
 	PHL_DBG_BCN,
 	PHL_DBG_MR,
@@ -85,6 +94,17 @@ enum PHL_DBG_CMD_ID {
 	PHL_DBG_CFG_TX_DUTY,
 #ifdef CONFIG_PHL_CHANNEL_INFO_DBG
 	PHL_DBG_CHAN_INFO,
+#endif
+	PHL_DBG_SET_LEVEL,
+	PHL_DBG_SET_DUMP_CFG,
+#ifdef CONFIG_PHL_SNIFFER_SUPPORT
+	PHL_DBG_SNIFFER,
+#endif
+#ifdef CONFIG_USB_HCI
+	PHL_DBG_USB_SPEED,
+#endif
+#ifdef DBG_MONITOR_TIME
+	PHL_DBG_FUNC_LATENCY,
 #endif
 	PHL_DBG_MAX
 };
@@ -115,6 +135,9 @@ static const struct phl_dbg_cmd_info phl_dbg_cmd_i[] = {
 	{"bcn", PHL_DBG_BCN},
 	{"mcc", PHL_DBG_MCC},
 	{"ltr", PHL_DBG_LTR},
+#ifdef CONFIG_PCI_HCI
+	{"pcie_cfgspc", PHL_DBG_PCIE_CFGSPC},
+#endif
 	{"phy_stats", PHL_DBG_PHY_STATS},
 	{"mr_info", PHL_DBG_MR},
 	{"lamode", PHL_DBG_LA_ENABLE},
@@ -122,7 +145,44 @@ static const struct phl_dbg_cmd_info phl_dbg_cmd_i[] = {
 #ifdef CONFIG_PHL_CHANNEL_INFO_DBG
 	{"set_chan_info", PHL_DBG_CHAN_INFO},
 #endif
+	{"dbglevel", PHL_DBG_SET_LEVEL},
+	{"dump_cfg", PHL_DBG_SET_DUMP_CFG},
+#ifdef CONFIG_PHL_SNIFFER_SUPPORT
+	{"sniffer", PHL_DBG_SNIFFER},
+#endif
+#ifdef CONFIG_USB_HCI
+	{"usb_speed", PHL_DBG_USB_SPEED},
+#endif
+
+#ifdef DBG_MONITOR_TIME
+	{"fun_latency", PHL_DBG_FUNC_LATENCY}
+#endif
+
 };
+
+#ifdef CONFIG_PHL_SNIFFER_SUPPORT
+enum PHL_DBG_SNIFFER_CMD_ID {
+	PHL_DBG_SNIFFER_HELP,
+	PHL_DBG_SNIFFER_PSTS_MODE,
+};
+static const struct phl_dbg_cmd_info phl_dbg_sniffer_cmd_i[] = {
+	{"help", PHL_DBG_SNIFFER_HELP},
+	{"pmode", PHL_DBG_SNIFFER_PSTS_MODE},
+};
+#endif
+
+#ifdef CONFIG_USB_HCI
+enum PHL_DBG_USB_SPEED_CMD_ID {
+	PHL_DBG_USB_SPEED_HELP,
+	PHL_DBG_USB_SPEED_SHOW,
+	PHL_DBG_USB_SPEED_CONFIG,
+};
+static const struct phl_dbg_cmd_info phl_dbg_usb_speed_cmd_i[] = {
+	{"help", PHL_DBG_USB_SPEED_HELP},
+	{"show", PHL_DBG_USB_SPEED_SHOW},
+	{"set", PHL_DBG_USB_SPEED_CONFIG},
+};
+#endif
 
 enum rtw_hal_status
 rtw_phl_dbg_proc_cmd(struct phl_info_t *phl_info,

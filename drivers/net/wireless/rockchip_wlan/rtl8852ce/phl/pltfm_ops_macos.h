@@ -15,6 +15,8 @@
 #ifndef _PLTFM_OPS_MACOS_H_
 #define _PLTFM_OPS_MACOS_H_
 
+#include "core4phl_inc.h"
+
 static __inline char *_os_strsep(char **s, const char *ct)
 {
 	return NULL;
@@ -95,14 +97,23 @@ static inline void _os_cache_wback(void *d, u32 *bus_addr_l,
 {
 }
 
+static inline void *_os_dma_pool_create(void *d, char *name, u32 wd_page_sz)
+{
+	return NULL;
+}
+
+static inline void _os_dma_pool_destory(void *d, void *pool)
+{
+}
+
 /* txbd, rxbd, wd */
-static inline void *_os_shmem_alloc(void *d, u32 *bus_addr_l,
+static inline void *_os_shmem_alloc(void *d, void *pool, u32 *bus_addr_l, 
 				    u32 *bus_addr_h, u32 buf_sz,
 				    u8 cache, u8 direction, void **os_rsvd)
 {
 	return NULL;
 }
-static inline void _os_shmem_free(void *d, u8 *vir_addr, u32 *bus_addr_l,
+static inline void _os_shmem_free(void *d, void *pool, u8 *vir_addr, u32 *bus_addr_l,
 				  u32 *bus_addr_h, u32 buf_sz,
 				  u8 cache, u8 direction, void *os_rsvd)
 {
@@ -122,12 +133,12 @@ static inline void *_os_pkt_buf_map_rx(void *d, u32 *bus_addr_l, u32 *bus_addr_h
 }
 
 static inline void *_os_pkt_buf_alloc_rx(void *d, u32 *bus_addr_l, u32 *bus_addr_h,
-					u32 buf_sz, void **os_priv)
+					u32 buf_sz, enum cache_addr_type cache, void **os_priv)
 {
 	return NULL;
 }
 static inline u8 *_os_pkt_buf_free_rx(void *d, u8 *vir_addr, u32 bus_addr_l,
-				u32 bus_addr_h, u32 buf_sz, void *os_priv)
+				u32 bus_addr_h, u32 buf_sz, enum cache_addr_type cache, void *os_priv)
 {
 	return NULL;
 }
@@ -422,6 +433,27 @@ static inline u8 _os_deinit_handler_ext(void *drv_priv,
 }
 
 /* File Operation */
+
+/*
+* if _os_file_readable() is supported
+*/
+static inline bool _os_file_readable_supported(void)
+{
+	return false;
+}
+
+/*
+* Test if the specific @param path is a file and readable.
+* If readable, @param sz is set to file size
+* @param path the path of the file to test
+* @param sz the file size if file is readable
+* @return true or false
+*/
+static inline bool _os_file_readable(const char *path, u32 *sz)
+{
+	return false;
+}
+
 static inline u32 _os_read_file(const char *path, u8 *buf, u32 sz)
 {
 	/* OS Dependent API */

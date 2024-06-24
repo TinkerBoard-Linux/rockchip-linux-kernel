@@ -22,6 +22,7 @@
 #define MAX_WD_BODY_LEN (24)
 #define MAX_BAENTRY		16
 
+#define HAL_MAX_PATH HALBB_MAX_PATH
 
 enum hal_path {
 	PATH_NON = 0,
@@ -86,23 +87,14 @@ enum rtw_hal_status {
 	RTW_HAL_STATUS_BB_CH_INFO_LAST_SEG, /*13*/
 	RTW_HAL_STATUS_UNKNOWN_RFE_TYPE, /* 14 */
 	RTW_HAL_STATUS_TIMEOUT, /* 15 */
+	RTW_HAL_STATUS_NOT_SUPPORT, /* 16 */
 };
 
 #define FW_FILE_NIC_POSTFIX ""
+#define FW_FILE_NIC_CE_POSTFIX "_ce"
 #define FW_FILE_WOWLAN_POSTFIX "_wowlan"
 #define FW_FILE_SPIC_POSTFIX "_spic"
 #define FW_FILE_AP_POSTFIX "_ap"
-
-enum rtw_fw_type {
-	RTW_FW_NIC, /* 1 */
-	RTW_FW_WOWLAN, /* 2 */
-	RTW_FW_AP, /* 3 */
-	RTW_FW_ROM, /* 4 */
-	RTW_FW_SPIC, /* 5 */
-	RTW_FW_VRAP, /* 6 */
-	RTW_FW_NIC_CE, /* 7 */
-	RTW_FW_MAX
-};
 
 enum _rtw_hal_query_info {
 	RTW_HAL_RXDESC_SIZE,
@@ -574,13 +566,6 @@ enum hal_rxcnt_sel {
 	HAL_RXCNT_MAX
 };
 
-enum hal_rate_mode {
-	HAL_LEGACY_MODE	= 0,
-	HAL_HT_MODE	= 1,
-	HAL_VHT_MODE	= 2,
-	HAL_HE_MODE	= 3
-};
-
 enum hal_rate_bw {
 	HAL_RATE_BW_20	= 0,
 	HAL_RATE_BW_40	= 1,
@@ -654,7 +639,7 @@ struct rtw_rssi_info {
 
 struct rtw_rate_info {
  	enum rtw_gi_ltf gi_ltf; /* 3bit GILTF */
-	enum hal_rate_mode mode; /* 2bit 0:legacy, 1:HT, 2:VHT, 3:HE*/
+	enum rtw_rate_mode mode; /* 2bit 0:legacy, 1:HT, 2:VHT, 3:HE*/
 	enum hal_rate_bw bw; /*2bit 0:5M/10M/20M, 1:40M, 2:80M, 3:160M or 80+80*/
 	u8 mcs_ss_idx; /*HE: 3bit SS + 4bit MCS; non-HE: 5bit MCS/rate idx */
 	u8 mcs_idx;
@@ -675,7 +660,7 @@ struct rtw_ra_sta_info {
 	/*u8 txrx_state:2;			///////////////need to check if needed, [PHYDM] 0: Tx, 1:Rx, 2:bi-direction*/
 	/*u8 is_noisy:1;			///////////////need to check if needed, [PHYDM]*/
 	u16 curr_tx_rate;			/*use struct bb_rate_info, [PHYDM] FW->Driver*/
-	enum channel_width ra_bw_mode;	/*remove to phl, [Driver] max bandwidth, for RA only*/
+	enum channel_width ra_bw_mode;	/* [Driver] max bandwidth, for RA only */
 	enum channel_width curr_tx_bw;	/*bb_rate_info, [PHYDM] FW->Driver*/
 	/* u8 drv_ractrl; */
 
@@ -844,7 +829,6 @@ struct rtw_hal_stainfo_t {
 	/* from cmn_sta_info */
 	struct rtw_dtp_info dtp_stat;
 	struct rtw_trx_stat trx_stat;
-	void *hw_cfg_tab;
 	void *bb_sta;
 };
 
@@ -862,6 +846,11 @@ struct bus_hw_cap_t {
 	u8 l1dly_ctrl;
 	u8 ltr_sw_ctrl; /* whether ltr can be controlled by sw */
 	u8 ltr_hw_ctrl;
+
+#ifdef RTW_WKARD_DYNAMIC_PCIE_GEN
+	u8 pcie_gen_dm_en;
+#endif
+
 	u16 max_txbd_num;
 	u16 max_rxbd_num;
 	u16 max_rpbd_num;
@@ -882,6 +871,7 @@ struct bus_hw_cap_t {
 	u32 tx_mgnt_buf_num;
 	u32 tx_h2c_buf_num;
 	u32 rx_buf_size;
+	u32 rx_buf_align_size;
 	u32 rx_buf_num;
 	u32 in_token_num;
 #elif defined (CONFIG_SDIO_HCI)
@@ -939,63 +929,8 @@ enum phl_pwr_ctrl {
         PWR_CTRL_MAX
 };
 
-/*--------------------------------------------------------------------------*/
-/*[TX Power Unit(TPU) array size]*/
-#define TPU_SIZE_PWR_TAB	16 /*MCS0~MCS11(12) + {dcm_0,1,3,4}4 = 16*/
-#define TPU_SIZE_PWR_TAB_lGCY	12 /*cck(4) + ofdm(8) = 12*/
-#define TPU_SIZE_MODE		5  /*0~4: HE, VHT, HT, Legacy, CCK, */
-#define TPU_SIZE_BW		5 /*0~4: 80_80, 160, 80, 40, 20*/
-#define TPU_SIZE_RUA		3 /*{26, 52, 106}*/
-#define TPU_SIZE_BW20_SC	8 /*8 * 20M = 160M*/
-#define TPU_SIZE_BW40_SC	4 /*4 * 40M = 160M*/
-#define TPU_SIZE_BW80_SC	2 /*2 * 80M = 160M*/
-#define TPU_SIZE_BF		2 /*{NON_BF, BF}*/
-
-#if (defined(CONFIG_RTL8851A) || defined(CONFIG_RTL8851B))
-	#define HAL_COMPILE_IC_1SS
-#endif
-
-#if (defined(CONFIG_RTL8852A) || defined(CONFIG_RTL8852B) || defined(CONFIG_RTL8852BP) || defined(CONFIG_RTL8852C) || \
-    defined(CONFIG_RTL8192XB) || defined(CONFIG_RTL8832BR))
-	#define HAL_COMPILE_IC_2SS
-#endif
-
-#if defined(CONFIG_RTL8853A)
-	#define HAL_COMPILE_IC_3SS
-#endif
-
-#if defined(CONFIG_RTL8834A)
-	#define HAL_COMPILE_IC_4SS
-#endif
-
-/*@==========================================================================*/
-#if (defined(HAL_COMPILE_IC_4SS))
-	#define HAL_COMPILE_ABOVE_4SS
-#endif
-
-#if (defined(HAL_COMPILE_IC_3SS) || defined(HAL_COMPILE_ABOVE_4SS))
-	#define HAL_COMPILE_ABOVE_3SS
-#endif
-
-#if (defined(HAL_COMPILE_IC_2SS) || defined(HAL_COMPILE_ABOVE_3SS))
-	#define HAL_COMPILE_ABOVE_2SS
-#endif
-
-#if (defined(HAL_COMPILE_IC_1SS) || defined(HAL_COMPILE_ABOVE_2SS))
-	#define HAL_COMPILE_ABOVE_1SS
-#endif
-
-#if (defined(HAL_COMPILE_ABOVE_4SS))
-	#define HAL_MAX_PATH	4
-#elif (defined(HAL_COMPILE_ABOVE_3SS))
-	#define HAL_MAX_PATH	3
-#elif (defined(HAL_COMPILE_ABOVE_2SS))
-	#define HAL_MAX_PATH	2
-#else
-	#define HAL_MAX_PATH	1
-#endif
-
 /*--------------------------[Structure]-------------------------------------*/
+#if 0
 enum rtw_tpu_op_mode {
 	TPU_NORMAL_MODE		= 0,
 	TPU_DBG_MODE		= 1
@@ -1049,7 +984,7 @@ struct rtw_tpu_info { /*TX Power Unit (TPU)*/
 	u8 tx_ptrn_shap_idx_cck;
 	u16 pwr_constraint_mb;
 };
-
+#endif
 struct rtw_hal_stat_info {
 	u32 cnt_fail_all;
 	u32 cnt_cck_fail;
@@ -1077,6 +1012,7 @@ struct rtw_hw_band {
 	u8 ppdu_sts_appen_info;
 	u8 ppdu_sts_filter;
 	struct rtw_tpu_info rtw_tpu_i; /*TX Power Unit (TPU)*/
+	union bb_tpu_all_info bb_tpu_all_i; /*TX Power Unit (TPU)*/
 	u16 tx_pause[PAUSE_RSON_MAX]; /* ref: enum rtw_sch_txen_cfg */
 	struct rtw_hal_stat_info stat_info;
 	u8 assoc_sta_cnt; /*number of associated nodes (sta or ap)*/
@@ -1094,6 +1030,8 @@ struct rtw_hal_com_t {
 	enum rtw_chip_id chip_id;
 	enum rtw_cv cv;
 	enum rtw_cv acv;
+	enum rtw_fv fv;
+	u32 aid;
 
 	struct ver_ctrl_t mac_vc;
 	struct ver_ctrl_t bb_vc;
@@ -1254,6 +1192,9 @@ struct rtw_hal_lps_info {
 	u8 awake_interval;
 	enum rtw_lps_smart_ps_mode smart_ps_mode;
 	u8 bcnnohit_en;
+	u8 dyntxant_en;
+	u8 maxtxant;
+	u8 lpstxant;
 };
 
 struct rtw_hal_ips_info {
@@ -1345,4 +1286,14 @@ enum rtw_hal_lps_flg_state {
 	RTW_HAL_LPS_FLG_STATE_LPS = 1,
 	RTW_HAL_LPS_FLG_STATE_MAX,
 };
+
+struct hal_ppdu_sts_cfg {
+	u8 band_idx;
+	bool ppdu_stat_en;
+	u8 appen_info;
+	u8 filter;
+	bool towcpu;
+	bool todcpu;
+};
+
 #endif /*_HAL_DEF_H_*/

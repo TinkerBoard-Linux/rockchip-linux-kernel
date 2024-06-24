@@ -33,6 +33,7 @@
 #define PCIE_POLL_DMACH_IDLE_DLY_US 10
 
 #define PCIE_POLL_SPEED_CHANGE_CNT 500
+#define PCIE_POLL_LANE_RESIZING_CNT 500
 
 #define PCIE_POLL_BDRAM_RST_CNT 10000
 #define PCIE_POLL_BDRAM_RST_DLY_US 50
@@ -91,6 +92,7 @@
 #define PCIE_1115E_AGG_NUM 0x100
 #define PCIE_8851E_AGG_NUM 0x40 // temp setting for Drv  request
 #define PCIE_8852D_AGG_NUM 0x40 // temp setting for Drv  request
+#define PCIE_8852BT_AGG_NUM 0x40
 
 #define PCIE_AUTOK_DIV_2048 0x0
 #define PCIE_AUTOK_MGN 0x8
@@ -118,6 +120,9 @@
 
 #define C_WOW_LDO_ID_LIST_NUM 1
 #define C_WOW_LDO_ID_MSK 0xFFFF
+
+#define PCIE_WP_ADDR_H_SEL_MAX_NUM 256
+#define PCIE_WP_ADDR_H_SEL_MAX_NUM_V1 16
 
 /*--------------------Define MACRO--------------------------------------*/
 #define EFUSE_2BYTES 2
@@ -175,6 +180,7 @@ enum pcie_l0sdly_hw {
 enum pcie_bd_ctrl_type {
 	PCIE_BD_CTRL_DESC_L = 0,
 	PCIE_BD_CTRL_DESC_H,
+	PCIE_BD_CTRL_DESC_H_P2,
 	PCIE_BD_CTRL_NUM,
 	PCIE_BD_CTRL_IDX,
 	PCIE_BD_CTRL_BDRAM,
@@ -182,6 +188,22 @@ enum pcie_bd_ctrl_type {
 	PCIE_BD_CTRL_LAST,
 	PCIE_BD_CTRL_MAX = PCIE_BD_CTRL_LAST,
 	PCIE_BD_CTRL_INVALID = PCIE_BD_CTRL_LAST,
+};
+
+enum mac_ax_ltr_dyn_ctrl_tp {
+	LTR_DYN_CTRL_LEAVE_LPS = 0,
+	LTR_DYN_CTRL_LEAVE_IPS,
+	LTR_DYN_CTRL_PRE_INIT,
+	LTR_DYN_CTRL_INIT,
+	LTR_DYN_CTRL_DEINIT,
+	LTR_DYN_CTRL_FAST_INIT,
+	LTR_DYN_CTRL_FAST_DEINIT,
+	LTR_DYN_CTRL_ENTER_WOWLAN,
+	LTR_DYN_CTRL_LEAVE_WOWLAN,
+
+	LTR_DYN_CTRL_LAST,
+	LTR_DYN_CTRL_MAX = LTR_DYN_CTRL_LAST,
+	LTR_DYN_CTRL_INVALID = LTR_DYN_CTRL_LAST,
 };
 
 /*--------------------Define Struct-------------------------------------*/
@@ -589,6 +611,43 @@ u32 ltr_set_pcie(struct mac_ax_adapter *adapter,
  * @{
  * @addtogroup PCIE
  * @{
+ */
+
+/**
+ * @brief patch_pcie_sw_ltr_setparm
+ *
+ * @param *adapter
+ * @param *param
+ * @return Please Place Description here.
+ * @retval u32
+ */
+u32 patch_pcie_sw_ltr_setparm(struct mac_ax_adapter *adapter,
+			      struct mac_ax_pcie_ltr_param *param);
+/**
+ * @}
+ * @}
+ */
+
+/**
+ * @addtogroup HCI
+ * @{
+ * @addtogroup PCIE
+ * @{
+ */
+
+/**
+ * @brief _patch_pcie_sw_ltr
+ *
+ * @param *adapter
+ * @param ctrl
+ * @return Please Place Description here.
+ * @retval u32
+ */
+u32 _patch_pcie_sw_ltr(struct mac_ax_adapter *adapter,
+		       enum mac_ax_pcie_ltr_sw_ctrl ctrl);
+/**
+ * @}
+ * @}
  */
 
 /**
@@ -1007,5 +1066,56 @@ u32 sync_trx_bd_idx_pcie(struct mac_ax_adapter *adapter);
  * @}
  * @}
  */
+
+/**
+ * @brief ctrl_txdma_pcie
+ *
+ * @param *adapter
+ * @param opt
+ * @return Please Place Description here.
+ * @retval u32
+ */
+u32 ctrl_txdma_pcie(struct mac_ax_adapter* adapter, u8 opt);
+/**
+ * @}
+ * @}
+ */
+
+/**
+ * @brief poll_txdma_idle_pcie
+ *
+ * @param *adapter
+ * @return Please Place Description here.
+ * @retval u32
+ */
+u32 poll_txdma_idle_pcie(struct mac_ax_adapter* adapter);
+/**
+ * @}
+ * @}
+ */
+
+/**
+ * @brief clr_hci_trx_pcie
+ *
+ * @param *adapter
+ * @return Please Place Description here.
+ * @retval u32
+ */
+u32 clr_hci_trx_pcie(struct mac_ax_adapter* adapter);
+/**
+ * @}
+ * @}
+ */
+
+u32 mac_read_pcie_cfg_spc(struct mac_ax_adapter *adapter, u16 addr, u32 *val);
+
+u32 set_pcie_driving_mponly(struct mac_ax_adapter *adapter,
+			    enum mac_ax_pcie_driving_ctrl drving_ctrl);
+
+u32 pcie_set_wp_addr_sel(struct mac_ax_adapter *adapter, struct mac_ax_pcie_wpaddr_sel *sel);
+
+u32 pcie_set_addr_h2(struct mac_ax_adapter *adapter, struct mac_ax_pcie_addr_h2 *info);
+
+u32 pcie_aspm_frontdoor_set(struct mac_ax_adapter *adapter);
 
 #endif

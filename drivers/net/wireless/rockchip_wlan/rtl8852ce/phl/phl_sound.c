@@ -44,10 +44,6 @@ enum rtw_phl_status phl_snd_init_snd_grp(struct phl_info_t *phl_info)
 	struct phl_sound_param *param = &snd->snd_param;
 	u8 i = 0;
 	do {
-		if (param->snd_grp == NULL) {
-			status = RTW_PHL_STATUS_FAILURE;
-			break;
-		}
 		for (i = 0; i < MAX_SND_GRP_NUM; i++) {
 			__reset_snd_grp(&param->snd_grp[i]);
 			param->snd_grp[i].gidx = i;
@@ -1183,10 +1179,6 @@ phl_snd_proc_precfg(struct phl_info_t *phl_info, struct phl_snd_grp *grp)
 
 	FUNCIN_WSTS(pstatus);
 	do {
-		if (grp == NULL) {
-			pstatus = RTW_PHL_STATUS_FAILURE;
-			break;
-		}
 		if (PHL_SND_TYPE_INVALID == grp->snd_type) {
 			/* both SW/HW mode need to set call halmac api to set bf entry */
 			break;
@@ -1699,10 +1691,6 @@ phl_snd_proc_postcfg(struct phl_info_t *phl_info, struct phl_snd_grp *grp)
 	FUNCIN();
 
 	do {
-		if (grp == NULL) {
-			pstatus = RTW_PHL_STATUS_FAILURE;
-			break;
-		}
 		he = (grp->snd_type >= PHL_SND_TYPE_HE_HW) ? true : false;
 		mu = (grp->sta[0].snd_fb_t == PHL_SND_FB_TYPE_MU) ? true :
 								    false;
@@ -1815,8 +1803,6 @@ phl_snd_proc_chk_condition(struct phl_info_t *phl_info, struct phl_snd_grp *grp)
 						goto exit;
 					}
 				}
-				if(terminate)
-					goto exit;
 			}
 		}
 
@@ -1911,7 +1897,12 @@ rtw_phl_snd_init_ops_send_ndpa(void *phl,
 #else
 
 enum rtw_phl_status
-rtw_phl_snd_init_ops_send_ndpa(void *phl, void *snd_send_ndpa)
+rtw_phl_snd_init_ops_send_ndpa(void *phl,
+                               enum rtw_phl_status (*snd_send_ndpa)(void *,
+                                                                    struct rtw_wifi_role_link_t *,
+                                                                    u8 *,
+                                                                    u32 *,
+                                                                    enum channel_width))
 {
 	return RTW_PHL_STATUS_SUCCESS;
 }

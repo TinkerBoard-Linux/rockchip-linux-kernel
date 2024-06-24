@@ -29,7 +29,7 @@ enum rtw_hal_status rtw_hal_mp_cal_trigger(
 	switch(arg->cal_type){
 	case MP_CAL_CHL_RFK:
 		PHL_INFO("MP_CAL_CHL_RFK: cur_phy_idx = %d.\n", mp->cur_phy);
-		hal_status = rtw_hal_rf_chl_rfk_trigger(hal_com, mp->cur_phy, false);
+		hal_status = rtw_hal_rf_chl_rfk_trigger(hal_com, mp->cur_phy, RFK_TYPE_FORCE_DO);
 		break;
 	case MP_CAL_DACK:
 		PHL_INFO("MP_CAL_DACK: . \n");

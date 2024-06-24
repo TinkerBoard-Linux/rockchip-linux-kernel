@@ -13,22 +13,39 @@
  *
  *****************************************************************************/
 #include "drv_types.h"
+#ifdef CONFIG_RTW_DEDICATED_CMA_POOL
+#include <linux/platform_device.h>
+extern struct platform_device *g_pldev;
+#endif
+
+#ifdef CONFIG_PLATFORM_AML_S905
+extern struct device * g_pcie_reserved_mem_dev;
+#endif
+
 
 void pci_cache_wback(struct pci_dev *hwdev,
 			dma_addr_t *bus_addr, size_t size, int direction)
 {
-	if (NULL != hwdev && NULL != bus_addr)
+	if (NULL != hwdev && NULL != bus_addr) {
+#ifdef CONFIG_PLATFORM_AML_S905_V1
+		if (g_pcie_reserved_mem_dev)
+			hwdev->dev.dma_mask = NULL;
+#endif
 	  	dma_sync_single_for_device(&hwdev->dev, *bus_addr, size,
 					direction);
-	else
+	} else
 		RTW_ERR("pcie hwdev handle or bus addr is NULL!\n");
 }
 void pci_cache_inv(struct pci_dev *hwdev,
 			dma_addr_t *bus_addr, size_t size, int direction)
 {
-	if (NULL != hwdev && NULL != bus_addr)
+	if (NULL != hwdev && NULL != bus_addr) {
+#ifdef CONFIG_PLATFORM_AML_S905_V1
+		if (g_pcie_reserved_mem_dev)
+			hwdev->dev.dma_mask = NULL;
+#endif
 		dma_sync_single_for_cpu(&hwdev->dev, *bus_addr, size, direction);
-	else
+	} else
 		RTW_ERR("pcie hwdev handle or bus addr is NULL!\n");
 }
 void pci_get_bus_addr(struct pci_dev *hwdev,
@@ -36,6 +53,10 @@ void pci_get_bus_addr(struct pci_dev *hwdev,
 			size_t size, int direction)
 {
 	if (NULL != hwdev) {
+#ifdef CONFIG_PLATFORM_AML_S905_V1
+		if (g_pcie_reserved_mem_dev)
+			hwdev->dev.dma_mask = NULL;
+#endif
 		*bus_addr = dma_map_single(&hwdev->dev, vir_addr, size, direction);
 	} else {
 		RTW_ERR("pcie hwdev handle is NULL!\n");
@@ -46,9 +67,13 @@ void pci_get_bus_addr(struct pci_dev *hwdev,
 void pci_unmap_bus_addr(struct pci_dev *hwdev,
 			dma_addr_t *bus_addr, size_t size, int direction)
 {
-	if (NULL != hwdev && NULL != bus_addr)
+	if (NULL != hwdev && NULL != bus_addr) {
+#ifdef CONFIG_PLATFORM_AML_S905_V1
+		if (g_pcie_reserved_mem_dev)
+			hwdev->dev.dma_mask = NULL;
+#endif
 		dma_unmap_single(&hwdev->dev, *bus_addr, size, direction);
-	else
+	} else
 		RTW_ERR("pcie hwdev handle or bus addr is NULL!\n");
 }
 void *pci_alloc_cache_mem(struct pci_dev *pdev,
@@ -58,24 +83,45 @@ void *pci_alloc_cache_mem(struct pci_dev *pdev,
 
 	vir_addr = rtw_zmalloc(size);
 
-	if (!vir_addr)
+	if (!vir_addr) {
 		bus_addr = NULL;
-	else
+		RTW_ERR("%s: alloc %ld failed\n", __func__, size);
+	}
+	else {
 		pci_get_bus_addr(pdev, vir_addr, bus_addr, size, direction);
+		if (!vir_addr) {
+			RTW_ERR("%s: map %ld failed\n", __func__, size);
+		}
+	}
 
 	return vir_addr;
 }
+
 void *pci_alloc_noncache_mem(struct pci_dev *pdev,
 			dma_addr_t *bus_addr, size_t size)
 {
 	void *vir_addr = NULL;
+	struct device *dev = NULL;
 
-	if (NULL != pdev)
-		vir_addr = dma_alloc_coherent(&pdev->dev,
+#ifdef CONFIG_RTW_DEDICATED_CMA_POOL
+	if (NULL != g_pldev){
+		dev = &g_pldev->dev;
+#else
+	if (NULL != pdev) {
+		dev = &pdev->dev;
+#ifdef CONFIG_PLATFORM_AML_S905
+		if (g_pcie_reserved_mem_dev)\
+			dev = g_pcie_reserved_mem_dev;
+#endif
+#endif
+		vir_addr = dma_alloc_coherent(dev,
 				size, bus_addr,
 				(in_atomic() ? GFP_ATOMIC : GFP_KERNEL));
-	if (!vir_addr)
+	}
+	if (!vir_addr) {
 		bus_addr = NULL;
+		RTW_ERR("%s: alloc %ld failed\n", __func__, size);
+	}
 	else
 		bus_addr = (dma_addr_t *)((((SIZE_PTR)bus_addr + 3) / 4) * 4);
 
@@ -90,10 +136,24 @@ void pci_free_cache_mem(struct pci_dev *pdev,
 
 	vir_addr = NULL;
 }
+
 void pci_free_noncache_mem(struct pci_dev *pdev,
 		void *vir_addr, dma_addr_t *bus_addr, size_t size)
 {
-	if (NULL != pdev)
-		dma_free_coherent(&pdev->dev, size, vir_addr, *bus_addr);
+	struct device *dev = NULL;
+
+#ifdef CONFIG_RTW_DEDICATED_CMA_POOL
+	if (NULL != g_pldev){
+		dev = &g_pldev->dev;
+#else
+	if (NULL != pdev){
+		dev = &pdev->dev;
+#ifdef CONFIG_PLATFORM_AML_S905
+	if (g_pcie_reserved_mem_dev)
+		dev = g_pcie_reserved_mem_dev;
+#endif
+#endif
+		dma_free_coherent(dev, size, vir_addr, *bus_addr);
+	}
 	vir_addr = NULL;
 }

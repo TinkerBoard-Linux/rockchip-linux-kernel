@@ -15,6 +15,7 @@
 #define _RTW_TRX_PCI_C_
 #include <drv_types.h>		/* struct dvobj_priv and etc. */
 
+#ifndef CONFIG_RTW_TX_AMSDU_USE_WQ
 static void rtw_mi_pci_tasklets_kill(_adapter *padapter)
 {
 	int i;
@@ -28,16 +29,9 @@ static void rtw_mi_pci_tasklets_kill(_adapter *padapter)
 		}
 	}
 }
+#endif
 
 /********************************xmit section*****************************/
-static void pci_xmit_tasklet(unsigned long data)
-{
-#ifdef CONFIG_TX_AMSDU_SW_MODE
-	_adapter *padapter = (_adapter *) data;
-	core_tx_amsdu_tasklet(padapter);
-#endif
-}
-
 s32 pci_init_xmit_priv(_adapter *adapter)
 {
 	s32 ret = _SUCCESS;
@@ -46,11 +40,6 @@ s32 pci_init_xmit_priv(_adapter *adapter)
 
 	_rtw_spinlock_init(&dvobj_to_pci(dvobj)->irq_th_lock);
 
-#ifdef CONFIG_TX_AMSDU_SW_MODE
-	rtw_tasklet_init(&pxmitpriv->xmit_tasklet,
-		     pci_xmit_tasklet,
-		     (unsigned long) adapter);
-#endif
 	return ret;
 }
 
@@ -59,6 +48,11 @@ void pci_free_xmit_priv(_adapter *adapter)
 	struct dvobj_priv *dvobj = adapter_to_dvobj(adapter);
 
 	_rtw_spinlock_free(&dvobj_to_pci(dvobj)->irq_th_lock);
+#ifdef CONFIG_RTW_TX_AMSDU_USE_WQ
+	_cancel_workitem_sync_cpu(&(adapter->xmitpriv.xmit_workitem));
+#else
+	rtw_tasklet_kill(&(adapter->xmitpriv.xmit_tasklet));
+#endif
 }
 
 static s32 pci_xmit_direct(_adapter *adapter, struct xmit_frame *pxmitframe)
@@ -117,7 +111,7 @@ static s32 pci_data_xmit(_adapter *adapter, struct xmit_frame *pxmitframe)
 
 #ifdef CONFIG_TX_AMSDU
 	if (MLME_IS_STA(adapter) &&
-		check_amsdu_tx_support(adapter)) {
+		check_amsdu_tx_support(adapter, pattrib)) {
 
 		if (IS_AMSDU_AMPDU_VALID(pattrib))
 			goto enqueue;
@@ -170,7 +164,9 @@ enqueue:
 		return _TRUE;
 	}
 
-#ifdef CONFIG_TX_AMSDU
+#ifdef CONFIG_RTW_TX_AMSDU_USE_WQ
+	_set_workitem_cpu(&pxmitpriv->xmit_workitem);
+#elif defined(CONFIG_TX_AMSDU)
 	rtw_tasklet_hi_schedule(&pxmitpriv->xmit_tasklet);
 #endif
 	return _FALSE;

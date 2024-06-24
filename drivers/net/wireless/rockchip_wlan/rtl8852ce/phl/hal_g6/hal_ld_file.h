@@ -40,12 +40,6 @@ enum PHY_PG_RATE_def {
 	OFDM_AllRate6_1 = 10,
 };
 
-struct _hal_file_regd_ext {
-		u16 domain;
-		char country[2];
-		char reg_name[10];
-};
-
 typedef struct hal_txpwr_lmt_t {
 	u8			band;
 	u8			bw;
@@ -247,6 +241,7 @@ struct hal_txpwr_track_t {
 	};
 
 int rtw_hal_find_ext_regd_num(struct rtw_para_pwrlmt_info_t *para_info, const char *regd_name);
+char *rtw_hal_get_ext_regd_name(struct rtw_para_pwrlmt_info_t *para_info, u8 idx);
 void rtw_hal_dl_all_para_file(struct rtw_phl_com_t *phl_com, char *ic_name, void *hal);
 u8 rtw_hal_efuse_shadow_file_load(void *hal, char *ic_name, bool is_limit);
 u8 rtw_hal_ld_fw_symbol(struct rtw_phl_com_t *phl_com,

@@ -39,7 +39,7 @@
 #define SND_MEE_CFG	 (B_AX_BFMEE_BFPARAM_SEL | B_AX_BFMEE_USE_NSTS | \
 			 B_AX_BFMEE_CSI_FORCE_RETE_EN | B_AX_BFMEE_BFINF0_NR | \
 			 B_AX_BFMEE_BFINFO0_NC)
-#define MAX_SNDTXCMDINFO_NUM		0x4
+#define MAX_SNDTXCMDINFO_NUM		0x7
 #define MAX_FWCMD_SND_LEN 600
 
 enum FrameExchangeType {
@@ -402,6 +402,20 @@ u32 mac_gidpos(struct mac_ax_adapter *adapter, struct mac_gid_pos *mu_gid);
 
 u32 mac_set_snd_para(struct mac_ax_adapter *adapter,
 		     struct mac_ax_fwcmd_snd *snd_info);
+/**
+ * @}
+ */
+
+/**
+ * @brief set_csi_release_cfg
+ *
+ * @param *adapter
+ * @param *cfg
+ * @return Please Place Description here.
+ * @retval u32
+ */
+u32 set_csi_release_cfg(struct mac_ax_adapter *adapter,
+			struct mac_ax_csi_release_cfg *cfg);
 /**
  * @}
  */

@@ -17,6 +17,76 @@
 #include <drv_types.h>
 #include <rtw_sec_cam.h>
 
+#if 0
+
+#define SEC_CAM_ENT_ID_TITLE_FMT "%-2s"
+#define SEC_CAM_ENT_ID_TITLE_ARG "id"
+#define SEC_CAM_ENT_ID_VALUE_FMT "%2u"
+#define SEC_CAM_ENT_ID_VALUE_ARG(id) (id)
+
+#define SEC_CAM_ENT_TITLE_FMT "%-6s %-17s %-32s %-3s %-8s %-2s %-2s %-5s"
+#define SEC_CAM_ENT_TITLE_ARG "ctrl", "addr", "key", "kid", "type", "MK", "GK", "valid"
+#define SEC_CAM_ENT_VALUE_FMT "0x%04x "MAC_FMT" "KEY_FMT" %3u %-8s %2u %2u %5u"
+#define SEC_CAM_ENT_VALUE_ARG(ent) \
+	(ent)->ctrl \
+	, MAC_ARG((ent)->mac) \
+	, KEY_ARG((ent)->key) \
+	, ((ent)->ctrl) & 0x03 \
+	, (((ent)->ctrl) & 0x200) ? \
+	security_type_str((((ent)->ctrl) >> 2 & 0x7) | _SEC_TYPE_256_) : \
+	security_type_str(((ent)->ctrl) >> 2 & 0x7) \
+	, (((ent)->ctrl) >> 5) & 0x01 \
+	, (((ent)->ctrl) >> 6) & 0x01 \
+	, (((ent)->ctrl) >> 15) & 0x01
+
+void dump_sec_cam_ent(void *sel, struct sec_cam_ent *ent, int id)
+{
+	if (id >= 0) {
+		RTW_PRINT_SEL(sel, SEC_CAM_ENT_ID_VALUE_FMT " " SEC_CAM_ENT_VALUE_FMT"\n"
+			, SEC_CAM_ENT_ID_VALUE_ARG(id), SEC_CAM_ENT_VALUE_ARG(ent));
+	} else
+		RTW_PRINT_SEL(sel, SEC_CAM_ENT_VALUE_FMT"\n", SEC_CAM_ENT_VALUE_ARG(ent));
+}
+
+void dump_sec_cam_ent_title(void *sel, u8 has_id)
+{
+	if (has_id) {
+		RTW_PRINT_SEL(sel, SEC_CAM_ENT_ID_TITLE_FMT " " SEC_CAM_ENT_TITLE_FMT"\n"
+			, SEC_CAM_ENT_ID_TITLE_ARG, SEC_CAM_ENT_TITLE_ARG);
+	} else
+		RTW_PRINT_SEL(sel, SEC_CAM_ENT_TITLE_FMT"\n", SEC_CAM_ENT_TITLE_ARG);
+}
+
+void dump_sec_cam(void *sel, _adapter *adapter)
+{
+	struct dvobj_priv *dvobj = adapter_to_dvobj(adapter);
+	struct cam_ctl_t *cam_ctl = &dvobj->cam_ctl;
+	struct sec_cam_ent ent;
+	int i;
+
+	RTW_PRINT_SEL(sel, "HW sec cam:\n");
+	dump_sec_cam_ent_title(sel, 1);
+	for (i = 0; i < cam_ctl->num; i++) {
+		rtw_hal_sec_read_cam_ent(adapter, i, (u8 *)(&ent.ctrl), ent.mac, ent.key);
+		dump_sec_cam_ent(sel , &ent, i);
+	}
+}
+
+void dump_sec_cam_cache(void *sel, _adapter *adapter)
+{
+	struct dvobj_priv *dvobj = adapter_to_dvobj(adapter);
+	struct cam_ctl_t *cam_ctl = &dvobj->cam_ctl;
+	int i;
+
+	RTW_PRINT_SEL(sel, "SW sec cam cache:\n");
+	dump_sec_cam_ent_title(sel, 1);
+	for (i = 0; i < cam_ctl->num; i++) {
+		if (dvobj->cam_cache[i].ctrl != 0)
+			dump_sec_cam_ent(sel, &dvobj->cam_cache[i], i);
+	}
+
+}
+
 void invalidate_cam_all(_adapter *padapter)
 {
 	struct dvobj_priv *dvobj = adapter_to_dvobj(padapter);
@@ -677,7 +747,7 @@ void rtw_clean_hw_dk_cam(_adapter *adapter)
 		rtw_hal_sec_clr_cam_ent(adapter, i);
 		/*_clear_cam_entry(adapter, i);*/
 }
-
+#endif
 void flush_all_cam_entry(struct _ADAPTER *a, enum phl_cmd_type cmd_type, u32 cmd_timeout)
 {
 	struct sta_priv	*stapriv = &a->stapriv;
@@ -715,19 +785,6 @@ void flush_all_cam_entry(struct _ADAPTER *a, enum phl_cmd_type cmd_type, u32 cmd
 		}
 	}
 }
-
-#if defined(DBG_CONFIG_ERROR_RESET) && defined(CONFIG_CONCURRENT_MODE)
-void rtw_iface_bcmc_sec_cam_map_restore(_adapter *adapter)
-{
-	struct dvobj_priv *dvobj = adapter_to_dvobj(adapter);
-	struct cam_ctl_t *cam_ctl = dvobj_to_sec_camctl(dvobj);
-	int cam_id = -1;
-
-	cam_id = rtw_phl_wrole_bcmc_id_get(GET_PHL_INFO(dvobj), adapter->phl_role);
-	if (cam_id != INVALID_SEC_MAC_CAM_ID)
-		rtw_sec_cam_map_set(&cam_ctl->used, cam_id);
-}
-#endif
 
 #ifdef  CONFIG_DBG_AX_CAM
 /*

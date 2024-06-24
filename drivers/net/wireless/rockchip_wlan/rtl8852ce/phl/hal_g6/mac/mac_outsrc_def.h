@@ -19,6 +19,11 @@
 
 // for other submodule ref definition defined here
 /*--------------------Define -------------------------------------------*/
+#define RTW_MAC_LA_BUF_SEL_256K 0x3
+#define RTW_MAC_LA_BUF_SEL_192K 0x2
+#define RTW_MAC_LA_BUF_SEL_128K 0x1
+#define RTW_MAC_LA_BUF_SEL_64K 0x0
+
 /*--------------------Define MACRO--------------------------------------*/
 /*--------------------Define Enum---------------------------------------*/
 

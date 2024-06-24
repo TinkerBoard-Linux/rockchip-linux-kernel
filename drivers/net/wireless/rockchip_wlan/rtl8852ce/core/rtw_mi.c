@@ -567,31 +567,27 @@ static u8 _rtw_mi_disconnect(_adapter *adapter, void *data)
 	struct link_mlme_ext_priv *lmlmeext = &adapter_link->mlmeextpriv;
 	struct mlme_ext_priv *mlmeext = &adapter->mlmeextpriv;
 	struct mlme_ext_info *mlmeinfo = &(mlmeext->mlmext_info);
+	struct rtw_mr_chctx_info mr_cc_info = {0};
 
 	if ((MLME_IS_AP(adapter) || MLME_IS_MESH(adapter))
 			&& check_fwstate(mlme, WIFI_ASOC_STATE)) {
-		#ifdef CONFIG_SPCT_CH_SWITCH
-		if (1)
-		rtw_ap_inform_ch_switch(adapter, adapter_link,
-				lmlmeext->chandef.chan, lmlmeext->chandef.offset);
-		else
-		#endif
 		#ifdef CONFIG_STA_CMD_DISPR
-			rtw_phl_cmd_stop_beacon(adapter_to_dvobj(adapter)->phl, adapter_link->wrlink, _TRUE, PHL_CMD_NO_WAIT, 0);
+		rtw_phl_cmd_stop_beacon(adapter_to_dvobj(adapter)->phl, adapter_link->wrlink, _TRUE, PHL_CMD_NO_WAIT, 0);
 		#else
-			rtw_phl_cmd_stop_beacon(adapter_to_dvobj(adapter)->phl, adapter->phl_role, _TRUE, PHL_CMD_DIRECTLY, 0);
+		rtw_phl_cmd_stop_beacon(adapter_to_dvobj(adapter)->phl, adapter->phl_role, _TRUE, PHL_CMD_DIRECTLY, 0);
 		#endif
 		rtw_sta_flush(adapter, _TRUE);
 
 		set_fwstate(mlme, WIFI_OP_CH_SWITCHING);
 		rtw_phl_chanctx_del(adapter_to_dvobj(adapter)->phl, adapter->phl_role, adapter_link->wrlink, NULL);
+		rtw_phl_chanctx_add(adapter_to_dvobj(adapter)->phl, adapter->phl_role, adapter_link->wrlink, ((struct disconnect_data *)data)->buddy_chdef, &mr_cc_info);
 
 	} else if (MLME_IS_STA(adapter)
 			&& check_fwstate(mlme, WIFI_ASOC_STATE)) {
 		Disconnect_type disc_code = DISCONNECTION_NOT_YET_OCCUR;
 
 		if (data)
-			disc_code = *(int *)data;
+			disc_code = ((struct disconnect_data *)data)->disc_code;
 
 		rtw_disassoc_cmd(adapter, 500, RTW_CMDF_DIRECTLY);
 #ifndef CONFIG_STA_CMD_DISPR
@@ -612,9 +608,9 @@ u8 rtw_mi_disconnect(_adapter *adapter)
 {
 	return _rtw_mi_process(adapter, _FALSE, NULL, _rtw_mi_disconnect);
 }
-u8 rtw_mi_buddy_disconnect(_adapter *adapter, Disconnect_type disc_code)
+u8 rtw_mi_buddy_disconnect(_adapter *adapter, struct disconnect_data *disc_data)
 {
-	return _rtw_mi_process(adapter, _TRUE, (void *)&disc_code,
+	return _rtw_mi_process(adapter, _TRUE, (void *)disc_data,
 			       _rtw_mi_disconnect);
 	/*_phl_mr_process_by_band(phl_info, wifi_role, _TRUE, NULL, _rtw_mi_disconnect);*/
 }
@@ -1055,6 +1051,42 @@ static u8 _rtw_mi_dynamic_check_handlder(struct _ADAPTER *a, void *data)
 	return _TRUE;
 }
 
+u8 rtw_mi_keep_alive_pre_chk_hdl(struct _ADAPTER *a)
+{
+	u8 ret = _SUCCESS;
+	int i;
+	_adapter *iface;
+	struct dvobj_priv *dvobj = adapter_to_dvobj(a);
+	u8 if_sta_chk_rx_bmp = 0;
+	u8 if_sta_chk_tx_bmp = 0;
+	u32 if_ap_chk_sta_bmp[MAX_WIFI_ROLE_NUMBER] = {0};
+
+	for (i = 0; i < dvobj->iface_nums; i++) {
+		iface = dvobj->padapters[i];
+		if ((iface) && rtw_is_adapter_up(iface)) {
+
+			if (!rtw_iface_at_same_hwband(a, iface))
+				continue;
+
+			#ifdef CONFIG_AP_MODE
+			if (MLME_IS_AP(iface) || MLME_IS_MESH(iface)) {
+				expire_timeout_chk(iface, &if_ap_chk_sta_bmp[iface->iface_id]);
+				#ifdef CONFIG_RTW_MESH
+				if (MLME_IS_MESH(iface) && MLME_IS_ASOC(iface))
+					rtw_mesh_peer_status_chk(iface);
+				#endif
+			}
+			#endif
+			linked_status_chk(iface, &if_sta_chk_rx_bmp, &if_sta_chk_tx_bmp);
+		}
+	}
+#ifdef CONFIG_POST_CORE_KEEP_ALIVE
+	rtw_set_post_keep_alive_param(a, if_sta_chk_rx_bmp, if_sta_chk_tx_bmp, if_ap_chk_sta_bmp);
+#endif
+
+	return ret;
+}
+
 u8 rtw_mi_dynamic_check_handlder(struct _ADAPTER *a)
 {
 	return _rtw_mi_process(a, _FALSE, NULL, _rtw_mi_dynamic_check_handlder);
@@ -1120,51 +1152,6 @@ u8 rtw_mi_buddy_report_survey_event(_adapter *padapter, union recv_frame *precv_
 	return _rtw_mi_process(padapter, _TRUE, precv_frame, _rtw_mi_report_survey_event);
 }
 
-static u8 _rtw_mi_sreset_adapter_hdl(_adapter *adapter, void *data)
-{
-	u8 bstart = *(u8 *)data;
-
-	if (bstart)
-		sreset_start_adapter(adapter);
-	else
-		sreset_stop_adapter(adapter);
-	return _TRUE;
-}
-u8 rtw_mi_sreset_adapter_hdl(_adapter *padapter, u8 bstart)
-{
-	u8 in_data = bstart;
-
-	return _rtw_mi_process(padapter, _FALSE, &in_data, _rtw_mi_sreset_adapter_hdl);
-}
-
-#if defined(DBG_CONFIG_ERROR_RESET) && defined(CONFIG_CONCURRENT_MODE)
-void rtw_mi_ap_info_restore(_adapter *adapter)
-{
-	int i;
-	_adapter *iface;
-	struct mlme_priv *pmlmepriv;
-	struct dvobj_priv *dvobj = adapter_to_dvobj(adapter);
-
-	for (i = 0; i < dvobj->iface_nums; i++) {
-		iface = dvobj->padapters[i];
-		if (iface) {
-			pmlmepriv = &iface->mlmepriv;
-
-			if (MLME_IS_AP(iface) || MLME_IS_MESH(iface)) {
-				RTW_INFO(FUNC_ADPT_FMT" %s\n", FUNC_ADPT_ARG(iface), MLME_IS_AP(iface) ? "AP" : "MESH");
-				rtw_iface_bcmc_sec_cam_map_restore(iface);
-			}
-		}
-	}
-}
-#endif /*#if defined(DBG_CONFIG_ERROR_RESET) && defined(CONFIG_CONCURRENT_MODE)*/
-
-u8 rtw_mi_buddy_sreset_adapter_hdl(_adapter *padapter, u8 bstart)
-{
-	u8 in_data = bstart;
-
-	return _rtw_mi_process(padapter, _TRUE, &in_data, _rtw_mi_sreset_adapter_hdl);
-}
 static u8 _rtw_mi_tx_beacon_hdl(_adapter *adapter, void *data)
 {
 	/* ToDo CONFIG_RTW_MLD: [currently primary link only] */
@@ -1187,7 +1174,7 @@ u8 rtw_mi_tx_beacon_hdl(_adapter *padapter)
 }
 u8 rtw_mi_buddy_tx_beacon_hdl(_adapter *padapter)
 {
-	return _rtw_mi_process(padapter, _TRUE, NULL, _rtw_mi_sreset_adapter_hdl);
+	return _rtw_mi_process(padapter, _TRUE, NULL, _rtw_mi_tx_beacon_hdl);
 }
 
 static u8 _rtw_mi_set_tx_beacon_cmd(_adapter *adapter, void *data)
@@ -1339,6 +1326,7 @@ static s32 _rtw_mi_buddy_clone_bcmc_packet(_adapter *adapter,
 		union recv_frame *precvframe, union recv_frame *pcloneframe)
 {
 	s32 ret = _SUCCESS;
+	s32 process_ret = CORE_RX_CONTINUE;
 #ifdef CONFIG_SKB_ALLOCATED
 	u8 *pbuf = precvframe->u.hdr.rx_data;
 #endif
@@ -1369,8 +1357,27 @@ static s32 _rtw_mi_buddy_clone_bcmc_packet(_adapter *adapter,
 #ifdef DBG_SKB_PROCESS
 			rtw_dbg_skb_process(adapter, precvframe, pcloneframe);
 #endif
-			validate_recv_frame(adapter, pcloneframe);
-
+			if (validate_recv_frame(adapter, &pcloneframe) != CORE_RX_CONTINUE) {
+				ret = _FAIL;
+				return ret;
+			}
+			process_ret = rtw_core_rx_data_pre_process(adapter, &pcloneframe);
+			if (process_ret == CORE_RX_DEFRAG)
+				return ret;
+			if (process_ret != CORE_RX_CONTINUE) {
+				ret = _FAIL;
+				return ret;
+			}
+			process_ret = rtw_core_rx_data_post_process(adapter, &pcloneframe);
+			if (process_ret == CORE_RX_DONE) {
+				adapter->recvinfo.rx_pkts++;
+			} else if (process_ret == CORE_RX_DROP) {
+				if (pcloneframe == NULL)
+					return ret;
+			} else {
+				ret = _FAIL;
+				return ret;
+			}
 		} else {
 			ret = _FAIL;
 			RTW_ERR("%s()-%d: rtw_os_alloc_recvframe() failed!\n", __func__, __LINE__);
@@ -1410,10 +1417,8 @@ void rtw_mi_buddy_clone_bcmc_packet(_adapter *padapter,
 		pcloneframe = rtw_alloc_recvframe(pfree_recv_queue);
 		if (pcloneframe) {
 			ret = _rtw_mi_buddy_clone_bcmc_packet(iface, precvframe, pcloneframe);
-			if (ret == _FAIL)
-				RTW_ERR("_rtw_mi_buddy_clone_bcmc_packet failed!\n");
-
-			rtw_free_recvframe(pcloneframe);
+			if (ret != _SUCCESS )
+				rtw_free_recvframe(pcloneframe);
 		} else {
 			RTW_ERR("%s rtw_alloc_recvframe failed\n", __func__);
 			rtw_warn_on(1);

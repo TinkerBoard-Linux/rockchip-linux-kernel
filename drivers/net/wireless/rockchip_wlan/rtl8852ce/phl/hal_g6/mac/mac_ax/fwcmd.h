@@ -39,6 +39,8 @@
 #define H2C_DATA_LEN		256
 #define H2C_LONG_DATA_LEN	2048
 
+#define H2C_MAX_TOTAL_LEN 2048
+
 #define SET_FWCMD_ID(_t, _ca, _cl, _f)                                         \
 		(SET_WORD(_t, H2C_HDR_DEL_TYPE) | SET_WORD(_ca, H2C_HDR_CAT) | \
 		 SET_WORD(_cl, H2C_HDR_CLASS) | SET_WORD(_f, H2C_HDR_FUNC))
@@ -152,6 +154,35 @@ struct h2c_buf {
 #define H2CB_FLAGS_FREED	BIT(0)
 	u32 flags;
 	u8 h2c_seq;
+};
+
+struct h2c_info {
+	u8 h2c_cat;
+	u8 h2c_class;
+	u8 h2c_func;
+	u8 rec_ack;
+	u8 done_ack;
+	u8 agg_en;
+	u16 content_len;
+};
+
+/**
+ * @struct c2h_proc_class
+ * @brief c2h_proc_class
+ *
+ * @var c2h_proc_class::id
+ * Please Place Description here.
+ * @var c2h_proc_class::handler
+ * Please Place Description here.
+ */
+struct h2c_allloc_status {
+	u16 ldata;
+	u16 data;
+	u16 cmd;
+	u16 mac;
+	u16 bb;
+	u16 rf;
+	u16 btc;
 };
 
 /**
@@ -527,6 +558,8 @@ u32 h2c_pkt_set_cmd(struct mac_ax_adapter *adapter, struct h2c_buf *h2cb,
 u32 h2c_pkt_build_txd(struct mac_ax_adapter *adapter, struct h2c_buf *h2cb);
 u32 h2c_agg_enqueue(struct mac_ax_adapter *adapter, h2c_buf *h2cb);
 
+u32 get_h2cb_status(struct h2c_allloc_status *h2c_status);
+
 /**
  * @addtogroup Firmware
  * @{
@@ -630,51 +663,8 @@ u32 mac_process_c2h(struct mac_ax_adapter *adapter, u8 *buf, u32 len,
  * @return Please Place Description here.
  * @retval u8
  */
-u8 c2h_field_parsing(struct fwcmd_hdr *hdr, struct rtw_c2h_info *info);
-/**
- * @}
- * @}
- */
-
-/**
- * @addtogroup Firmware
- * @{
- * @addtogroup C2H
- * @{
- */
-
-/**
- * @brief mac_fw_log_cfg
- *
- * @param *adapter
- * @param *log_cfg
- * @return Please Place Description here.
- * @retval u32
- */
-u32 mac_fw_log_cfg(struct mac_ax_adapter *adapter,
-		   struct mac_ax_fw_log *log_cfg);
-/**
- * @}
- * @}
- */
-
-/**
- * @addtogroup Firmware
- * @{
- * @addtogroup Beacon
- * @{
- */
-
-/**
- * @brief mac_send_bcn_h2c
- *
- * @param *adapter
- * @param *info
- * @return Please Place Description here.
- * @retval u32
- */
-u32 mac_send_bcn_h2c(struct mac_ax_adapter *adapter,
-		     struct mac_ax_bcn_info *info);
+u8 c2h_field_parsing(struct mac_ax_adapter *adapter,
+		     struct fwcmd_hdr *hdr, struct rtw_c2h_info *info);
 /**
  * @}
  * @}
@@ -720,28 +710,6 @@ u32 mac_host_getpkt_h2c(struct mac_ax_adapter *adapter, u8 macid, u8 pkttype);
  */
 u32 mac_outsrc_h2c_common(struct mac_ax_adapter *adapter,
 			  struct rtw_g6_h2c_hdr *hdr, u32 *pvalue);
-/**
- * @}
- * @}
- */
-
-/**
- * @addtogroup Firmware
- * @{
- * @addtogroup Beacon
- * @{
- */
-
-/**
- * @brief mac_ie_cam_upd
- *
- * @param *adapter
- * @param *info
- * @return Please Place Description here.
- * @retval u32
- */
-u32 mac_ie_cam_upd(struct mac_ax_adapter *adapter,
-		   struct mac_ax_ie_cam_cmd_info *info);
 /**
  * @}
  * @}
@@ -844,7 +812,8 @@ u32 mac_get_c2h_event(struct mac_ax_adapter *adapter,
  * @}
  */
 
-u32 mac_notify_fw_dbcc(struct mac_ax_adapter *adapter, u8 en);
+u32 mac_set_h2c_c2h_mon(struct mac_ax_adapter *adapter, u8 en);
 
+u32 mac_h2c_common(struct mac_ax_adapter *adapter, struct h2c_info *info, u32 *content);
 #endif
 

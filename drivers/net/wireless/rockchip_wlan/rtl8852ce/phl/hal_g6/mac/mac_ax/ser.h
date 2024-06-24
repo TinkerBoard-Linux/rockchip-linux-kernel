@@ -466,6 +466,14 @@
 #define DMAC_WDE_DATCHN_NULLPG_ERR_SER_EN SER_ENABLE
 //bit[26]
 #define DMAC_WDE_DATCHN_FRZTO_ERR_SER_EN SER_ENABLE
+//bit[27]
+#define DMAC_WDE_DATCHN_RRDY_ERR_SER_EN SER_ENABLE
+//bit[28]
+#define DMAC_WDE_DATCHN_ADRERR_ERR_SER_EN SER_ENABLE
+//bit[29]
+#define DMAC_WDE_DATCHN_CAMREQ_ERR_SER_EN SER_ENABLE
+//bit[30]
+#define DMAC_WDE_DATCHN_UAPG_ERR_SER_EN SER_DISABLE
 
 //PLE_ERR_IMR 0x9038
 //bit[0]
@@ -565,9 +573,9 @@
 //bit[29]
 #define DMAC_HDT_CHKSUM_FSM_ERR_SER_EN SER_DISABLE
 //bit[30]
-#define DMAC_HDT_RX_WRITE_OVERFLOW_SER_EN SER_DISABLE
+#define DMAC_HDT_RX_WRITE_OVERFLOW_SER_EN SER_ENABLE
 //bit[31]
-#define DMAC_HDT_RX_WRITE_UNDERFLOW_SER_EN SER_DISABLE
+#define DMAC_HDT_RX_WRITE_UNDERFLOW_SER_EN SER_ENABLE
 
 //CPU_DISPATCHER_ERR_IMR 0x8854
 //bit[0]
@@ -778,6 +786,8 @@
 #define DMAC_AX_TXPKTCTL_MAX_ADDR 0xFC
 #define DMAC_AX_HCI_BASE_ADDR 0x6000
 #define DMAC_AX_HCI_MAX_ADDR 0xFC
+#define DMAC_BE_HAXIDMA_BASE_ADDR 0x1000
+#define DMAC_BE_HAXIDMA_MAX_ADDR 0x7FC
 /*--------------------Define Enum---------------------------------------*/
 enum WCPU_ERR_SCENARIO {
 	RXI300_ERROR = 1,
@@ -809,5 +819,8 @@ u32 mac_chk_err_status(struct mac_ax_adapter *adapter, u8 *ser_status);
 u32 mac_dbg_log_dump(struct mac_ax_adapter *adapter);
 u32 mac_dbg_log_lvl_adjust(struct mac_ax_adapter *adapter, struct mac_debug_log_lvl *lvl);
 u32 mac_dump_ser_cnt(struct mac_ax_adapter *adapter, struct mac_ser_status *status);
-
+u32 mac_set_l0_dbg_mode(struct mac_ax_adapter *adapter);
+u32 mac_set_l1_dbg_mode(struct mac_ax_adapter *adapter);
+u32 mac_reset_dbg_mode(struct mac_ax_adapter *adapter);
+u32 set_l2_status(struct mac_ax_adapter *adapter);
 #endif

@@ -135,6 +135,13 @@
 enum rtw_hal_status hal_get_efuse_8852ce(struct rtw_phl_com_t *phl_com,
 					 struct hal_info_t *hal);
 
+enum rtw_hal_status hal_set_pcicfg_8852ce(struct hal_info_t *hal_info);
+enum rtw_hal_status hal_fast_start_8852ce(struct rtw_phl_com_t *phl_com,
+					 struct hal_info_t *hal);
+
+enum rtw_hal_status hal_fast_stop_8852ce(struct rtw_phl_com_t *phl_com,
+					 struct hal_info_t *hal);
+
 enum rtw_hal_status hal_init_8852ce(struct rtw_phl_com_t *phl_com,
 				    struct hal_info_t *hal);
 
@@ -173,8 +180,13 @@ void hal_clear_int_mask_8852ce(struct hal_info_t *hal);
 void hal_restore_int_8852ce(struct hal_info_t *hal);
 u32 hal_int_hdler_8852ce(struct hal_info_t *hal);
 void hal_rx_int_restore_8852ce(struct hal_info_t *hal);
+enum rtw_hal_status
+hal_get_pcicfg_8852ce(struct hal_info_t *hal_info,
+		      struct rtw_pcie_cfgspc_param *cfg);
 #ifdef PHL_RXSC_ISR
-enum rtw_hal_status hal_rx_rpq_int_check_8852ce(u8 dma_ch, u32 hal_int_array);
+enum rtw_hal_status
+
+ hal_rx_rpq_int_check_8852ce(u8 dma_ch, u32 hal_int_array);
 #endif
 /* rtl8852ce_ops.c */
 

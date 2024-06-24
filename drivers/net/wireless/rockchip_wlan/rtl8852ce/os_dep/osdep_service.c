@@ -190,7 +190,7 @@ struct mstat_sniff_rule {
 };
 
 struct mstat_sniff_rule mstat_sniff_rules[] = {
-	{MSTAT_TYPE_VIR, 32, 32},
+	/*{MSTAT_TYPE_VIR, 32, 32},*/
 };
 
 int mstat_sniff_rule_num = sizeof(mstat_sniff_rules) / sizeof(struct mstat_sniff_rule);

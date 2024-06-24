@@ -844,7 +844,7 @@ u32 rtw_efuse_init(struct rtw_phl_com_t *phl_com,
 
 	if(efuse_info == NULL) {
 		hal_status = RTW_HAL_STATUS_RESOURCE;
-		goto error_efuse_init;
+		return hal_status;
 	}
 
 	/* Allocate shadow map memory */
@@ -1002,7 +1002,6 @@ error_efuse_mask_init:
 error_efuse_shadow_init:
 	_os_mem_free(hal_com->drv_priv, efuse_info, sizeof(struct efuse_t));
 
-error_efuse_init:
 	return hal_status;
 }
 
@@ -1043,10 +1042,8 @@ void rtw_efuse_deinit(struct rtw_hal_com_t *hal_com, void *efuse)
 		efuse_info->shadow_map = NULL;
 	}
 
-	if (efuse_info) {
-		_os_mem_free(hal_com->drv_priv, efuse_info, sizeof(struct efuse_t));
-		efuse_info = NULL;
-	}
+	_os_mem_free(hal_com->drv_priv, efuse_info, sizeof(struct efuse_t));
+	efuse_info = NULL;
 }
 
 /* BT EFUSE API */
@@ -1489,7 +1486,7 @@ enum rtw_hal_status rtw_efuse_renew(void *efuse, u8 type)
 
 	if (type == HAL_MP_EFUSE_WIFI) {
 		rtw_hal_bb_get_efuse_init(efuse_info->hal_com);
-		rtw_hal_rf_get_efuse_ex(efuse_info->hal_com, HW_PHY_MAX);
+		rtw_hal_rf_get_efuse_ex(efuse_info->hal_com, HW_PHY_0);
 		PHL_INFO("%s: hal efuse renew done\n", __FUNCTION__);
 
 	} else if (type == HAL_MP_EFUSE_BT) {

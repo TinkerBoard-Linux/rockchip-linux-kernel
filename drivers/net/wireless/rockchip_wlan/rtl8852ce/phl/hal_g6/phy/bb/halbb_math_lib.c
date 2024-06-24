@@ -296,9 +296,32 @@ u64 halbb_gen_mask(u8 up_num, u8 low_num)
 	return (halbb_gen_mask_from_0(up_num - low_num + 1) << low_num);
 }
 
+u8 halbb_bitmask_lsb(struct bb_info *bb, u32 mask)
+{
+	u8 i = 0;
+
+	for (i = 0; i < 32; i++)
+		if ((mask >> i) & BIT(0))
+			break;
+	return i;
+}
+
+u8 halbb_bitmask_msb(struct bb_info *bb, u32 mask)
+{
+	u8 i = 0;
+
+	for (i = 0; i < 32; i++)
+		if ((mask >> i) == 1)
+			break;
+	return i;
+}
+
 u32 halbb_cal_bit_shift(u32 bit_mask)
 {
-	u32 i;
+	u32 i = 0;
+
+	if (bit_mask == 0)
+		return 0;
 
 	for (i = 0; i <= 31; i++) {
 		if ((bit_mask >> i) & BIT0)
@@ -309,7 +332,7 @@ u32 halbb_cal_bit_shift(u32 bit_mask)
 
 s32 halbb_cnvrt_2_sign(u32 val, u8 bit_num)
 {
-	if (bit_num > 32)
+	if (bit_num >= 32)
 		return (s32)val;
 
 	if (val & BIT(bit_num - 1)) /*Sign BIT*/

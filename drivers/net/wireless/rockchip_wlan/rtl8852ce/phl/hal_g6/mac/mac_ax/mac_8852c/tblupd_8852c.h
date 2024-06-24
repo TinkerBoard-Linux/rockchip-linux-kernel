@@ -52,32 +52,6 @@ u32 mac_f2p_test_cmd_8852c(struct mac_ax_adapter *adapter,
 /**
  * @addtogroup Basic_TRX
  * @{
- * @addtogroup DMAC_Table
- * @{
- */
-
-/**
- * @brief mac_upd_dctl_info_8852c
- *
- * @param *adapter
- * @param *info
- * @param *mask
- * @param macid
- * @param operation
- * @return Please Place Description here.
- * @retval u32
- */
-u32 mac_upd_dctl_info_8852c(struct mac_ax_adapter *adapter,
-			    struct mac_ax_dctl_info *info,
-			    struct mac_ax_dctl_info *mask, u8 macid, u8 operation);
-/**
- * @}
- * @}
- */
-
-/**
- * @addtogroup Basic_TRX
- * @{
  * @addtogroup CMAC_Table
  * @{
  */
@@ -142,29 +116,6 @@ u32 mac_init_cctl_info_8852c(struct mac_ax_adapter *adapter, u8 macid);
 
 u32 cctl_info_debug_write_8852c(struct mac_ax_adapter *adapter,
 				struct fwcmd_cctlinfo_ud *tbl, u8 macid);
-/**
- * @}
- * @}
- */
-
-/**
- * @addtogroup Basic_TRX
- * @{
- * @addtogroup DMAC_Table
- * @{
- */
-
-/**
- * @brief dctl_info_debug_write_v1_8852c
- *
- * @param *adapter
- * @param *tbl
- * @param macid
- * @return Please Place Description here.
- * @retval u32
- */
-u32 dctl_info_debug_write_8852c(struct mac_ax_adapter *adapter,
-				struct fwcmd_dctlinfo_ud_v1 *tbl, u8 macid);
 /**
  * @}
  * @}

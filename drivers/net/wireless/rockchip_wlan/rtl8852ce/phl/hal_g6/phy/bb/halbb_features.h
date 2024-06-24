@@ -70,18 +70,24 @@
 #ifndef DRV_BB_DIG_DISABLE
 	#define HALBB_DIG_SUPPORT
 	#ifndef DRV_BB_TDMADIG_DISABLE
+	#if (HLABB_CODE_BASE_NUM >= 34) || (HLABB_CODE_BASE_NUM == 29) || (HLABB_CODE_BASE_NUM == 27) || (HLABB_CODE_BASE_NUM == 25)
 	#define HALBB_DIG_TDMA_SUPPORT
 	#endif
-	#ifndef DRV_BB_DIG_MCC_DISABLE
-	#define HALBB_DIG_MCC_SUPPORT
-	#define HALBB_DIG_MCC_SUPPORT_IC (BB_RTL8852A | BB_RTL8852B | BB_RTL8851B)
 	#endif
 	#define HALBB_DIG_DAMPING_CHK
 #endif
+#ifndef DRV_BB_MCC_DISABLE
+	#define HALBB_MCC_SUPPORT
+#endif
 #ifndef DRV_BB_LA_MODE_DISABLE
 	#define HALBB_LA_MODE_SUPPORT
-	#ifdef BB_8922A_SUPPORT
+	#ifdef BB_1115_SUPPORT
 	#define HALBB_LA_320M_PATCH /*for RTL1115 320M 3-phase case only*/
+	#endif
+
+	#define BB_IC_LA_MODE_GEN2	(BB_IC_BE_1 | BB_IC_BE_2)
+	#if (defined(HALBB_COMPILE_BE1_SERIES)||defined(HALBB_COMPILE_BE2_SERIES))
+		#define HALBB_COMPILE_LA_MODE_GEN2
 	#endif
 #endif
 #ifndef DRV_BB_PSD_DISABLE
@@ -90,8 +96,15 @@
 #ifndef DRV_BB_PWR_CTRL_DISABLE
 	#define HALBB_PWR_CTRL_SUPPORT
 #endif
+#ifndef DRV_BB_WRAP_DISABLE
+	#ifdef HALBB_COMPILE_BE_SERIES
+	#define HALBB_BB_WRAP_SUPPORT
+	#endif
+#endif
 #ifndef DRV_BB_SR_DISABLE
+	#if (HLABB_CODE_BASE_NUM == 29)
 	#define HALBB_SR_SUPPORT
+	#endif
 #endif
 #ifndef DRV_BB_RUA_DISABLE
 	#define HALBB_RUA_SUPPORT
@@ -122,14 +135,18 @@
 #endif
 
 /*[FW OFFLOAD]*/
-#if ((defined(CONFIG_FW_IO_OFLD_SUPPORT) ||defined(CONFIG_FW_DBCC_OFLD_SUPPORT))  &&  defined(HALBB_COMPILE_IC_FWOFLD))
+#if ((defined(CONFIG_PHL_IO_OFLD) ||defined(CONFIG_FW_DBCC_OFLD_SUPPORT)) && defined(HALBB_COMPILE_IC_FWOFLD))
 #define HALBB_FW_OFLD_SUPPORT
-	#if (defined(CONFIG_FW_IO_OFLD_SUPPORT))
+	#if (defined(CONFIG_PHL_IO_OFLD))
 	#define HALBB_FW_NORMAL_OFLD_SUPPORT
 	#endif
-	#if (defined(CONFIG_FW_DBCC_OFLD_SUPPORT))
+	#if (defined(CONFIG_FW_DBCC_OFLD_SUPPORT) || defined(HALBB_COMPILE_IC_DBCC_MLO))
 	#define HALBB_FW_DBCC_OFLD_SUPPORT
 	#endif
+#endif
+
+#ifdef CONFIG_PHL_BCNOFLD
+	#define HALBB_BCNOFLD_SUPPORT
 #endif
 
 /*[DBCC]*/
@@ -178,4 +195,11 @@
 	#define HALBB_INIT_FW_NHM_EN
 #endif
 
+#ifdef CONFIG_24G_256QAM
+	#define HALBB_CONFIG_HT2VHT_SUPPORT
+#endif
+
+#ifndef DRV_BB_DV_PXP_DISABLE
+	#define HALBB_DV_PXP_DBG_SUPPORT
+#endif
 #endif

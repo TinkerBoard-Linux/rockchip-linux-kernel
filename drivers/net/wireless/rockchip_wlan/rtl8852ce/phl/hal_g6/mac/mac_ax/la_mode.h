@@ -26,15 +26,11 @@
 #define LA_SIZE_192K_BUF_BNDY 0x20
 #define LA_SIZE_256K_BUF_BNDY 0x18
 
-#define LA_BUF_SEL_256K 0x3
-#define LA_BUF_SEL_192K 0x2
-#define LA_BUF_SEL_128K 0x1
-#define LA_BUF_SEL_64K 0x0
-
 #define DLE_BLOCK_SIZE 0x2000
 #define DLE_BUF_BNDY_8852A 0x70000
 #define DLE_BUF_BNDY_8852B 0x20000
 #define DLE_BUF_BNDY_8851B 0x20000
+#define DLE_BUF_BNDY_8852BT 0x20000
 #define LA_BUF_END_8852C_256K 0x70000
 #define LA_BUF_END_8852C_128K 0x50000
 #define LA_BUF_END_8192XB_256K 0x70000
@@ -45,6 +41,7 @@
 #define LA_BUF_END_8852D_128K 0x50000
 #define LA_SIZE_128K_BUF_BNDY_8852B 0x8
 #define LA_SIZE_128K_BUF_BNDY_8851B 0x8
+#define LA_SIZE_128K_BUF_BNDY_8852BT 0x8
 
 /*--------------------Define Enum------------------------------------*/
 /*--------------------Define MACRO----------------------------------*/
@@ -136,5 +133,7 @@ struct mac_ax_la_status mac_get_lamode_st
  * @}
  * @}
  */
+
+u32 mac_query_lamode_buf(struct mac_ax_adapter *adapter, u8 *la_buf_sel);
 
 #endif

@@ -116,19 +116,16 @@ enum rtw_hal_status rtw_hal_get_wow_aoac_rpt(void *hal, struct rtw_aoac_report *
 	return hstatus;
 }
 
-#ifdef CONFIG_PCI_HCI
-enum rtw_hal_status rtw_hal_wow_cfg_txdma(void *hal, u8 en)
+enum rtw_hal_status rtw_hal_wow_cfg_txdma(void *hal, u8 state)
 {
 	struct hal_info_t *hal_info = (struct hal_info_t *)hal;
-	struct hal_trx_ops *trx_ops = hal_info->trx_ops;
 
-	PHL_TRACE(COMP_PHL_DBG, _PHL_DEBUG_, "%s : enable %d.\n", __func__, en);
+	PHL_TRACE(COMP_PHL_DBG, _PHL_DEBUG_, "%s : state %d.\n", __func__, state);
 
-	trx_ops->cfg_wow_txdma(hal_info, en);
+	rtw_hal_mac_cfg_txdma(hal_info, state);
 
 	return RTW_HAL_STATUS_SUCCESS;
 }
-#endif
 
 enum rtw_hal_status
 rtw_hal_wow_cfg_nlo(void *hal, enum SCAN_OFLD_OP op, u16 mac_id,
@@ -222,6 +219,9 @@ enum rtw_hal_status rtw_hal_wow_init(struct rtw_phl_com_t *phl_com, void *hal,
 	if (hal_status != RTW_HAL_STATUS_SUCCESS)
 		return hal_status;
 
+	if (sta->rlink->mstate == MLME_LINKED)
+		rtw_hal_rf_fwredl_config(hal_info, rtw_hal_hw_band_to_phy_idx(sta->rlink->hw_band));
+
 	PHL_TRACE(COMP_PHL_WOW, _PHL_INFO_, "%s successfully done.\n", __func__);
 
 	FUNCOUT_WSTS(hal_status);
@@ -242,6 +242,12 @@ enum rtw_hal_status rtw_hal_wow_deinit(struct rtw_phl_com_t *phl_com, void *hal,
 	hal_status = hal_ops->hal_wow_deinit(phl_com, hal_info, sta);
 	if (hal_status != RTW_HAL_STATUS_SUCCESS)
 		return hal_status;
+
+	/* recover fw log settings after wowlan resume redl fw */
+	rtw_hal_fw_recover_log_cfg(hal);
+
+	if (sta->rlink->mstate == MLME_LINKED)
+		rtw_hal_rf_fwredl_config(hal_info, rtw_hal_hw_band_to_phy_idx(sta->rlink->hw_band));
 
 	PHL_TRACE(COMP_PHL_WOW, _PHL_INFO_, "%s successfully done.\n", __func__);
 
@@ -455,11 +461,12 @@ enum rtw_hal_status rtw_hal_wow_func_stop(struct rtw_phl_com_t *phl_com, void *h
 	return hstatus;
 }
 
-enum rtw_hal_status rtw_hal_set_wowlan(struct rtw_phl_com_t *phl_com, void *hal, u8 enter)
+enum rtw_hal_status rtw_hal_set_wowlan(struct rtw_phl_com_t *phl_com, void *hal,
+				       enum mac_ax_wow_ctrl ctrl)
 {
 	struct hal_info_t *hal_info = (struct hal_info_t *)hal;
 	enum rtw_hal_status hal_status = RTW_HAL_STATUS_FAILURE;
-	hal_status = rtw_hal_mac_set_wowlan(hal_info, enter);
+	hal_status = rtw_hal_mac_set_wowlan(hal_info, ctrl);
 
 	PHL_TRACE(COMP_PHL_WOW, _PHL_INFO_, "%s : status(%u).\n", __func__, hal_status);
 
@@ -516,6 +523,30 @@ enum rtw_hal_status rtw_hal_wow_drop_tx(void *hal, u8 band)
 		PHL_TRACE(COMP_PHL_WOW, _PHL_INFO_, "[wow] %s : chk/drop ok.\n", __func__);
 		hal_status = RTW_HAL_STATUS_SUCCESS;
 	}
+
+	return hal_status;
+}
+
+enum rtw_hal_status rtw_hal_wow_req_tri_evt(void *hal)
+{
+	enum rtw_hal_status hal_status = RTW_HAL_STATUS_FAILURE;
+	struct hal_info_t *hal_info = (struct hal_info_t *)hal;
+
+	hal_status = rtw_hal_mac_wow_req_tri_evt(hal_info);
+
+	PHL_TRACE(COMP_PHL_WOW, _PHL_INFO_, "%s : status(%u).\n", __func__, hal_status);
+
+	return hal_status;
+}
+
+enum rtw_hal_status rtw_hal_wow_req_diag_rpt(void *hal)
+{
+	enum rtw_hal_status hal_status = RTW_HAL_STATUS_FAILURE;
+	struct hal_info_t *hal_info = (struct hal_info_t *)hal;
+
+	hal_status = rtw_hal_mac_wow_req_diag_rpt(hal_info);
+
+	PHL_TRACE(COMP_PHL_WOW, _PHL_INFO_, "%s : status(%u).\n", __func__, hal_status);
 
 	return hal_status;
 }

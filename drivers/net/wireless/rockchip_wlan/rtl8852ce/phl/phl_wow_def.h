@@ -53,6 +53,7 @@ struct rtw_nlo_info {
 	u8 ssid[MAX_NLO_NUM][MAX_SSID_LEN];
 	u8 ssidlen[MAX_NLO_NUM];
 	u8 chipertype[MAX_NLO_NUM];
+	u8 compare_cipher_type;
 	u8 probe_req_id;
 	struct scan_ofld_ch_info channel_list[MAX_NLO_CHANNEL];
 	u8 channel_num;
@@ -176,49 +177,6 @@ struct rtw_realwow_info {
 	u8 wakeup_pattern_id;
 	u8 ack_pattern_id;
 	struct rtw_realwow_ofld_content realwow_ofld_content;
-};
-
-struct rtw_dev2hst_gpio_info {
-	/* dword0 */
-	u32 dev2hst_gpio_en:1;
-	u32 disable_inband:1;
-	u32 gpio_output_input:1;
-	u32 gpio_active:1;
-	u32 toggle_pulse:1;
-	u32 data_pin_wakeup:1;
-	u32 gpio_pulse_nonstop:1;
-	u32 gpio_time_unit:1;
-	u32 gpio_num:8;
-	u32 gpio_pulse_dura:8;
-	u32 gpio_pulse_period:8;
-	/* dword1 */
-	u32 gpio_pulse_count:8;
-	u32 rsvd0:24;
-	/* dword2 */
-	u32 customer_id:8;
-	u32 rsvd1:24;
-	/* dword3 */
-	u32 rsn_a_en:1;
-	u32 rsn_a_toggle_pulse:1;
-	u32 rsn_a_pulse_nonstop:1;
-	u32 rsn_a_time_unit:1;
-	u32 rsvd2:28;
-	/* dword4 */
-	u32 rsn_a:8;
-	u32 rsn_a_pulse_duration:8;
-	u32 rsn_a_pulse_period:8;
-	u32 rsn_a_pulse_count:8;
-	/* dword5 */
-	u32 rsn_b_en:1;
-	u32 rsn_b_toggle_pulse:1;
-	u32 rsn_b_pulse_nonstop:1;
-	u32 rsn_b_time_unit:1;
-	u32 rsvd3:28;
-	/* dword6 */
-	u32 rsn_b:8;
-	u32 rsn_b_pulse_duration:8;
-	u32 rsn_b_pulse_period:8;
-	u32 rsn_b_pulse_count:8;
 };
 
 struct rtw_wow_gpio_info {

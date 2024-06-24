@@ -51,9 +51,9 @@ rtw_phl_cmd_set_macid_pause(struct rtw_wifi_role_t *wifi_role,
 
 enum rtw_phl_status
 rtw_phl_cmd_set_macid_pause_ac(struct rtw_wifi_role_t *wifi_role,
-                      struct rtw_phl_stainfo_t *phl_sta, bool pause,
-                      enum phl_cmd_type cmd_type,
-                      u32 cmd_timeout);
+			       struct rtw_phl_stainfo_t *phl_sta, bool pause,
+			       enum phl_cmd_type cmd_type,
+			       u32 cmd_timeout);
 
 enum rtw_phl_status
 rtw_phl_cmd_set_macid_pkt_drop(struct rtw_wifi_role_t *wifi_role,
@@ -243,6 +243,10 @@ phl_macid_map_clr(u32 *map, u16 id);
 
 void
 phl_macid_map_set(u32 *map, u16 id);
+
+enum rtw_phl_status
+phl_send_client_ps_annc_ntfy_cmd(struct phl_info_t *phl,
+			struct rtw_phl_stainfo_t *sta, enum link_state lstate);
 
 /*********** phl mld_ctrl section ***********/
 enum rtw_phl_status

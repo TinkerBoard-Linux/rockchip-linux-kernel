@@ -31,7 +31,7 @@ void halbb_media_status_delete_phy1(struct bb_info *bb_in)
 	struct bb_info *bb_1;
 	struct rtw_hal_com_t *hal = bb_in->hal_com;
 	struct rtw_phl_stainfo_t *phl_sta_i;
-	u8 i = 0, sta_cnt = 0;
+	u16 i = 0, sta_cnt = 0;
 
 	BB_DBG(bb_in, DBG_DBCC, "[%s]\n", __func__);
 
@@ -69,6 +69,12 @@ void halbb_media_status_delete_phy1(struct bb_info *bb_in)
 
 	bb_0->bb_sta_cnt = sta_cnt;
 	bb_1->bb_sta_cnt = 0;
+
+#ifdef BB_8852C_SUPPORT
+	if (bb_0->ic_type == BB_RTL8852C && bb_0->ic_sub_type != BB_IC_SUB_TYPE_8852C_8852D) {
+		halbb_bfee_en_8852c(bb_0, true);
+	}
+#endif
 }
 
 void halbb_dbcc_band_switch_notify(struct bb_info *bb)
@@ -204,7 +210,7 @@ void halbb_cfo_trk_joint_phy_dec(struct bb_info *bb_in)
 	struct bb_info *bb_0, *bb_1;
 	struct rtw_phl_stainfo_t *phl_sta_i;
 	enum phl_phy_idx phy_idx_tmp = HW_PHY_0;
-	u8 i;
+	u16 i = 0;
 	u8 wmode_max_phy0 = 0, wmode_max_phy1 = 0, wmode_tmp = 0;
 	u32 val = 0;
 
@@ -263,12 +269,6 @@ void halbb_cfo_trk_joint_phy_dec(struct bb_info *bb_in)
 			BB_DBG(bb_in, DBG_DBCC, "wmode_max[1] = 0x%x\n", wmode_max_phy1);
 		}
 	}
-
-	/*MLO usage for BE series can still enable cfo tracking due to same connectivity source*/
-#if defined(BB_8922A_SUPPORT)
-	if (bb_in->ic_type == BB_RTL8922A)
-		return;
-#endif
 
 	if (wmode_max_phy1 > wmode_max_phy0) {
 		BB_DBG(bb_in, DBG_DBCC, "Disable Phy[0] CFO_TRK\n");
@@ -359,11 +359,6 @@ halbb_buffer_init_phy1(struct bb_info *bb_0)
 
 	BB_DBG(bb_0, DBG_INIT, "[%s]\n", __func__);
 
-	if (!bb_0) {
-		BB_WARNING("[%s]*bb_phy_0 = NULL\n", __func__);
-		return RTW_HAL_STATUS_BB_INIT_FAILURE;
-	}
-
 	bb_1 = halbb_mem_alloc(bb_0, sizeof(struct bb_info));
 
 	if (!bb_1) {
@@ -402,7 +397,7 @@ void halbb_dbcc_early_init(struct bb_info *bb)
 
 	BB_DBG(bb, DBG_DBCC, "IC_dbcc_support=%d\n", bb->bb_cmn_hooker->ic_dbcc_support);
 
-	#ifdef CONFIG_FW_IO_OFLD_SUPPORT
+	#ifdef CONFIG_PHL_IO_OFLD
 	drv_fw_ofld = true;
 	#endif
 

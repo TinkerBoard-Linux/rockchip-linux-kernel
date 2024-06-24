@@ -14,7 +14,336 @@
  ******************************************************************************/
 
 #include "fwdl.h"
-#define SUPPORT_52BP 1
+#include "mac_priv.h"
+
+/* Const String-Debug Boot Step */
+static const char fwdl_dbg_step_0[11] = "MAIN START";
+static const char fwdl_dbg_step_1[9] = "DBG DONE";
+static const char fwdl_dbg_step_2[14] = "INIT HW PREDL";
+static const char fwdl_dbg_step_3[12] = "AXIDMA DONE";
+static const char fwdl_dbg_step_4[11] = "IDDMA DONE";
+static const char fwdl_dbg_step_5[10] = "UART DONE";
+static const char fwdl_dbg_step_6[14] = "HW PREDL DONE";
+static const char fwdl_dbg_step_7[11] = "DLFW START";
+static const char fwdl_dbg_step_8[14] = "DL FWHDR DONE";
+static const char fwdl_dbg_step_9[10] = "DLFW DONE";
+static const char fwdl_dbg_step_10[16] = "RXBD CHECK FAIL";
+static const char fwdl_dbg_step_11[16] = "DSP CHKSUM FAIL";
+static const char fwdl_dbg_step_12[17] = "SECURE BOOT FAIL";
+static const char fwdl_dbg_step_13[19] = "SECURE CHKSUM FAIL";
+static const char fwdl_dbg_step_14[11] = "RAM LOADED";
+static const char fwdl_dbg_step_15[18] = "INIT SYSMIB ENTRY";
+static const char fwdl_dbg_step_16[18] = "SYSMIB ENTRY DONE";
+static const char fwdl_dbg_step_17[14] = "INIT FW ENTRY";
+static const char fwdl_dbg_step_18[12] = "H2CPKT DONE";
+static const char fwdl_dbg_step_19[12] = "C2HPKT DONE";
+static const char fwdl_dbg_step_20[14] = "FW ENTRY DONE";
+static const char fwdl_dbg_step_21[19] = "INIT SYSMIB POSTDL";
+static const char fwdl_dbg_step_22[19] = "SYSMIB POSTDL DONE";
+static const char fwdl_dbg_step_23[15] = "INIT HW POSTDL";
+static const char fwdl_dbg_step_24[12] = "RXI300 DONE";
+static const char fwdl_dbg_step_25[12] = "32KCAL DONE";
+static const char fwdl_dbg_step_26[13] = "FREERUN DONE";
+static const char fwdl_dbg_step_27[13] = "PSTIMER DONE";
+static const char fwdl_dbg_step_28[17] = "INIT IOHANG DONE";
+static const char fwdl_dbg_step_29[15] = "HW POSTDL DONE";
+static const char fwdl_dbg_step_30[15] = "INIT FW POSTDL";
+static const char fwdl_dbg_step_31[11] = "FWINT DONE";
+static const char fwdl_dbg_step_32[12] = "H2CREG DONE";
+static const char fwdl_dbg_step_33[12] = "C2HREG DONE";
+static const char fwdl_dbg_step_34[11] = "TXRPT DONE";
+static const char fwdl_dbg_step_35[13] = "DBG PKT DONE";
+static const char fwdl_dbg_step_36[12] = "CPU MG DONE";
+static const char fwdl_dbg_step_37[12] = "FWOFLD DONE";
+static const char fwdl_dbg_step_38[8] = "PS DONE";
+static const char fwdl_dbg_step_39[15] = "FW POSTDL DONE";
+static const char fwdl_dbg_step_40[10] = "INIT WLAN";
+static const char fwdl_dbg_step_41[10] = "WLAN DONE";
+static const char fwdl_dbg_step_42[14] = "INIT IRQ DONE";
+static const char fwdl_dbg_step_43[14] = "OS START DONE";
+static const char fwdl_dbg_step_2_52a[18] = "INIT SYSMIB PREDL";
+static const char fwdl_dbg_step_3_52a[18] = "SYSMIB PREDL DONE";
+static const char fwdl_dbg_step_9_52a[14] = "INIT FW PREDL";
+static const char fwdl_dbg_step_12_52a[14] = "FW PREDL DONE";
+
+#if FWDL_SUPPORT_8852A
+static const char *fwdl_8852a_debug_step[38] = {
+	fwdl_dbg_step_0,
+	fwdl_dbg_step_1,
+	fwdl_dbg_step_2_52a,
+	fwdl_dbg_step_3_52a,
+	fwdl_dbg_step_2,
+	fwdl_dbg_step_3,
+	fwdl_dbg_step_4,
+	fwdl_dbg_step_5,
+	fwdl_dbg_step_6,
+	fwdl_dbg_step_9_52a,
+	fwdl_dbg_step_18,
+	fwdl_dbg_step_19,
+	fwdl_dbg_step_12_52a,
+	fwdl_dbg_step_7,
+	fwdl_dbg_step_9,
+	fwdl_dbg_step_14,
+	fwdl_dbg_step_21,
+	fwdl_dbg_step_22,
+	fwdl_dbg_step_23,
+	fwdl_dbg_step_24,
+	fwdl_dbg_step_25,
+	fwdl_dbg_step_26,
+	fwdl_dbg_step_27,
+	fwdl_dbg_step_29,
+	fwdl_dbg_step_30,
+	fwdl_dbg_step_31,
+	fwdl_dbg_step_32,
+	fwdl_dbg_step_33,
+	fwdl_dbg_step_34,
+	fwdl_dbg_step_35,
+	fwdl_dbg_step_36,
+	fwdl_dbg_step_37,
+	fwdl_dbg_step_38,
+	fwdl_dbg_step_39,
+	fwdl_dbg_step_40,
+	fwdl_dbg_step_41,
+	fwdl_dbg_step_28,
+};
+#endif
+
+#if FWDL_SUPPORT_8852B || FWDL_SUPPORT_8851B || FWDL_SUPPORT_8852BT
+static const char *fwdl_8852b_debug_step[38] = {
+	fwdl_dbg_step_0,
+	fwdl_dbg_step_1,
+	fwdl_dbg_step_2,
+	fwdl_dbg_step_3,
+	fwdl_dbg_step_4,
+	fwdl_dbg_step_5,
+	fwdl_dbg_step_6,
+	fwdl_dbg_step_7,
+	fwdl_dbg_step_9,
+	fwdl_dbg_step_14,
+	fwdl_dbg_step_15,
+	fwdl_dbg_step_16,
+	fwdl_dbg_step_17,
+	fwdl_dbg_step_18,
+	fwdl_dbg_step_19,
+	fwdl_dbg_step_20,
+	fwdl_dbg_step_21,
+	fwdl_dbg_step_22,
+	fwdl_dbg_step_23,
+	fwdl_dbg_step_24,
+	fwdl_dbg_step_25,
+	fwdl_dbg_step_26,
+	fwdl_dbg_step_27,
+	fwdl_dbg_step_29,
+	fwdl_dbg_step_30,
+	fwdl_dbg_step_31,
+	fwdl_dbg_step_32,
+	fwdl_dbg_step_33,
+	fwdl_dbg_step_34,
+	fwdl_dbg_step_35,
+	fwdl_dbg_step_36,
+	fwdl_dbg_step_37,
+	fwdl_dbg_step_38,
+	fwdl_dbg_step_39,
+	fwdl_dbg_step_40,
+	fwdl_dbg_step_41,
+	fwdl_dbg_step_28,
+};
+#endif
+
+#if FWDL_SUPPORT_8852C || FWDL_SUPPORT_8852D || FWDL_SUPPORT_8192XB
+static const char *fwdl_8852c_debug_step[39] = {
+	fwdl_dbg_step_0,
+	fwdl_dbg_step_1,
+	fwdl_dbg_step_2,
+	fwdl_dbg_step_3,
+	fwdl_dbg_step_4,
+	fwdl_dbg_step_5,
+	fwdl_dbg_step_6,
+	fwdl_dbg_step_7,
+	fwdl_dbg_step_9,
+	fwdl_dbg_step_14,
+	fwdl_dbg_step_15,
+	fwdl_dbg_step_16,
+	fwdl_dbg_step_17,
+	fwdl_dbg_step_18,
+	fwdl_dbg_step_19,
+	fwdl_dbg_step_20,
+	fwdl_dbg_step_21,
+	fwdl_dbg_step_22,
+	fwdl_dbg_step_23,
+	fwdl_dbg_step_24,
+	fwdl_dbg_step_25,
+	fwdl_dbg_step_26,
+	fwdl_dbg_step_27,
+	fwdl_dbg_step_28,
+	fwdl_dbg_step_29,
+	fwdl_dbg_step_30,
+	fwdl_dbg_step_31,
+	fwdl_dbg_step_32,
+	fwdl_dbg_step_33,
+	fwdl_dbg_step_34,
+	fwdl_dbg_step_35,
+	fwdl_dbg_step_36,
+	fwdl_dbg_step_37,
+	fwdl_dbg_step_38,
+	fwdl_dbg_step_39,
+	fwdl_dbg_step_40,
+	fwdl_dbg_step_41,
+	fwdl_dbg_step_42,
+	fwdl_dbg_step_43,
+};
+#endif
+
+static inline u32 fwdl_precheck(struct mac_ax_adapter *adapter)
+{
+	u32 ple_que_ch0_empty;
+	u32 ple_que_ch1_empty;
+	u32 val32;
+	u32 dma_idx;
+	u32 cpu_idx;
+	u32 ret;
+	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
+	struct dle_dfi_qempty_t qempty = {0};
+
+	qempty.dle_type = DLE_CTRL_TYPE_PLE;
+	qempty.grpsel = 0;
+	ret = dle_dfi_qempty(adapter, &qempty);
+	if (ret != MACSUCCESS) {
+		PLTFM_MSG_ERR("[FWDL][ERROR][%s] dle dfi empty group %d fail %d\n", __func__,
+			      qempty.grpsel, ret);
+		return MACDBGPORTDMP;
+	}
+	val32 = qempty.qempty;
+	ple_que_ch0_empty = (val32 & (1 << 8));
+	ple_que_ch1_empty = (val32 & (1 << 9));
+	if (ple_que_ch0_empty == 0) {
+		PLTFM_MSG_ERR("[FWDL][ERROR][%s] PLE queue for PAXIDMA ch0 is not empty\n",
+			      __func__);
+		return MACWQBUSY;
+	}
+	if (ple_que_ch1_empty == 0) {
+		PLTFM_MSG_ERR("[FWDL][ERROR][%s] PLE queue for PAXIDMA ch1 is not empty\n",
+			      __func__);
+		return MACWQBUSY;
+	}
+
+#if FWDL_AX_MIPS_SUPPORT
+	if ((FWDL_IS_AX_MIPS) && adapter->env_info.intf != MAC_AX_INTF_PCIE)
+		PLTFM_MSG_TRACE("[FWDL]Skip HAXIDMA CH12 Check\n");
+#endif
+
+#if FWDL_AX_RISCV_SUPPORT
+	if (FWDL_IS_AX_RISCV) {
+		val32 = MAC_REG_R32(R_AX_CH12_TXBD_IDX);
+		dma_idx = GET_FIELD(val32, B_AX_CH12_HW_IDX);
+		cpu_idx = GET_FIELD(val32, B_AX_CH12_HOST_IDX);
+		if (dma_idx != cpu_idx) {
+			PLTFM_MSG_ERR("[FWDL][ERROR][%s]", __func__);
+			PLTFM_MSG_ERR("HAXIDMA CH12 TX DMA IDX 0x%04X != CPU IDX 0x%04X\n",
+				      dma_idx, cpu_idx);
+			return MACWQBUSY;
+		}
+	}
+#endif
+
+	return MACSUCCESS;
+}
+
+void fwdl_time_parsing(struct mac_ax_adapter *adapter)
+{
+#if MAC_FWDL_TIME_PROFILING
+	u32 rom_boot_time = FWDL_TIME_DELTA_US(FWDL_TIMESTAMP_BUFF.ts0,
+					       FWDL_TIMESTAMP_BUFF.ts1);
+	u32 header_dl_time = FWDL_TIME_DELTA_US(FWDL_TIMESTAMP_BUFF.ts1,
+						FWDL_TIMESTAMP_BUFF.ts2);
+	u32 setion_dl_time = FWDL_TIME_DELTA_US(FWDL_TIMESTAMP_BUFF.ts2,
+						FWDL_TIMESTAMP_BUFF.ts3);
+	u32 secure_check_time = FWDL_TIME_DELTA_US(FWDL_TIMESTAMP_BUFF.ts3,
+						   FWDL_TIMESTAMP_BUFF.ts4);
+	u32 post_boot_time = FWDL_TIME_DELTA_US(FWDL_TIMESTAMP_BUFF.ts4,
+						FWDL_TIMESTAMP_BUFF.ts5);
+
+	PLTFM_MSG_ALWAYS("[FWDL][INFO] ROM Boot Time = %uus\n",
+			 rom_boot_time);
+	PLTFM_MSG_ALWAYS("[FWDL][INFO] Header DL Time = %uus\n",
+			 header_dl_time);
+	PLTFM_MSG_ALWAYS("[FWDL][INFO] Section DL Time = %uus\n",
+			 setion_dl_time);
+	PLTFM_MSG_ALWAYS("[FWDL][INFO] Secure Check Time = %uus\n",
+			 secure_check_time);
+	PLTFM_MSG_ALWAYS("[FWDL][INFO] Post Boot Time = %uus\n",
+			 post_boot_time);
+#if NOUSE
+	if (rom_boot_time > 1500 || header_dl_time > 15000 || setion_dl_time > 25000 ||
+	    secure_check_time > 3000 || post_boot_time > 3000) {
+		PLTFM_MSG_ALWAYS("[FWDL][WARN] %uus, %uus, %uus, %uus, %uus, %uus\n",
+				 FWDL_TIMESTAMP_BUFF.ts0,
+				 FWDL_TIMESTAMP_BUFF.ts1,
+				 FWDL_TIMESTAMP_BUFF.ts2,
+				 FWDL_TIMESTAMP_BUFF.ts3,
+				 FWDL_TIMESTAMP_BUFF.ts4,
+				 FWDL_TIMESTAMP_BUFF.ts5);
+	}
+#endif
+#else
+	(void *)adapter;
+#endif
+}
+
+void idmem_share_mode_check(struct mac_ax_adapter *adapter, u8 *fw)
+{
+
+	u8 val8 = 0;
+	u8 idmem_share_mode = 0;
+	u32 val32 = 0;
+	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
+	struct fwhdr_hdr_t *hdr = (struct fwhdr_hdr_t *)fw;
+
+	/* AX Chip Can't Modify ROM Code, So We have to:
+	 * 1. Set C00 SEC_IDMEM_SIZE_CONFIG if IS NOT Secure IC
+	 * 2. Show ERROR if Previous IDMEM Share Mode != Current IDMEM Share Mode
+	 * if IS secure IC
+	 */
+	if (!adapter->hw_info->is_sec_ic) {
+		// 1. Set C00 SEC_IDMEM_SIZE_CONFIG if IS NOT Secure IC
+		val32 = MAC_REG_R32(R_AX_SEC_CTRL);
+		val8 = GET_FIELD(val32, B_SEC_IDMEM_SIZE_CONFIG);
+		if (val8 != FWDL_IDMEM_SHARE_DEFAULT_MODE) {
+			PLTFM_MSG_ALWAYS("[FWDL] Change IDMEM Share to Default Mode 0x%x\n",
+					 FWDL_IDMEM_SHARE_DEFAULT_MODE);
+			val32 = SET_CLR_WORD(val32, FWDL_IDMEM_SHARE_DEFAULT_MODE,
+					     B_SEC_IDMEM_SIZE_CONFIG);
+			MAC_REG_W32(R_AX_SEC_CTRL, val32);
+		}
+	} else {
+		/* 2. Show WARNING if Previous IDMEM Share Mode != Default Mode
+		 * if IS secure IC
+		 */
+		val32 = MAC_REG_R32(R_AX_WCPU_FW_CTRL);
+		if (val32 & B_AX_IDMEM_SHARE_MODE_RECORD_VALID) {
+			/* Record Is Valid, This may be second boot
+			 * Now we will Check if Previous IDMEM Share Mode Match Current
+			 */
+			val8 = GET_FIELD(val32, B_AX_IDMEM_SHARE_MODE_RECORD);
+			if (val8 != FWDL_IDMEM_SHARE_DEFAULT_MODE) {
+				PLTFM_MSG_WARN("[FWDL][WARN][%s] IDMEM Share Mode Change\n",
+						__func__);
+				PLTFM_MSG_WARN("[FWDL][WARN][%s] Previous Mode = 0x%X\n",
+						__func__, val8);
+				PLTFM_MSG_WARN("[FWDL][WARN][%s] Default Mode = 0x%X\n",
+						__func__, FWDL_IDMEM_SHARE_DEFAULT_MODE);
+				PLTFM_MSG_WARN("[FWDL][WARN][%s] FWDL May Fail.\n",
+						__func__);
+			}
+		}
+		//Record Current IDMEM Share Mode
+		idmem_share_mode = GET_FIELD(le32_to_cpu(hdr->dword7), FWHDR_FW_IDMEM_SHARE_MODE);
+		val32 = SET_CLR_WORD(val32, idmem_share_mode, B_AX_IDMEM_SHARE_MODE_RECORD);
+		val32 |= B_AX_IDMEM_SHARE_MODE_RECORD_VALID;
+		MAC_REG_W32(R_AX_WCPU_FW_CTRL, val32);
+	}
+}
+
 static inline void fwhdr_section_parser(struct mac_ax_adapter *adapter,
 					struct fwhdr_section_t *section,
 					struct fwhdr_section_info *info)
@@ -34,14 +363,16 @@ static inline void fwhdr_section_parser(struct mac_ax_adapter *adapter,
 	info->len = section_len;
 	info->redl = (hdr_val & SECTION_INFO_REDL) ? 1 : 0;
 
-	if (is_chip_id(adapter, MAC_AX_CHIP_ID_8852A) ||
-	    is_chip_id(adapter, MAC_AX_CHIP_ID_8852B) ||
-	    is_chip_id(adapter, MAC_AX_CHIP_ID_8851B)) {
+#if FWDL_AX_MIPS_SUPPORT
+	if (FWDL_IS_AX_MIPS) {
 		info->dladdr = (GET_FIELD(le32_to_cpu(section->dword0),
 		SECTION_INFO_SEC_DL_ADDR)) & 0x1FFFFFFF;
-	} else {
-		info->dladdr = (GET_FIELD(le32_to_cpu(section->dword0),	SECTION_INFO_SEC_DL_ADDR));
 	}
+#endif
+#if FWDL_AX_RISCV_SUPPORT
+	if (FWDL_IS_AX_RISCV)
+		info->dladdr = (GET_FIELD(le32_to_cpu(section->dword0),	SECTION_INFO_SEC_DL_ADDR));
+#endif
 }
 
 static inline u32 fwhdr_hdr_parser(struct mac_ax_adapter *adapter, struct fwhdr_hdr_t *hdr,
@@ -75,9 +406,6 @@ static inline u32 fwhdr_hdr_parser(struct mac_ax_adapter *adapter, struct fwhdr_
 				      info->dynamic_hdr_len);
 			return MACCMP;
 		}
-		PLTFM_MSG_TRACE("[TRACE]%s:FW Use Dynamic Header:0x%X\n", __func__,
-				info->dynamic_hdr_en);
-		PLTFM_MSG_TRACE("[TRACE]%s:FW Dynamic Header Len:0x%X\n", __func__, val32);
 	} else {
 		val32 = FWHDR_HDR_LEN + info->section_num * FWHDR_SECTION_LEN;
 		if (val32 != info->hdr_len) {
@@ -91,59 +419,168 @@ static inline u32 fwhdr_hdr_parser(struct mac_ax_adapter *adapter, struct fwhdr_
 
 	hdr_val = le32_to_cpu(hdr->dword2);
 	info->git_idx = GET_FIELD(hdr_val, FWHDR_COMMITID);
+	PLTFM_MSG_ALWAYS("[FWDL] Image Git SHA = %08X\n", info->git_idx);
 	return MACSUCCESS;
 }
 
 static u32 get_ple_base(struct mac_ax_adapter *adapter)
 {
-	u32 chip_id;
-	u32 ple_base = 0;
-	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
+	u32 ple_base = FWDL_PLE_BASE_ADDR;
 
-	chip_id = GET_FIELD(MAC_REG_R32(R_AX_SYS_CHIPINFO), B_AX_HW_ID);
-
-	switch (chip_id) {
-#ifdef MAC_8852A_SUPPORT
-	case RTL8852A_ID:
-		ple_base = FWDL_PLE_BASE_ADDR_8852A;
-		break;
-#endif
-#ifdef MAC_8852B_SUPPORT
-	case RTL8852B_ID:
-		ple_base = FWDL_PLE_BASE_ADDR_8852B;
-		break;
-#endif
-#ifdef MAC_8852C_SUPPORT
-	case RTL8852C_ID:
-		ple_base = FWDL_PLE_BASE_ADDR_8852C;
-		break;
-#endif
-#ifdef MAC_8192XB_SUPPORT
-	case RTL8192XB_ID:
-		ple_base = FWDL_PLE_BASE_ADDR_8192XB;
-		break;
-#endif
-#ifdef MAC_8851B_SUPPORT
-	case RTL8851B_ID:
-		ple_base = FWDL_PLE_BASE_ADDR_8851B;
-		break;
-#endif
-#ifdef MAC_8851E_SUPPORT
-	case RTL8851E_ID:
-		ple_base = FWDL_PLE_BASE_ADDR_8851E;
-		break;
-#endif
-#ifdef MAC_8852D_SUPPORT
-	case RTL8852D_ID:
-		ple_base = FWDL_PLE_BASE_ADDR_8852D;
-		break;
-#endif
-	default:
-		PLTFM_MSG_ERR("[ERR]%s: invalid chip\n", __func__);
-		ple_base = 0;
-		break;
-	}
+	if (!ple_base)
+		PLTFM_MSG_WARN("[FWDL][WARN][%s] Unknown Chip ID 0x%X's PLE Base\n", __func__,
+			       adapter->hw_info->chip_id);
 	return ple_base;
+}
+
+static inline u32 get_mss_keypool_index(struct mac_ax_adapter *adapter, u32 *mss_idx,
+					u8 *secure_section_end, u32 *msskp_hdr_len,
+					u32 *msskp_key_num)
+{
+	u8 b1, b2, mss_dev_type, mss_cust_idx, mss_key_num, sel_bit_idx, bit_idx;
+	u8 end_bit;
+	u8 *p_mss_pool, *rmp_tbl;
+	u32 byte_idx;
+	u32 sel_byte_idx;
+	struct fwdl_mss_pool_hdr_v0 mss_hdr = { 0 };
+	u8 mss_pool_magic_num[] = { 0x4D, 0x53, 0x53, 0x4B, 0x50, 0x4F, 0x4F, 0x4C }; //MSSKPOOL
+	u32 rmp_tbl_size = 0;
+	u32 mss_sel_idx = 0;
+	u32 en_key_count = 0;
+	enum mac_ax_efuse_bank bank = MAC_AX_EFUSE_BANK_WIFI;
+	struct mac_ax_ops *ops = adapter_to_mac_ops(adapter);
+
+	//MSS Pool Locate AFTER Secure Section, out of section headder recorded bound
+	p_mss_pool = secure_section_end;
+
+	//Compare to Magic Number
+	if (PLTFM_MEMCMP(p_mss_pool, mss_pool_magic_num, FWDL_MSS_POOL_HDR_MGN_SIZE)) {
+		PLTFM_MSG_ERR("[FWDL][ERR][%s] MSS Key Pool Magic Number Not Found!\n", __func__);
+		return MACFWBIN;
+	}
+
+	//Store MSS Keypool Header
+	PLTFM_MEMCPY(&mss_hdr, p_mss_pool, FWDL_MSS_POOL_HDR_LEN);
+	// Handle Endian Issue
+	ENDIAN_REVERTER(mss_hdr, FWDL_MSS_POOL_HDR_LEN);
+
+	//Locate MSS Keypool Remap Table Size and Location
+	if (mss_hdr.rmpfmt == MSS_POOL_RMP_TBL_BITMASK) {
+		rmp_tbl_size = ((mss_hdr.msskey_num_max) * (mss_hdr.msscust_max) *
+				(mss_hdr.mssdev_max)) >> 3;
+		if (mss_hdr.defen)
+			rmp_tbl_size += FWDL_MSS_POOL_DEFKEYSETS_SIZE;
+		rmp_tbl = p_mss_pool + mss_hdr.mss_rmp_tbl_offset;
+	} else {
+		PLTFM_MSG_ERR("[FWDL][ERR][%s] MSS Key Pool Remap Table Format Unsupport:%X\n",
+			      __func__, mss_hdr.rmpfmt);
+		return MACNOITEM;
+	}
+
+	//Check MSS Keypool Header Format Correct
+	if (rmp_tbl_size + FWDL_MSS_POOL_HDR_LEN != mss_hdr.mss_key_raw_offset) {
+		PLTFM_MSG_ERR("[FWDL][ERR][%s] MSS Key Pool Format Error:0x%X + 0x%X != 0x%X\n",
+			      __func__, rmp_tbl_size, FWDL_MSS_POOL_HDR_LEN,
+			      mss_hdr.mss_key_raw_offset);
+		return MACNOITEM;
+	}
+
+	//Get MSS Necessary Information From OTP
+	if (ops->read_efuse(adapter, EFUSE_EXTERNALPN_ADDR, 1, &b1, bank) != 0) {
+		PLTFM_MSG_ERR("[FWDL][ERR][%s] Read efuse 0x%X failed.\n", __func__,
+			      EFUSE_EXTERNALPN_ADDR);
+		return MACEFUSEREAD;
+	}
+	if (ops->read_efuse(adapter, EFUSE_CUSTOMER_ADDR, 1, &b2, bank) != 0) {
+		PLTFM_MSG_ERR("[FWDL][ERR][%s] Read efuse 0x%X failed.\n", __func__,
+			      EFUSE_CUSTOMER_ADDR);
+		return MACEFUSEREAD;
+	}
+	b1 = le32_to_cpu(b1);
+	b2 = le32_to_cpu(b2);
+	PLTFM_MSG_TRACE("[FWDL][INFO] Read efuse EFUSE_EXTERNALPN_ADDR(0x%X) = 0x%X.\n",
+			EFUSE_EXTERNALPN_ADDR, b1);
+	PLTFM_MSG_TRACE("[FWDL][INFO] Read efuse EFUSE_CUSTOMER_ADDR(0x%X) = 0x%X.\n",
+			EFUSE_CUSTOMER_ADDR, b2);
+
+	//Transfer OTP Value into Device Type
+	mss_dev_type = GET_FIELD(b1, EFUSE_MSSDEVTYPE);
+	mss_cust_idx = 0x1F - (GET_FIELD(b1, EFUSE_MSSCUSTIDX0) |
+			       (GET_FIELD(b2, EFUSE_MSSCUSTIDX1) << EFUSE_MSSCUSTIDX0_SH));
+	mss_key_num = 0xF - GET_FIELD(b2, EFUSE_MSSKEYNUM);
+
+	if ((FWDL_IS_8852B) && (b1 == 0xFF && b2 == 0x6E)) {
+	// compatible old release
+		mss_dev_type = MSS_DEV_TYPE_FWSEC_NONLIN_INBOX_NON_COB;
+		mss_cust_idx = 0;
+		mss_key_num = 0;
+	}
+
+	switch (mss_dev_type) {
+	case MSS_DEV_TYPE_FWSEC_WINLIN_INBOX:
+		mss_dev_type = 0x0;
+		break;
+	case MSS_DEV_TYPE_FWSEC_NONLIN_INBOX_NON_COB:
+		mss_dev_type = 0x1;
+		break;
+	case MSS_DEV_TYPE_FWSEC_NONLIN_INBOX_COB:
+		mss_dev_type = 0x2;
+		break;
+	case MSS_DEV_TYPE_FWSEC_NONWIN_INBOX:
+		mss_dev_type = 0x3;
+		break;
+	case MSS_DEV_TYPE_FWSEC_DEF:
+		break;
+	default:
+		mss_dev_type = 0xFF;
+		PLTFM_MSG_ERR("[FWDL][ERR][%s] MSS Key Pool Unknown Device Type = 0x%X.\n",
+			      __func__, mss_dev_type);
+		return MACNOITEM;
+	}
+
+	//Calculate Relative MSS Key Pool Keypair Index
+	if (mss_dev_type == MSS_DEV_TYPE_FWSEC_DEF) {
+		if (mss_hdr.defen)
+			mss_sel_idx = mss_cust_idx * (mss_hdr.msskey_num_max) + mss_key_num;
+		else
+			return MACNOITEM;
+	} else {
+		if (mss_hdr.defen)
+			mss_sel_idx = (FWDL_MSS_POOL_DEFKEYSETS_SIZE << 3);
+		else
+			mss_sel_idx = 0;
+		mss_sel_idx += (mss_dev_type * ((mss_hdr.msscust_max) * (mss_hdr.msskey_num_max)) +
+				mss_cust_idx * (mss_hdr.msskey_num_max) + mss_key_num);
+	}
+	//Looking into Remap Table, Make sure OTP Selected Key is Also Enabled in Remap table
+	sel_byte_idx = mss_sel_idx >> 3;
+	sel_bit_idx = mss_sel_idx & 0x7;
+	if (rmp_tbl[sel_byte_idx] & (0x1 << sel_bit_idx)) {
+		/* Calculate the number of key is enable in Remap Table, before the selected key
+		 * This Numner - 1 is the actual key offset of selected key in Image
+		 */
+		for (byte_idx = 0; byte_idx <= sel_byte_idx; byte_idx++) {
+			end_bit = (byte_idx == sel_byte_idx) ? sel_bit_idx : 7;
+			for (bit_idx = 0; bit_idx <= end_bit; bit_idx++) {
+				if (rmp_tbl[byte_idx] & (0x1 << bit_idx))
+					en_key_count++;
+			}
+		}
+	} else {
+		PLTFM_MSG_ERR("[FWDL][ERR][%s] MSS Key Pool Key offset 0x%X Not Enable.\n",
+			      __func__, mss_sel_idx);
+		return MACNOITEM;
+	}
+	*mss_idx = en_key_count - 1;
+	//fwbin_info->img_info.mss_keypool_keypair_num = (u16)mss_hdr.keypair_num;
+	//fwbin_info->img_info.mss_keypool_hdr_len = mss_hdr.mss_key_raw_offset;
+	PLTFM_MSG_TRACE("[FWDL][INFO] mss_idx = 0x%X.\n", *mss_idx);
+	PLTFM_MSG_TRACE("[FWDL][INFO] Keypair number = 0x%X.\n", mss_hdr.keypair_num);
+	PLTFM_MSG_TRACE("[FWDL][INFO] mss_pool_hdr_len = 0x%X.\n",
+			mss_hdr.mss_key_raw_offset);
+	*msskp_hdr_len = mss_hdr.mss_key_raw_offset;
+	*msskp_key_num = mss_hdr.keypair_num;
+	return MACSUCCESS;
 }
 
 static s8 __mss_index(struct mac_ax_adapter *adapter)
@@ -171,9 +608,9 @@ static s8 __mss_index(struct mac_ax_adapter *adapter)
 	externalPN = 0xFF - GET_FIELD(b1, EFUSE_EXTERNALPN);
 	customer = 0xF - GET_FIELD(b2, EFUSE_CUSTOMER);
 	serialNum = 0x7 - GET_FIELD(b2, EFUSE_SERIALNUM);
-	PLTFM_MSG_ALWAYS("[DBG]%s: External PN %x\n", __func__, externalPN);
-	PLTFM_MSG_ALWAYS("[DBG]%s: customer %x\n", __func__, customer);
-	PLTFM_MSG_ALWAYS("[DBG]%s: Serial Num %x\n", __func__, serialNum);
+	PLTFM_MSG_TRACE("[DBG]%s: External PN %x\n", __func__, externalPN);
+	PLTFM_MSG_TRACE("[DBG]%s: customer %x\n", __func__, customer);
+	PLTFM_MSG_TRACE("[DBG]%s: Serial Num %x\n", __func__, serialNum);
 	for (i = 0; i < OTP_KEY_INFO_NUM; i++) {
 		if (externalPN == otp_key_info_externalPN[i] &&
 		    customer == otp_key_info_customer[i] &&
@@ -182,7 +619,7 @@ static s8 __mss_index(struct mac_ax_adapter *adapter)
 			break;
 		}
 	}
-	PLTFM_MSG_ALWAYS("[DBG]%s: ret %d\n", __func__, ret);
+	PLTFM_MSG_TRACE("[DBG]%s: ret %d\n", __func__, ret);
 	return ret;
 }
 
@@ -198,7 +635,10 @@ static u32 fwhdr_parser(struct mac_ax_adapter *adapter, u8 *fw, u32 len,
 	enum DLE_RSVD_INFO dle_info;
 	u8 *mss_start;
 	u8 *mss_selected;
-	s8 mss_idx;
+	s8 mss_idx = 0;
+	u32 msskp_idx = 0;
+	u32 msskp_hdr_len;
+	u32 msskp_key_num;
 
 	if (!info) {
 		PLTFM_MSG_ERR("[ERR]%s: *info = NULL\n", __func__);
@@ -224,7 +664,7 @@ static u32 fwhdr_parser(struct mac_ax_adapter *adapter, u8 *fw, u32 len,
 	for (i = 0; i < info->section_num; i++) {
 		fwhdr_section_parser(adapter, (struct fwhdr_section_t *)fw,
 				     cur_section_info);
-		if (is_chip_id(adapter, MAC_AX_CHIP_ID_8852B)) {
+		if (FWDL_IS_8852B) {
 			if (cur_section_info->type == FWDL_SECURITY_SECTION_TYPE) {
 				cur_section_info->len = 2048;
 				((struct fwhdr_section_t *)fw)->dword1 = 0x09000800; //0x800 = 2048
@@ -235,23 +675,35 @@ static u32 fwhdr_parser(struct mac_ax_adapter *adapter, u8 *fw, u32 len,
 		if (cur_section_info->dladdr == fwdl_ple_base)
 			info->is_fw_use_ple = 1;
 		if (cur_section_info->type == FWDL_SECURITY_SECTION_TYPE &&
-			cur_section_info->mssc > 0) {
-			fw_end -= (cur_section_info->mssc * FWDL_SECURITY_SIGLEN);
+		    cur_section_info->mssc > 0) {
 			mss_start = cur_section_info->addr + FWDL_SECURITY_SECTION_CONSTANT;
-			mss_idx = __mss_index(adapter);
-			if (mss_idx < 0) {
-				PLTFM_MSG_ERR("[ERR]%s:", __func__);
-				PLTFM_MSG_ERR("Failed to get secure info offset\n");
-				return MACFWBIN;
+			if ((cur_section_info->mssc & 0xFF) == 0xFF) {
+				PLTFM_MSG_TRACE("[FWDL][INFO] New MSS Key Pool Enable\n");
+				ret = get_mss_keypool_index(adapter, &msskp_idx, bin_ptr,
+							    &msskp_hdr_len, &msskp_key_num);
+				if (ret)
+					return ret;
+				mss_selected = bin_ptr + (((u64)msskp_idx) * FWDL_SECURITY_SIGLEN) +
+					       msskp_hdr_len;
+				fw_end -= (msskp_key_num * FWDL_SECURITY_SIGLEN + msskp_hdr_len);
+			} else {
+				PLTFM_MSG_TRACE("[FWDL][INFO] Multi Secure Section Enable\n");
+				fw_end -= (cur_section_info->mssc * FWDL_SECURITY_SIGLEN);
+				mss_idx = __mss_index(adapter);
+				if (mss_idx < 0) {
+					PLTFM_MSG_ERR("[ERR]%s:", __func__);
+					PLTFM_MSG_ERR("Failed to get secure info offset\n");
+					return MACFWBIN;
+				}
+				mss_selected = bin_ptr + (mss_idx * FWDL_SECURITY_SIGLEN);
 			}
-			mss_selected = bin_ptr + (mss_idx * FWDL_SECURITY_SIGLEN);
 			PLTFM_MEMCPY(mss_start, mss_selected, FWDL_SECURITY_SIGLEN);
-			if (is_chip_id(adapter, MAC_AX_CHIP_ID_8852B)) {
+			if (FWDL_IS_8852B) {
 				// Workaround for 1344 workaround,
 				// Secure Boot CAN NOT have 1344 workaround
 				// Assuming if mss_idx>0, than we are in secure boot.
 				// Sub 1088 (1344-256) from cur_section_info->len
-				if (mss_idx > 0) {
+				if (mss_idx > 0 || msskp_idx > 0) {
 					//cur_section_info->len should be 960
 					cur_section_info->len = 960;
 					//0x3C0=960
@@ -272,6 +724,7 @@ static u32 fwhdr_parser(struct mac_ax_adapter *adapter, u8 *fw, u32 len,
 		PLTFM_MSG_ERR("fw try to download something to ple illegally\n");
 		return MACFWBIN;
 	}
+	adapter->fw_info.last_fw_use_ple = (u8)info->is_fw_use_ple;
 
 	if (fw_end != bin_ptr) {
 		PLTFM_MSG_ERR("[ERR]%s: ", __func__);
@@ -295,6 +748,9 @@ static inline u32 update_fw_ver(struct mac_ax_adapter *adapter,
 	info->sub_ver = GET_FIELD(hdr_val, FWHDR_SUBVERSION);
 	info->sub_idx = GET_FIELD(hdr_val, FWHDR_SUBINDEX);
 
+	hdr_val = le32_to_cpu(hdr->dword2);
+	info->commit_id = GET_FIELD(hdr_val, FWHDR_COMMITID);
+
 	hdr_val = le32_to_cpu(hdr->dword5);
 	info->build_year = GET_FIELD(hdr_val, FWHDR_YEAR);
 
@@ -316,6 +772,7 @@ u32 mac_get_dynamic_hdr_ax(struct mac_ax_adapter *adapter, u8 *fw, u32 fw_len)
 	struct fw_bin_info info;
 	u32 dynamic_hdr_len = 0;
 	u32 dynamic_hdr_count = 0;
+	u32 gitshainfo = 0;
 	u16 dynamic_section_len = 0;
 	u8 dynamic_section_type = 0;
 	u32 val32 = 0;
@@ -337,22 +794,15 @@ u32 mac_get_dynamic_hdr_ax(struct mac_ax_adapter *adapter, u8 *fw, u32 fw_len)
 		PLTFM_MSG_TRACE("[TRACE]%s: WCPU Dynamic Header Disabled\n", __func__);
 		return MACSUCCESS;
 	}
-	PLTFM_MSG_TRACE("[TRACE]%s: WCPU Dynamic Header Enabled\n", __func__);
 	dynamic_hdr_content = fw + (FWHDR_HDR_LEN + info.section_num * FWHDR_SECTION_LEN);
 	dynamic_hdr_len = le32_to_cpu(*(u32 *)dynamic_hdr_content);
 	dynamic_hdr_count = le32_to_cpu(*(u32 *)(dynamic_hdr_content + 4));
 	dynamic_hdr_content += 8;
 	total_len += 8;
-	PLTFM_MSG_TRACE("[TRACE]%s: dynamic_hdr_len:0x%X\n", __func__, dynamic_hdr_len);
-	PLTFM_MSG_TRACE("[TRACE]%s: dynamic_hdr_count:0x%X\n", __func__, dynamic_hdr_count);
 	// Check Dynamic Header length match first, so we won't need to malloc and free if failed.
 	for (val32 = 0; val32 < dynamic_hdr_count; val32++) {
 		dynamic_section_len = le16_to_cpu(*(u16 *)(dynamic_hdr_content));
 		dynamic_section_type = *(u8 *)(dynamic_hdr_content + 2);
-		PLTFM_MSG_TRACE("[TRACE]%s: Dynamic Hdr Section %d Len:0x%X\n", __func__,
-				val32, dynamic_section_len);
-		PLTFM_MSG_TRACE("[TRACE]%s: Dynamic Hdr Section %d Type:0x%X\n", __func__,
-				val32, dynamic_section_type);
 		total_len += dynamic_section_len;
 		dynamic_hdr_content += dynamic_section_len;
 	}
@@ -382,12 +832,23 @@ u32 mac_get_dynamic_hdr_ax(struct mac_ax_adapter *adapter, u8 *fw, u32 fw_len)
 			PLTFM_MEMCPY(adapter->fw_info.cap_buff, content, dynamic_section_len - 4);
 			adapter->fw_info.cap_size = dynamic_section_len - 4;
 			break;
+		case FWDL_DYNAMIC_HDR_OUTSRC_GIT_INFO:
+			gitshainfo = le32_to_cpu(*(u32 *)content);
+			adapter->fw_info.commit_id_outsrc_bb = gitshainfo;
+			PLTFM_MSG_ALWAYS("[FWDL] BB Git SHA = %08X\n", gitshainfo);
+			gitshainfo = le32_to_cpu(*(u32 *)(content + 4));
+			adapter->fw_info.commit_id_outsrc_btc = gitshainfo;
+			PLTFM_MSG_ALWAYS("[FWDL] BTC Git SHA = %08X\n", gitshainfo);
+			gitshainfo = le32_to_cpu(*(u32 *)(content + 8));
+			adapter->fw_info.commit_id_outsrc_rf = gitshainfo;
+			PLTFM_MSG_ALWAYS("[FWDL] RF Git SHA = %08X\n", gitshainfo);
+			break;
 		case FWDL_DYNAMIC_HDR_NOUSE:
 		case FWDL_DYNAMIC_HDR_MAX:
 		default:
 			PLTFM_MSG_ERR("[ERR]%s: Dynamic Hdr Type Unused or Undefind:0x%X\n",
 				      __func__, dynamic_section_type);
-			return MACNOITEM;
+			break;
 		}
 		dynamic_hdr_content += dynamic_section_len;
 	}
@@ -623,8 +1084,8 @@ static u32 __write_memory(struct mac_ax_adapter *adapter,
 	}
 
 	PLTFM_MSG_WARN("%s ind access start\n", __func__);
-	PLTFM_MUTEX_LOCK(&adapter->hw_info->ind_access_lock);
-	adapter->hw_info->ind_aces_cnt++;
+	PLTFM_MUTEX_LOCK(&adapter->lock_info.ind_access_lock);
+	adapter->dbg_info.ind_aces_cnt++;
 
 	MAC_REG_W32(R_AX_FILTER_MODEL_ADDR, addr);
 	MAC_REG_W32(R_AX_INDIR_ACCESS_ENTRY, 0xAAAAAAAA);
@@ -643,8 +1104,8 @@ static u32 __write_memory(struct mac_ax_adapter *adapter,
 	}
 
 ind_aces_end:
-	adapter->hw_info->ind_aces_cnt--;
-	PLTFM_MUTEX_UNLOCK(&adapter->hw_info->ind_access_lock);
+	adapter->dbg_info.ind_aces_cnt--;
+	PLTFM_MUTEX_UNLOCK(&adapter->lock_info.ind_access_lock);
 	PLTFM_MSG_WARN("%s ind access end\n", __func__);
 	if (ret != MACSUCCESS)
 		return ret;
@@ -661,8 +1122,8 @@ ind_aces_end:
 	target_addr = addr;
 
 	PLTFM_MSG_WARN("%s ind access trg 0x%X start\n", __func__, target_addr);
-	PLTFM_MUTEX_LOCK(&adapter->hw_info->ind_access_lock);
-	adapter->hw_info->ind_aces_cnt++;
+	PLTFM_MUTEX_LOCK(&adapter->lock_info.ind_access_lock);
+	adapter->dbg_info.ind_aces_cnt++;
 	while (dl_size != 0) {
 		MAC_REG_W32(R_AX_FILTER_MODEL_ADDR, target_addr);
 		write_addr = R_AX_INDIR_ACCESS_ENTRY;
@@ -687,8 +1148,8 @@ ind_aces_end:
 		target_addr += seg_size;
 		dl_size -= seg_size;
 	}
-	adapter->hw_info->ind_aces_cnt--;
-	PLTFM_MUTEX_UNLOCK(&adapter->hw_info->ind_access_lock);
+	adapter->dbg_info.ind_aces_cnt--;
+	PLTFM_MUTEX_UNLOCK(&adapter->lock_info.ind_access_lock);
 	PLTFM_MSG_WARN("%s ind access trg 0x%X end\n", __func__, target_addr);
 
 	PLTFM_FREE(content, len);
@@ -701,7 +1162,6 @@ static u32 fwdl_phase0(struct mac_ax_adapter *adapter)
 	u32 cnt = FWDL_WAIT_CNT;
 	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
 
-	PLTFM_MSG_TRACE("[TRACE]%s:Start.\n", __func__);
 	if (adapter->sm.fwdl != MAC_AX_FWDL_CPU_ON) {
 		PLTFM_MSG_ERR("[ERR]%s: state != CPU_ON\n", __func__);
 		return MACPROCERR;
@@ -719,7 +1179,10 @@ static u32 fwdl_phase0(struct mac_ax_adapter *adapter)
 	}
 
 	adapter->sm.fwdl = MAC_AX_FWDL_H2C_PATH_RDY;
-	PLTFM_MSG_TRACE("[TRACE]%s:End.\n", __func__);
+#if MAC_FWDL_TIME_PROFILING
+	FWDL_TIMESTAMP_BUFF.ts1 = FWDL_CURRENT_TIME_US();
+#endif
+	PLTFM_MSG_ALWAYS("[FWDL] WCPU PRE BOOT..................................DONE\n");
 
 	return MACSUCCESS;
 }
@@ -731,7 +1194,6 @@ static u32 fwdl_phase1(struct mac_ax_adapter *adapter,
 	u32 cnt = FWDL_WAIT_CNT;
 	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
 
-	PLTFM_MSG_TRACE("[TRACE]%s:Start.\n", __func__);
 	if (adapter->sm.fwdl != MAC_AX_FWDL_H2C_PATH_RDY) {
 		PLTFM_MSG_ERR("[ERR]%s: state != H2C_PATH_RDY\n", __func__);
 		return MACPROCERR;
@@ -758,9 +1220,167 @@ static u32 fwdl_phase1(struct mac_ax_adapter *adapter,
 	MAC_REG_W32(R_AX_HALT_C2H_CTRL, 0);
 
 	adapter->sm.fwdl = MAC_AX_FWDL_PATH_RDY;
-	PLTFM_MSG_TRACE("[TRACE]%s:End.\n", __func__);
+#if MAC_FWDL_TIME_PROFILING
+	FWDL_TIMESTAMP_BUFF.ts2 = FWDL_CURRENT_TIME_US();
+#endif
+	PLTFM_MSG_ALWAYS("[FWDL] WCPU IMAGE HEADER SEND........................DONE\n");
 
 	return MACSUCCESS;
+}
+
+void check_ser_status(struct mac_ax_adapter *adapter, const char *caller)
+{
+	u32 val32;
+	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
+
+	if (is_chip_id(adapter, MAC_AX_CHIP_ID_8852A) ||
+	    is_chip_id(adapter, MAC_AX_CHIP_ID_8852B) ||
+	    is_chip_id(adapter, MAC_AX_CHIP_ID_8851B) ||
+	    is_chip_id(adapter, MAC_AX_CHIP_ID_8851E) ||
+	    is_chip_id(adapter, MAC_AX_CHIP_ID_8852BT)) {
+#if (MAC_AX_8852A_SUPPORT || MAC_AX_8852B_SUPPORT || \
+MAC_AX_8851E_SUPPORT || MAC_AX_8851B_SUPPORT || MAC_AX_8852BT_SUPPORT)
+		val32 = MAC_REG_R32(R_AX_HALT_C2H);
+		if (val32) {
+			PLTFM_MSG_WARN("[FWDL][WARN] L2 Debug not empty after %s\n", caller);
+			PLTFM_MSG_WARN("[FWDL][WARN] (0x%X) = 0x%X\n", R_AX_HALT_C2H, val32);
+		}
+
+		val32 = MAC_REG_R32(R_AX_UDM1);
+		if (val32) {
+			PLTFM_MSG_WARN("[FWDL][WARN] L2 Debug not empty after %s\n", caller);
+			PLTFM_MSG_WARN("[FWDL][WARN] (0x%X) = 0x%X\n", R_AX_UDM1, val32);
+		}
+
+		val32 = MAC_REG_R32(R_AX_UDM2);
+		if (val32) {
+			PLTFM_MSG_WARN("[FWDL][WARN] L2 Debug not empty after %s\n", caller);
+			PLTFM_MSG_WARN("[FWDL][WARN] (0x%X) = 0x%X\n", R_AX_UDM2, val32);
+		}
+
+		val32 = MAC_REG_R32(R_AX_HD0ISR);
+		if (val32) {
+			PLTFM_MSG_WARN("[FWDL][WARN]R_AX_HD0ISR not empty after %s\n", caller);
+			PLTFM_MSG_WARN("[FWDL][WARN] (0x%X) = 0x%X\n", R_AX_HD0ISR, val32);
+			if (val32 & B_AX_WDT_PTFM_INT) {
+				PLTFM_MSG_WARN("[FWDL][WARN] clear WDT\n");
+				MAC_REG_W32(R_AX_HD0ISR, B_AX_WDT_PTFM_INT);
+			}
+		}
+#endif
+	} else if (is_chip_id(adapter, MAC_BE_CHIP_ID_1115E) ||
+		   is_chip_id(adapter, MAC_BE_CHIP_ID_8922A) ||
+		   is_chip_id(adapter, MAC_BE_CHIP_ID_8952A) ||
+		   is_chip_id(adapter, MAC_AX_CHIP_ID_8852C) ||
+		   is_chip_id(adapter, MAC_AX_CHIP_ID_8852D) ||
+		   is_chip_id(adapter, MAC_AX_CHIP_ID_8192XB)) {
+#if MAC_AX_8852C_SUPPORT || MAC_AX_8192XB_SUPPORT || MAC_AX_8852D_SUPPORT
+		val32 = MAC_REG_R32(R_AX_HALT_C2H);
+		if (val32) {
+			PLTFM_MSG_WARN("[FWDL][WARN] L2 Debug not empty after %s\n", caller);
+			PLTFM_MSG_WARN("[FWDL][WARN] (0x%X) = 0x%X\n", R_AX_HALT_C2H, val32);
+		}
+
+		val32 = MAC_REG_R32(R_AX_UDM1);
+		if (val32) {
+			PLTFM_MSG_WARN("[FWDL][WARN] L2 Debug not empty after %s\n", caller);
+			PLTFM_MSG_WARN("[FWDL][WARN] (0x%X) = 0x%X\n", R_AX_UDM1, val32);
+		}
+
+		val32 = MAC_REG_R32(R_AX_UDM2);
+		if (val32) {
+			PLTFM_MSG_WARN("[FWDL][WARN] L2 Debug not empty after %s\n", caller);
+			PLTFM_MSG_WARN("[FWDL][WARN] (0x%X) = 0x%X\n", R_AX_UDM2, val32);
+		}
+
+		val32 = MAC_REG_R32(R_AX_HISR0);
+		if (val32) {
+			PLTFM_MSG_WARN("[FWDL][WARN]R_AX_HISR0 not empty after %s\n", caller);
+			PLTFM_MSG_WARN("[FWDL][WARN] (0x%X) = 0x%X\n", R_AX_HISR0, val32);
+			if (val32 & B_AX_WDT_TIMEOUT_INT) {
+				PLTFM_MSG_WARN("[FWDL][WARN] clear WDT\n");
+				MAC_REG_W32(R_AX_HISR0, B_AX_WDT_TIMEOUT_INT);
+			}
+		}
+#endif
+#if MAC_BE_1115E_SUPPORT || MAC_BE_8922A_SUPPORT || MAC_BE_8952A_SUPPORT
+		val32 = MAC_REG_R32(R_BE_HALT_C2H);
+		if (val32) {
+			PLTFM_MSG_WARN("[FWDL][WARN] L2 Debug not empty after %s\n", caller);
+			PLTFM_MSG_WARN("[FWDL][WARN] (0x%X) = 0x%X\n", R_BE_HALT_C2H, val32);
+		}
+
+		val32 = MAC_REG_R32(R_BE_UDM1);
+		if (val32) {
+			PLTFM_MSG_WARN("[FWDL][WARN] L2 Debug not empty after %s\n", caller);
+			PLTFM_MSG_WARN("[FWDL][WARN] (0x%X) = 0x%X\n", R_BE_UDM1, val32);
+		}
+
+		val32 = MAC_REG_R32(R_BE_UDM2);
+		if (val32) {
+			PLTFM_MSG_WARN("[FWDL][WARN] L2 Debug not empty after %s\n", caller);
+			PLTFM_MSG_WARN("[FWDL][WARN] (0x%X) = 0x%X\n", R_BE_UDM2, val32);
+		}
+
+		val32 = MAC_REG_R32(R_BE_HISR0);
+		if (val32) {
+			PLTFM_MSG_WARN("[FWDL][WARN]R_BE_HISR0 not empty after %s\n", caller);
+			PLTFM_MSG_WARN("[FWDL][WARN](0x%X) = 0x%X\n", R_BE_HISR0, val32);
+			if (val32 & B_BE_WDT_TIMEOUT_INT) {
+				PLTFM_MSG_WARN("[FWDL][WARN]clear WDT\n");
+				MAC_REG_W32(R_BE_HISR0, B_BE_WDT_TIMEOUT_INT);
+			}
+		}
+#endif
+	}
+}
+
+static inline void fwdl_fw_debug_status_log(struct mac_ax_adapter *adapter, u16 debug_step)
+{
+	const char **cur_fwdl_debug_step;
+
+	//For performance reason, do not change to if(IS_XXXX)
+	switch (adapter->hw_info->chip_id) {
+#if FWDL_SUPPORT_8852A
+	case MAC_AX_CHIP_ID_8852A:
+		cur_fwdl_debug_step = fwdl_8852a_debug_step;
+		break;
+#endif
+#if FWDL_SUPPORT_8852B || FWDL_SUPPORT_8851B || FWDL_SUPPORT_8852BT
+	case MAC_AX_CHIP_ID_8852B:
+	case MAC_AX_CHIP_ID_8851B:
+	case MAC_AX_CHIP_ID_8852BT:
+		cur_fwdl_debug_step = fwdl_8852b_debug_step;
+		break;
+#endif
+#if FWDL_SUPPORT_8852C || FWDL_SUPPORT_8852D || FWDL_SUPPORT_8192XB
+	case MAC_AX_CHIP_ID_8852C:
+	case MAC_AX_CHIP_ID_8852D:
+	case MAC_AX_CHIP_ID_8192XB:
+		cur_fwdl_debug_step = fwdl_8852c_debug_step;
+		break;
+#endif
+#if FWDL_SUPPORT_8851E
+	case MAC_AX_CHIP_ID_8851E:
+		PLTFM_MSG_ALWAYS("[FWDL][FW Debug Step] 0x%X\n", debug_step);
+		return;
+#endif
+	default:
+		PLTFM_MSG_ALWAYS("[FWDL][FW Debug Step] 0x%X\n", debug_step);
+		return;
+	}
+
+	PLTFM_MSG_ALWAYS("[FWDL] %s (0x%X)\n", cur_fwdl_debug_step[debug_step],
+			 debug_step);
+}
+
+static void fwdl_show_fwdlpass_text(struct mac_ax_adapter *adapter)
+{
+	PLTFM_MSG_ALWAYS("[FWDL] WCPU RAM PATCH.................................DONE\n");
+	PLTFM_MSG_ALWAYS(" _____      _____  _      ___  _   ___ ___\n");
+	PLTFM_MSG_ALWAYS("| __\\ \\    / /   \\| |    | _ \\/_\\ / __/ __|\n");
+	PLTFM_MSG_ALWAYS("| _| \\ \\/\\/ /| |) | |__  |  _/ _ \\\\__ \\__ \\\n");
+	PLTFM_MSG_ALWAYS("|_|   \\_/\\_/ |___/|____| |_|/_/ \\_\\___/___/\n");
 }
 
 static u32 check_fw_rdy(struct mac_ax_adapter *adapter)
@@ -768,23 +1388,18 @@ static u32 check_fw_rdy(struct mac_ax_adapter *adapter)
 	u32 pre_val8;
 	u32 val8 = FWDL_INITIAL_STATE;
 	u32 cnt = FWDL_WAIT_CNT;
+	u8 fwdl_done = 0;
 	u32 pre_bootstep = 0, cur_bootstep = 0, pre_secure_step = 0, cur_secure_step = 0;
 	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
 
-#if defined(MAC_8852A_SUPPORT) || defined(MAC_8852B_SUPPORT) || defined(MAC_8851B_SUPPORT)
-	if (is_chip_id(adapter, MAC_AX_CHIP_ID_8852A) ||
-	    is_chip_id(adapter, MAC_AX_CHIP_ID_8852B) ||
-	    is_chip_id(adapter, MAC_AX_CHIP_ID_8851B)) {
+#if FWDL_AX_MIPS_SUPPORT
+	if (FWDL_IS_AX_MIPS) {
 		pre_bootstep = GET_FIELD(MAC_REG_R32(R_AX_BOOT_DBG), B_AX_BOOT_STATUS);
 		pre_secure_step = GET_FIELD(MAC_REG_R32(R_AX_BOOT_DBG), B_AX_SECUREBOOT_STATUS);
 	}
 #endif
-#if defined(MAC_8852C_SUPPORT) || defined(MAC_8192XB_SUPPORT) || \
-defined(MAC_8851E_SUPPORT) || defined(MAC_8852D_SUPPORT)
-	if (is_chip_id(adapter, MAC_AX_CHIP_ID_8852C) ||
-	    is_chip_id(adapter, MAC_AX_CHIP_ID_8192XB) ||
-	    is_chip_id(adapter, MAC_AX_CHIP_ID_8851E) ||
-	    is_chip_id(adapter, MAC_AX_CHIP_ID_8852D)) {
+#if FWDL_AX_RISCV_SUPPORT
+	if (FWDL_IS_AX_RISCV) {
 		pre_bootstep = GET_FIELD(MAC_REG_R32(R_AX_BOOT_DBG_V1), B_AX_BOOT_STATUS);
 		pre_secure_step = GET_FIELD(MAC_REG_R32(R_AX_BOOT_DBG_V1), B_AX_SECUREBOOT_STATUS);
 	}
@@ -793,21 +1408,15 @@ defined(MAC_8851E_SUPPORT) || defined(MAC_8852D_SUPPORT)
 			     B_AX_WCPU_FWDL_STS);
 
 	while (--cnt) {
-#if defined(MAC_8852A_SUPPORT) || defined(MAC_8852B_SUPPORT) || defined(MAC_8851B_SUPPORT)
-		if (is_chip_id(adapter, MAC_AX_CHIP_ID_8852A) ||
-		    is_chip_id(adapter, MAC_AX_CHIP_ID_8852B) ||
-		    is_chip_id(adapter, MAC_AX_CHIP_ID_8851B)) {
+#if FWDL_AX_MIPS_SUPPORT
+		if (FWDL_IS_AX_MIPS) {
 			cur_bootstep = GET_FIELD(MAC_REG_R32(R_AX_BOOT_DBG), B_AX_BOOT_STATUS);
 			cur_secure_step = GET_FIELD(MAC_REG_R32(R_AX_BOOT_DBG),
 						    B_AX_SECUREBOOT_STATUS);
 		}
 #endif
-#if defined(MAC_8852C_SUPPORT) || defined(MAC_8192XB_SUPPORT) || \
-defined(MAC_8851E_SUPPORT) || defined(MAC_8852D_SUPPORT)
-		if (is_chip_id(adapter, MAC_AX_CHIP_ID_8852C) ||
-		    is_chip_id(adapter, MAC_AX_CHIP_ID_8192XB) ||
-		    is_chip_id(adapter, MAC_AX_CHIP_ID_8851E) ||
-		    is_chip_id(adapter, MAC_AX_CHIP_ID_8852D)) {
+#if FWDL_AX_RISCV_SUPPORT
+		if (FWDL_IS_AX_RISCV) {
 			cur_bootstep = GET_FIELD(MAC_REG_R32(R_AX_BOOT_DBG_V1), B_AX_BOOT_STATUS);
 			cur_secure_step = GET_FIELD(MAC_REG_R32(R_AX_BOOT_DBG_V1),
 						    B_AX_SECUREBOOT_STATUS);
@@ -816,9 +1425,20 @@ defined(MAC_8851E_SUPPORT) || defined(MAC_8852D_SUPPORT)
 		val8 = GET_FIELD(MAC_REG_R8(R_AX_WCPU_FW_CTRL),
 				 B_AX_WCPU_FWDL_STS);
 		if (cur_bootstep != pre_bootstep) {
-			PLTFM_MSG_TRACE("[TRACE]%s: BOOTSTEP 0x%x -> 0x%x\n",
-					__func__, pre_bootstep, cur_bootstep);
+			fwdl_fw_debug_status_log(adapter, (u16)cur_bootstep);
 			pre_bootstep = cur_bootstep;
+			if (pre_bootstep >= FWDL_DBGSTEP_FW_BOOT_RAM_LOADED && !fwdl_done) {
+				fwdl_done = 1;
+				fwdl_show_fwdlpass_text(adapter);
+			}
+#if MAC_FWDL_TIME_PROFILING
+			if (!FWDL_TIMESTAMP_BUFF.ts3 &&
+			    pre_bootstep >= FWDL_DBGSTEP_FW_BOOT_DLFW_DONE)
+				FWDL_TIMESTAMP_BUFF.ts3 = FWDL_CURRENT_TIME_US();
+			if (!FWDL_TIMESTAMP_BUFF.ts4 &&
+			    pre_bootstep >= FWDL_DBGSTEP_FW_BOOT_RAM_LOADED)
+				FWDL_TIMESTAMP_BUFF.ts4 = FWDL_CURRENT_TIME_US();
+#endif
 		}
 		if (cur_secure_step != pre_secure_step) {
 			PLTFM_MSG_TRACE("[TRACE]%s: SECURE_STEP 0x%x -> 0x%x\n",
@@ -831,6 +1451,9 @@ defined(MAC_8851E_SUPPORT) || defined(MAC_8852D_SUPPORT)
 			pre_val8 = val8;
 		}
 		if (val8 == FWDL_WCPU_FW_INIT_RDY) {
+#if MAC_FWDL_TIME_PROFILING
+			FWDL_TIMESTAMP_BUFF.ts5 = FWDL_CURRENT_TIME_US();
+#endif
 			break;
 		} else if (val8 == FWDL_CHECKSUM_FAIL) {
 			PLTFM_MSG_ERR("[ERR]%s: FWDL_DISPATCHER_CHECKSUM_FAIL\n", __func__);
@@ -854,7 +1477,13 @@ defined(MAC_8851E_SUPPORT) || defined(MAC_8852D_SUPPORT)
 		return MACPOLLTO;
 	}
 
+	check_ser_status(adapter, __func__);
 	adapter->sm.fwdl = MAC_AX_FWDL_INIT_RDY;
+	PLTFM_MSG_ALWAYS("[FWDL] WCPU FREERTOS INIT.............................DONE\n");
+	PLTFM_MSG_ALWAYS("  ___ _____ ___  ___   ___  ___   ___ _____\n");
+	PLTFM_MSG_ALWAYS(" | _ |_   _/ _ \\/ __| | _ )/ _ \\ / _ |_   _|\n");
+	PLTFM_MSG_ALWAYS(" |   / | || (_) \\__ \\ | _ | (_) | (_) || |\n");
+	PLTFM_MSG_ALWAYS(" |_|_\\ |_| \\___/|___/ |___/\\___/ \\___/ |_|\n");
 
 	return MACSUCCESS;
 }
@@ -864,16 +1493,18 @@ static u32 fwdl_phase2(struct mac_ax_adapter *adapter, u8 *fw,
 {
 	u32 ret;
 	u32 section_num = info->section_num;
+	u32 section_idx = 0;
 	struct fwhdr_section_info *section_info = info->section_info;
 
-	PLTFM_MSG_TRACE("[TRACE]%s:Start.\n", __func__);
 	if (adapter->sm.fwdl != MAC_AX_FWDL_PATH_RDY) {
 		PLTFM_MSG_ERR("[ERR]%s: state != FWDL_PATH_RDY\n", __func__);
 		return MACPROCERR;
 	}
-	PLTFM_MSG_TRACE("[TRACE]%s:Section Download Start.\n", __func__);
-	while (section_num > 0) {
-		PLTFM_MSG_TRACE("[TRACE]%s:Remain Section Count:%d\n", __func__, section_num);
+
+	for (section_idx = 0; section_idx < section_num; section_idx++) {
+		PLTFM_MSG_ALWAYS("[FWDL] SEC_%d:Len=0x%X,Addr=0x%X,Type=0x%X\n",
+				 section_idx, section_info->len, section_info->dladdr,
+				 section_info->type);
 		if (!redl) {
 			ret = __sections_download(adapter, section_info);
 			if (ret) {
@@ -894,121 +1525,74 @@ static u32 fwdl_phase2(struct mac_ax_adapter *adapter, u8 *fw,
 			}
 		}
 		section_info++;
-		section_num--;
 	}
-	PLTFM_MSG_TRACE("[TRACE]%s:Section Send End.\n", __func__);
-	PLTFM_DELAY_MS(5);
-	PLTFM_MSG_TRACE("[TRACE]%s:Polling 0x1E0[7:5] = 7 Start\n", __func__);
+
 	ret = check_fw_rdy(adapter);
 	if (ret) {
 		PLTFM_MSG_ERR("%s: check_fw_rdy fail\n", __func__);
 		return ret;
 	}
-	PLTFM_MSG_TRACE("[TRACE]%s:Polling 0x1E0[7:5] = 7 End\n", __func__);
-	PLTFM_MSG_TRACE("[TRACE]%s:End.\n", __func__);
 	return MACSUCCESS;
 }
 
 static void fwdl_fail_dump(struct mac_ax_adapter *adapter,
 			   struct fw_bin_info *info, u32 ret)
 {
-	u32 val32;
-	u16 val16, index;
-	u8 chip_id;
-	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
-#if MAC_AX_FEATURE_DBGPKG
-	struct mac_ax_ops *mac_ops = adapter_to_mac_ops(adapter);
-	struct mac_ax_dbgpkg dbg_val = {0};
-	struct mac_ax_dbgpkg_en dbg_en = {0};
-#endif
-
-	chip_id = adapter->hw_info->chip_id;
 	PLTFM_MSG_ERR("[ERR]fwdl ret = %d\n", ret);
-	val32 = MAC_REG_R32(R_AX_WCPU_FW_CTRL);
-	PLTFM_MSG_ERR("[ERR]fwdl 0x1E0 = 0x%x\n", val32);
+	PLTFM_MSG_ERR("[ERR]fw git idx = 0x%x\n", info->git_idx);
 
-#if defined(MAC_8852A_SUPPORT) || defined(MAC_8852B_SUPPORT) || defined(MAC_8851B_SUPPORT)
-	if (is_chip_id(adapter, MAC_AX_CHIP_ID_8852A) ||
-	    is_chip_id(adapter, MAC_AX_CHIP_ID_8852B) ||
-	    is_chip_id(adapter, MAC_AX_CHIP_ID_8851B)) {
-		val16 = MAC_REG_R16(R_AX_BOOT_DBG + 2);
-		PLTFM_MSG_ERR("[ERR]fwdl 0x83F2 = 0x%x\n", val16);
-	}
-
-#elif defined(MAC_8852C_SUPPORT) || defined(MAC_8192XB_SUPPORT) || \
-defined(MAC_8851E_SUPPORT) || defined(MAC_8852D_SUPPORT)
-	if (is_chip_id(adapter, MAC_AX_CHIP_ID_8852C) ||
-	    is_chip_id(adapter, MAC_AX_CHIP_ID_8192XB) ||
-	    is_chip_id(adapter, MAC_AX_CHIP_ID_8851E) ||
-	    is_chip_id(adapter, MAC_AX_CHIP_ID_8852D)) {
-		val16 = MAC_REG_R16(R_AX_BOOT_DBG_V1 + 2);
-		PLTFM_MSG_ERR("[ERR]fwdl 0x78F2 = 0x%x\n", val16);
-	}
-#else
-#error Chip not define
-#endif
-	val32 = MAC_REG_R32(R_AX_UDM3);
-	PLTFM_MSG_ERR("[ERR]fwdl 0x1FC = 0x%x\n", val32);
-
-	val32 = info->git_idx;
-	PLTFM_MSG_ERR("[ERR]fw git idx = 0x%x\n", val32);
-
-	PLTFM_MUTEX_LOCK(&adapter->hw_info->dbg_port_lock);
-	adapter->hw_info->dbg_port_cnt++;
-	if (adapter->hw_info->dbg_port_cnt != 1) {
-		PLTFM_MSG_ERR("[ERR]fwdl fail dump lock cnt %d\n",
-			      adapter->hw_info->dbg_port_cnt);
-		goto end;
-	}
-
-	MAC_REG_W32(R_AX_DBG_CTRL, 0xf200f2);
-	val32 = MAC_REG_R32(R_AX_SYS_STATUS1);
-	val32 = SET_CLR_WORD(val32, 0x1, B_AX_SEL_0XC0);
-	MAC_REG_W32(R_AX_SYS_STATUS1, val32);
-
-	for (index = 0; index < 15; index++) {
-		switch (chip_id) {
-#if defined(MAC_8852A_SUPPORT) || defined(MAC_8852B_SUPPORT) || defined(MAC_8851B_SUPPORT)
-		case RTL8852A_ID:
-		case RTL8852B_ID:
-		case RTL8851B_ID:
-			val32 = MAC_REG_R32(R_AX_DBG_PORT_SEL);
-			break;
-#endif
-#if defined(MAC_8852C_SUPPORT) || defined(MAC_8192XB_SUPPORT) || \
-defined(MAC_8851E_SUPPORT) || defined(MAC_8852D_SUPPORT)
-		case RTL8852C_ID:
-		case RTL8192XB_ID:
-		case RTL8851E_ID:
-		case RTL8852D_ID:
-			val32 = MAC_REG_R32(R_AX_WLCPU_PORT_PC);
-			break;
-#endif
-		default:
-			val32 = 0xEAEAEAEA;
-			PLTFM_MSG_ERR("Unknown Chip ID.\n");
-			break;
-		}
-		PLTFM_MSG_ERR("[ERR]fw PC = 0x%x\n", val32);
-		PLTFM_DELAY_US(10);
-	}
-
-	//unknown purpose dump, disable
-	//mac_dump_ple_dbg_page(adapter, 0);
+	ret = fw_st_dbg_dump(adapter);
+	if (ret != MACSUCCESS)
+		PLTFM_MSG_ERR("fw st dump fail %d\n", ret);
 
 	pltfm_dbg_dump(adapter);
-end:
-#if MAC_AX_FEATURE_DBGPKG
-	dbg_en.ss_dbg = 0;
-	dbg_en.dle_dbg = 0;
-	dbg_en.dmac_dbg = 0;
-	dbg_en.cmac_dbg = 0;
-	dbg_en.mac_dbg_port = 0;
-	dbg_en.plersvd_dbg = 0;
-	mac_ops->dbg_status_dump(adapter, &dbg_val, &dbg_en);
-#endif
-	adapter->hw_info->dbg_port_cnt--;
-	PLTFM_MUTEX_UNLOCK(&adapter->hw_info->dbg_port_lock);
+}
+
+u8 mac_fwredl_needed(struct mac_ax_adapter *adapter)
+{
+	if (adapter->sm.fwdl != MAC_AX_FWDL_INIT_RDY) {
+		PLTFM_MSG_TRACE("[FWDL][INFO] Not Yet FWDL\n");
+		return false;
+	}
+	//FWREDL function is available only on 8852B
+	if (!FWDL_IS_SUPPORT_REDL) {
+		PLTFM_MSG_TRACE("[FWDL][INFO] FWREDL available only on 8852B or 8851B or 8852BT\n");
+		return false;
+	}
+	if (!adapter->fw_info.last_fw_use_ple) {
+		PLTFM_MSG_TRACE("[FWDL][INFO] Last FW Not Use PLE Section, REDL No Need.\n");
+		return false;
+	}
+	return true;
+}
+
+static u32 send_h2c_reset_idmem_mode(struct mac_ax_adapter *adapter)
+{
+	u32 ret = MACSUCCESS;
+	struct h2c_info h2c_info = { 0 };
+	struct fwcmd_fw_redl_cfg *content;
+
+	h2c_info.agg_en = 0;
+	h2c_info.content_len = sizeof(struct fwcmd_fw_redl_cfg);
+	h2c_info.h2c_cat = FWCMD_H2C_CAT_MAC;
+	h2c_info.h2c_class = FWCMD_H2C_CL_FW_INFO;
+	h2c_info.h2c_func = FWCMD_H2C_FUNC_FW_REDL_CFG;
+	h2c_info.rec_ack = 0;
+	h2c_info.done_ack = 0;
+
+	content = (struct fwcmd_fw_redl_cfg *)PLTFM_MALLOC(h2c_info.content_len);
+
+	if (!content) {
+		PLTFM_MSG_ERR("%s: malloc fail\n", __func__);
+		return MACNPTR;
+	}
+	content->dword0 = cpu_to_le32(FWCMD_H2C_FW_REDL_CFG_STOP_WATCHDOG |
+				      FWCMD_H2C_FW_REDL_CFG_RESET_IDMEM_MODE);
+
+	ret = mac_h2c_common(adapter, &h2c_info, (u32 *)content);
+	PLTFM_FREE(content, h2c_info.content_len);
+
+	return ret;
 }
 
 u32 mac_fwredl(struct mac_ax_adapter *adapter, u8 *fw, u32 len)
@@ -1019,9 +1603,8 @@ u32 mac_fwredl(struct mac_ax_adapter *adapter, u8 *fw, u32 len)
 	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
 
 	//FWREDL funtion is available only on 8852B
-	if (!(is_chip_id(adapter, MAC_AX_CHIP_ID_8852B) ||
-	      is_chip_id(adapter, MAC_AX_CHIP_ID_8851B))) {
-		PLTFM_MSG_ERR("%s: FWREDL is available only on 8852B/8851B\n",
+	if (!FWDL_IS_SUPPORT_REDL) {
+		PLTFM_MSG_ERR("%s: FWREDL is available only on 8852B/8851B/8852BT\n",
 			      __func__);
 		return MACSUCCESS;
 	}
@@ -1095,6 +1678,7 @@ u32 mac_fwdl(struct mac_ax_adapter *adapter, u8 *fw, u32 len)
 		PLTFM_MSG_ERR("[ERR]%s: fwhdr_parser fail\n", __func__);
 		return ret;
 	}
+	PLTFM_MSG_ALWAYS("[FWDL] WCPU FW BIN CHECK.............................DONE\n");
 
 	ret = update_fw_ver(adapter, (struct fwhdr_hdr_t *)fw);
 	if (ret)
@@ -1125,6 +1709,10 @@ u32 mac_fwdl(struct mac_ax_adapter *adapter, u8 *fw, u32 len)
 			PLTFM_MSG_ERR("[ERR]%s: mac_get_dynamic_hdr_ax fail\n", __func__);
 			goto fwdl_err;
 		}
+
+#if MAC_FWDL_TIME_PROFILING
+		fwdl_time_parsing(adapter);
+#endif
 
 		return MACSUCCESS;
 
@@ -1171,27 +1759,6 @@ u32 mac_enable_cpu(struct mac_ax_adapter *adapter, u8 boot_reason, u8 dlfw)
 		return MACPROCERR;
 	}
 
-	// Monitor PLE queue
-	{
-		u32 ple_que_ch0_empty, ple_que_ch1_empty;
-
-		MAC_REG_W32(R_AX_PLE_DBG_FUN_INTF_CTL, 0x80070000);
-		val32 = MAC_REG_R32(R_AX_PLE_DBG_FUN_INTF_DATA);
-		PLTFM_MSG_ALWAYS("[TRACE]Set R_AX_PLE_DBG_FUN_INTF_CTL to  0x80070000");
-		PLTFM_MSG_ALWAYS("[TRACE]R_AX_PLE_DBG_FUN_INTF_DATA = 0x%x\n", val32);
-
-		ple_que_ch0_empty = (val32 & (1 << 8));
-		ple_que_ch1_empty = (val32 & (1 << 9));
-		if (ple_que_ch0_empty == 0) {
-			PLTFM_MSG_ERR("PLE queue for PAXIDMA ch0 is not empty\n");
-			//return MACWQBUSY;
-		}
-		if (ple_que_ch1_empty == 0) {
-			PLTFM_MSG_ERR("PLE queue for PAXIDMA ch1 is not empty\n");
-			//return MACWQBUSY;
-		}
-	}
-
 	//FW cannot support too much log. Reset R_AX_LDM for FW debug config
 	MAC_REG_W32(R_AX_LDM, 0);
 
@@ -1228,15 +1795,15 @@ u32 mac_enable_cpu(struct mac_ax_adapter *adapter, u8 boot_reason, u8 dlfw)
 	val16 = SET_CLR_WORD(val16, boot_reason, B_AX_BOOT_REASON);
 	MAC_REG_W16(R_AX_BOOT_REASON, val16);
 
-	//Set IDMEM share mode to default value because NIC/NICCE use different mode
-	if (is_chip_id(adapter, MAC_AX_CHIP_ID_8852B)) {
-		val32 = MAC_REG_R32(R_AX_SEC_CTRL);
-		val32 = SET_CLR_WORD(val32, 0x2, B_AX_SEC_IDMEM_SIZE_CONFIG);
-		MAC_REG_W32(R_AX_SEC_CTRL, val32);
-	}
+	ret = fwdl_precheck(adapter);
+	if (ret)
+		return ret;
 
 	val32 = MAC_REG_R32(R_AX_PLATFORM_ENABLE);
 	MAC_REG_W32(R_AX_PLATFORM_ENABLE, val32 | B_AX_WCPU_EN);
+#if MAC_FWDL_TIME_PROFILING
+	FWDL_TIMESTAMP_BUFF.ts0 = FWDL_CURRENT_TIME_US();
+#endif
 
 	adapter->sm.fwdl = MAC_AX_FWDL_CPU_ON;
 
@@ -1251,7 +1818,7 @@ u32 mac_enable_cpu(struct mac_ax_adapter *adapter, u8 boot_reason, u8 dlfw)
 		}
 	}
 
-    // Prevent sequence number in HALMAC and FW mismatching
+	// Prevent sequence number in HALMAC and FW mismatching
 	reset_lps_seq_num(adapter);
 
 	return MACSUCCESS;
@@ -1264,6 +1831,9 @@ u32 mac_disable_cpu(struct mac_ax_adapter *adapter)
 	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
 
 	adapter->sm.fwdl = MAC_AX_FWDL_IDLE;
+#if MAC_FWDL_TIME_PROFILING
+	PLTFM_MEMSET(&FWDL_TIMESTAMP_BUFF, 0, sizeof(struct mac_fwdl_timestamp));
+#endif
 	//todo: need to check cpu in safe state before reset CPU
 
 	val32 = MAC_REG_R32(R_AX_PLATFORM_ENABLE);
@@ -1285,14 +1855,15 @@ u32 mac_disable_cpu(struct mac_ax_adapter *adapter)
 	 * After 52C, Disable WCPU Will Also Disable WDT
 	 * So only 52A, 52B and 51B need to reset B_AX_APB_WRAP_EN
 	 */
-	if (is_chip_id(adapter, MAC_AX_CHIP_ID_8852B) ||
-	    is_chip_id(adapter, MAC_AX_CHIP_ID_8851B)) {
+#if FWDL_RESET_APB_WRAP_SUPPORT
+	if (FWDL_IS_RESET_APB_WRAP) {
 		val32 = MAC_REG_R32(R_AX_PLATFORM_ENABLE);
 		MAC_REG_W32(R_AX_PLATFORM_ENABLE, val32 & ~B_AX_APB_WRAP_EN);
 
 		val32 = MAC_REG_R32(R_AX_PLATFORM_ENABLE);
 		MAC_REG_W32(R_AX_PLATFORM_ENABLE, val32 | B_AX_APB_WRAP_EN);
 	}
+#endif
 
 	adapter->sm.plat = MAC_AX_PLAT_OFF;
 
@@ -1306,6 +1877,7 @@ u32 mac_disable_cpu(struct mac_ax_adapter *adapter)
 
 	adapter->sm.plat = MAC_AX_PLAT_ON;
 
+	PLTFM_MSG_ALWAYS("[FWDL] WCPU OFF......................................DONE\n");
 	return MACSUCCESS;
 }
 
@@ -1381,18 +1953,18 @@ u32 mac_ram_boot(struct mac_ax_adapter *adapter, u8 *fw, u32 len)
 
 	addr = (0xb8003000 + R_AX_CPU_BOOT_ADDR) & 0x1FFFFFFF;
 	PLTFM_MSG_WARN("%s ind access 0x%X start\n", __func__, addr);
-	PLTFM_MUTEX_LOCK(&adapter->hw_info->ind_access_lock);
-	adapter->hw_info->ind_aces_cnt++;
-	MAC_REG_W32(R_AX_FILTER_MODEL_ADDR, addr);
-	if (is_chip_id(adapter, MAC_AX_CHIP_ID_8852A) ||
-	    is_chip_id(adapter, MAC_AX_CHIP_ID_8852B) ||
-	    is_chip_id(adapter, MAC_AX_CHIP_ID_8851B)) {
+	PLTFM_MUTEX_LOCK(&adapter->lock_info.ind_access_lock);
+	adapter->dbg_info.ind_aces_cnt++;
+#if FWDL_AX_MIPS_SUPPORT
+	if (FWDL_IS_AX_MIPS)
 		MAC_REG_W32(R_AX_INDIR_ACCESS_ENTRY, 0xB8970000);
-	} else {
+#endif
+#if FWDL_AX_RISCV_SUPPORT
+	if (FWDL_IS_AX_RISCV)
 		MAC_REG_W32(R_AX_INDIR_ACCESS_ENTRY, 0x20100000);
-	}
-	adapter->hw_info->ind_aces_cnt--;
-	PLTFM_MUTEX_UNLOCK(&adapter->hw_info->ind_access_lock);
+#endif
+	adapter->dbg_info.ind_aces_cnt--;
+	PLTFM_MUTEX_UNLOCK(&adapter->lock_info.ind_access_lock);
 	PLTFM_MSG_WARN("%s ind access 0x%X end\n", __func__, addr);
 
 	ret = mac_enable_cpu(adapter, AX_BOOT_REASON_PWR_ON, 0);
@@ -1420,35 +1992,36 @@ u32 mac_enable_fw(struct mac_ax_adapter *adapter, enum rtw_fw_type cat)
 {
 	u32 ret = MACSUCCESS;
 #if defined(PHL_FEATURE_AP) || defined(PHL_FEATURE_NIC)
-	u32 chip_id, cv;
 	u32 fw_len = 0;
 	u8 *fw = NULL;
-	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
 	enum DLE_RSVD_INFO dle_info;
 
-	chip_id = GET_FIELD(MAC_REG_R32(R_AX_SYS_CHIPINFO), B_AX_HW_ID);
-	cv = GET_FIELD(MAC_REG_R32(R_AX_SYS_CFG1), B_AX_CHIP_VER);
+	PLTFM_MSG_ALWAYS("[FWDL] FW INIT......................................START\n");
 
 	ret = get_dle_rsvd_info(adapter, (enum DLE_RSVD_INFO *)&dle_info);
 	if (ret != MACSUCCESS) {
 		PLTFM_MSG_ERR("[ERR]%s: ", __func__);
+		PLTFM_MSG_ALWAYS("[FWDL] FW INIT.......................................FAIL\n");
 		return ret;
 	}
 
-	PLTFM_MSG_ALWAYS("Downloading Chip HW ID: %d\n", chip_id);
+	PLTFM_MSG_ALWAYS("Downloading Chip Halmac ID: 0x%02X\n", adapter->hw_info->chip_id);
 
 	ret = mac_query_fw_buff(adapter, cat, &fw, &fw_len);
-
 	if (ret != MACSUCCESS) {
 		PLTFM_MSG_ERR("[ERR]%s: fw selection fail\n", __func__);
+		PLTFM_MSG_ALWAYS("[FWDL] FW INIT.......................................FAIL\n");
 		return ret;
 	}
 
 	ret = mac_disable_cpu(adapter);
 	if (ret != MACSUCCESS) {
 		PLTFM_MSG_ERR("[ERR]%s: mac_disable_cpu fail\n", __func__);
+		PLTFM_MSG_ALWAYS("[FWDL] FW INIT.......................................FAIL\n");
 		return ret;
 	}
+
+	PLTFM_MSG_ALWAYS("[FWDL] WCPU FWDL Boot.\n");
 
 	/* _patch_otp_power_issue checks whether OTP arbiter switchs to WLAN. */
 	/* If return err, print log but not return ret. */
@@ -1459,602 +2032,319 @@ u32 mac_enable_fw(struct mac_ax_adapter *adapter, enum rtw_fw_type cat)
 			PLTFM_MSG_WARN("[WARN]%s: _patch_otp_power_issue fail\n", __func__);
 	}
 
+	idmem_share_mode_check(adapter, fw);
+
 	ret = mac_enable_cpu(adapter, AX_BOOT_REASON_PWR_ON, 1);
 	if (ret != MACSUCCESS) {
 		PLTFM_MSG_ERR("[ERR]%s: mac_enable_cpu fail\n", __func__);
+		PLTFM_MSG_ALWAYS("[FWDL] FW INIT.......................................FAIL\n");
 		return ret;
 	}
 
 	ret = mac_fwdl(adapter, fw, fw_len);
 	if (ret != MACSUCCESS) {
 		PLTFM_MSG_ERR("[ERR]%s: mac_enable_cpu fail\n", __func__);
+		PLTFM_MSG_ALWAYS("[FWDL] FW INIT.......................................FAIL\n");
 		return ret;
 	}
 	mac_scanofld_reset_state(adapter);
 
 #endif /* #if defined(PHL_FEATURE_AP) || defined(PHL_FEATURE_NIC) */
+	PLTFM_MSG_ALWAYS("[FWDL] FW INIT.......................................DONE\n");
 	return ret;
 }
 
 u32 mac_query_fw_buff(struct mac_ax_adapter *adapter, enum rtw_fw_type cat, u8 **fw, u32 *fw_len)
 {
 	u32 ret = MACSUCCESS;
-#if defined(PHL_FEATURE_AP) || defined(PHL_FEATURE_NIC)
 	u32 chip_id, cv;
-	struct mac_ax_intf_ops *ops = adapter_to_intf_ops(adapter);
 	enum DLE_RSVD_INFO dle_info;
 
-	chip_id = GET_FIELD(MAC_REG_R32(R_AX_SYS_CHIPINFO), B_AX_HW_ID);
-	cv = GET_FIELD(MAC_REG_R32(R_AX_SYS_CFG1), B_AX_CHIP_VER);
+	chip_id = adapter->hw_info->chip_id;
+	cv = adapter->hw_info->cv;
+	PLTFM_MSG_ALWAYS("[FWDL] Query Internal FW Chip_ID = 0x%X\n", chip_id);
+	PLTFM_MSG_ALWAYS("[FWDL] Query Internal FW CV = 0x%X\n", cv);
+	PLTFM_MSG_ALWAYS("[FWDL] Query Internal FW cat = 0x%X\n", cat);
 
 	ret = get_dle_rsvd_info(adapter, (enum DLE_RSVD_INFO *)&dle_info);
-	if (ret != MACSUCCESS)
+	if (ret != MACSUCCESS) {
+		PLTFM_MSG_ERR("[FWDL][ERROR][%s] get_dle_rsvd_info Fail.\n", __func__);
 		return ret;
-
-	PLTFM_MSG_ALWAYS("Query Chip HW ID: %d\n", chip_id);
-	switch (chip_id) {
-#ifdef MAC_8852A_SUPPORT
-	case RTL8852A_ID:
-		switch (cv) {
-#ifdef MAC_FW_8852A_U2
-		case FWDL_CBV:
-			switch (cat) {
-#ifdef PHL_FEATURE_AP
-#ifdef MAC_FW_CATEGORY_AP
-			case RTW_FW_AP:
-				*fw_len = array_length_8852a_u2_ap;
-				*fw = array_8852a_u2_ap;
-				break;
-#endif /*MAC_FW_CATEGORY_AP*/
-#endif /*PHL_FEATURE_AP*/
-#ifdef PHL_FEATURE_NIC
-#ifdef MAC_FW_CATEGORY_NIC
-			case RTW_FW_NIC:
-				*fw_len = array_length_8852a_u2_nic;
-				*fw = array_8852a_u2_nic;
-				break;
-#endif /*MAC_FW_CATEGORY_NIC*/
-#ifdef CONFIG_WOWLAN
-#ifdef MAC_FW_CATEGORY_WOWLAN
-			case RTW_FW_WOWLAN:
-				*fw_len = array_length_8852a_u2_wowlan;
-				*fw = array_8852a_u2_wowlan;
-				break;
-#endif /*MAC_FW_CATEGORY_WOWLAN*/
-#endif /*CONFIG_WOWLAN*/
-#endif /*PHL_FEATURE_NIC*/
-			default:
-				PLTFM_MSG_ERR("[ERR]%s: no cat\n", __func__);
-				*fw_len = 0;
-				fw = 0;
-				ret = MACNOFW;
-				break;
-			}
-			break;
-#endif /*MAC_FW_8852A_U2*/
-#ifdef MAC_FW_8852A_U3
-		case FWDL_CCV:
-			// fall through
-		default:
-			switch (cat) {
-#ifdef PHL_FEATURE_AP
-#ifdef MAC_FW_CATEGORY_AP
-			case RTW_FW_AP:
-				*fw_len = array_length_8852a_u3_ap;
-				*fw = array_8852a_u3_ap;
-				break;
-#endif /*MAC_FW_CATEGORY_AP*/
-#endif /*PHL_FEATURE_AP*/
-#ifdef PHL_FEATURE_NIC
-#ifdef MAC_FW_CATEGORY_NIC
-			case RTW_FW_NIC:
-				*fw_len = array_length_8852a_u3_nic;
-				*fw = array_8852a_u3_nic;
-				break;
-#endif /*MAC_FW_CATEGORY_NIC*/
-#ifdef CONFIG_WOWLAN
-#ifdef MAC_FW_CATEGORY_WOWLAN
-			case RTW_FW_WOWLAN:
-				*fw_len = array_length_8852a_u3_wowlan;
-				*fw = array_8852a_u3_wowlan;
-				break;
-#endif /*MAC_FW_CATEGORY_WOWLAN*/
-#endif /*CONFIG_WOWLAN*/
-#endif /*PHL_FEATURE_NIC*/
-			default:
-				PLTFM_MSG_ERR("[ERR]%s: no cat\n", __func__);
-				*fw_len = 0;
-				fw = 0;
-				ret = MACNOFW;
-				break;
-			}
-			break;
-#endif /*MAC_FW_8852A_U3*/
-		}
-		break;
-#endif /*MAC_8852A_SUPPORT*/
-#ifdef MAC_8852B_SUPPORT
-	case RTL8852B_ID:
-		switch (cv) {
-#ifdef MAC_FW_8852B_U2
-		case FWDL_CBV:
-			switch (cat) {
-#ifdef PHL_FEATURE_AP
-#ifdef MAC_FW_CATEGORY_AP
-			case RTW_FW_AP:
-				PLTFM_MSG_ERR("[ERR]%s: 8852b does not have ap image\n", __func__);
-				*fw_len = 0;
-				fw = 0;
-				ret = MACNOFW;
-				break;
-#endif /*MAC_FW_CATEGORY_AP*/
-#endif /*PHL_FEATURE_AP*/
-#ifdef PHL_FEATURE_NIC
-#ifdef MAC_FW_CATEGORY_NICCE
-			case RTW_FW_NIC_CE:
-				*fw_len = array_length_8852b_u2_nicce;
-				*fw = array_8852b_u2_nicce;
-				break;
-#endif /*MAC_FW_CATEGORY_NICCE*/
-
-#ifdef MAC_FW_CATEGORY_NIC
-			case RTW_FW_NIC:
-				if (PLTFM_GET_CHIP_ID(void) == CHIP_WIFI6_8852B) {
-					if (dle_info == DLE_RSVD_INFO_FW) {
-						PLTFM_MSG_WARN("PLE FW is not in use\n");
-					    // disable PLE FW temporarily
-					    // *fw_len = array_length_8852b_u2_nic_ple;
-					    // *fw = array_8852b_u2_nic_ple;
-						*fw_len = array_length_8852b_u2_nic;
-						*fw = array_8852b_u2_nic;
-					} else {
-						*fw_len = array_length_8852b_u2_nic;
-						*fw = array_8852b_u2_nic;
-					}
-				} else if (PLTFM_GET_CHIP_ID(void) == CHIP_WIFI6_8852BP) {
-#if (SUPPORT_52BP && defined(MAC_FW_CATEGORY_NIC_BPLUS))
-					*fw_len = array_length_8852b_u2_nic_bplus;
-					*fw = array_8852b_u2_nic_bplus;
-#else
-					PLTFM_MSG_ERR("Not support 52BP\n");
-					*fw_len = 0;
-					*fw = 0;
-					ret = MACNOFW;
-#endif /* (SUPPORT_52BP && defined(MAC_FW_CATEGORY_NIC_BPLUS))*/
-				}
-				break;
-#endif /*MAC_FW_CATEGORY_NIC*/
-
-#ifdef CONFIG_WOWLAN
-#ifdef MAC_FW_CATEGORY_WOWLAN
-			case RTW_FW_WOWLAN:
-				if (PLTFM_GET_CHIP_ID(void) == CHIP_WIFI6_8852B) {
-					*fw_len = array_length_8852b_u2_wowlan;
-					*fw = array_8852b_u2_wowlan;
-				} else if (PLTFM_GET_CHIP_ID(void) == CHIP_WIFI6_8852BP) {
-#if (SUPPORT_52BP && defined(MAC_FW_CATEGORY_WOWLAN_BPLUS))
-					*fw_len = array_length_8852b_u2_wowlan_bplus;
-					*fw = array_8852b_u2_wowlan_bplus;
-#else
-					PLTFM_MSG_ERR("Not support 52BP\n");
-					*fw_len = 0;
-					*fw = 0;
-					ret = MACNOFW;
-#endif /*(SUPPORT_52BP && defined(MAC_FW_CATEGORY_WOWLAN_BPLUS)*/
-				}
-				break;
-#endif /*MAC_FW_CATEGORY_WOWLAN*/
-#endif /*CONFIG_WOWLAN*/
-#endif /*PHL_FEATURE_NIC*/
-			default:
-				PLTFM_MSG_ERR("[ERR]%s: no cat\n", __func__);
-				*fw_len = 0;
-				fw = 0;
-				ret = MACNOFW;
-				break;
-			}
-			break;
-#endif /*MAC_FW_8852B_U2*/
-#ifdef MAC_FW_8852B_U3
-		case FWDL_CCV:
-			// fall through
-		default:
-			PLTFM_MSG_WARN("[WARN]%s: 8852B Fall Back to C Cut FW\n", __func__);
-			switch (cat) {
-#ifdef PHL_FEATURE_AP
-#ifdef MAC_FW_CATEGORY_AP
-			case RTW_FW_AP:
-				PLTFM_MSG_ERR("[ERR]%s: 8852b does not have ap image\n", __func__);
-				*fw_len = 0;
-				fw = 0;
-				ret = MACNOFW;
-				break;
-#endif /*MAC_FW_CATEGORY_AP*/
-#endif /*PHL_FEATURE_AP*/
-#ifdef PHL_FEATURE_NIC
-#ifdef MAC_FW_CATEGORY_NICCE
-			case RTW_FW_NIC_CE:
-				*fw_len = array_length_8852b_u3_nicce;
-				*fw = array_8852b_u3_nicce;
-				break;
-#endif /*MAC_FW_CATEGORY_NICCE*/
-
-#ifdef MAC_FW_CATEGORY_NIC
-			case RTW_FW_NIC:
-				if (PLTFM_GET_CHIP_ID(void) == CHIP_WIFI6_8852B) {
-					*fw_len = array_length_8852b_u3_nic;
-					*fw = array_8852b_u3_nic;
-				} else if (PLTFM_GET_CHIP_ID(void) == CHIP_WIFI6_8852BP) {
-#if (SUPPORT_52BP && defined(MAC_FW_CATEGORY_NIC_BPLUS))
-					*fw_len = array_length_8852b_u3_nic_bplus;
-					*fw = array_8852b_u3_nic_bplus;
-#else
-					PLTFM_MSG_ERR("Not support 52BP\n");
-					*fw_len = 0;
-					*fw = 0;
-					ret = MACNOFW;
-#endif /*(SUPPORT_52BP && defined(MAC_FW_CATEGORY_NIC_BPLUS))*/
-				}
-				break;
-#endif /*MAC_FW_CATEGORY_NIC*/
-
-#ifdef CONFIG_WOWLAN
-#ifdef MAC_FW_CATEGORY_WOWLAN
-			case RTW_FW_WOWLAN:
-				if (PLTFM_GET_CHIP_ID(void) == CHIP_WIFI6_8852B) {
-					*fw_len = array_length_8852b_u3_wowlan;
-					*fw = array_8852b_u3_wowlan;
-				} else if (PLTFM_GET_CHIP_ID(void) == CHIP_WIFI6_8852BP) {
-#if (SUPPORT_52BP && defined(MAC_FW_CATEGORY_WOWLAN_BPLUS))
-					*fw_len = array_length_8852b_u3_wowlan_bplus;
-					*fw = array_8852b_u3_wowlan_bplus;
-#else
-					PLTFM_MSG_ERR("Not support 52BP\n");
-					*fw_len = 0;
-					*fw = 0;
-					ret = MACNOFW;
-#endif
-				}
-				break;
-#endif /*MAC_FW_CATEGORY_WOWLAN*/
-#endif /*CONFIG_WOWLAN*/
-#endif /*PHL_FEATURE_NIC*/
-			default:
-				PLTFM_MSG_ERR("[ERR]%s: no cat\n", __func__);
-				*fw_len = 0;
-				fw = 0;
-				ret = MACNOFW;
-				break;
-			}
-			break;
-#endif /*MAC_FW_8852B_U3*/
-		}
-		break;
-#endif /*MAC_8852B_SUPPORT*/
-#ifdef MAC_8852C_SUPPORT
-	case RTL8852C_ID:
-		switch (cv) {
-#ifdef MAC_FW_8852C_U1
-		case FWDL_CAV:
-			switch (cat) {
-#ifdef PHL_FEATURE_AP
-#ifdef MAC_FW_CATEGORY_AP
-			case RTW_FW_AP:
-				*fw_len = array_length_8852c_u1_ap;
-				*fw = array_8852c_u1_ap;
-				break;
-#endif /*MAC_FW_CATEGORY_AP*/
-#endif /*PHL_FEATURE_AP*/
-#ifdef PHL_FEATURE_NIC
-#ifdef MAC_FW_CATEGORY_NIC
-			case RTW_FW_NIC:
-				*fw_len = array_length_8852c_u1_nic;
-				*fw = array_8852c_u1_nic;
-				break;
-#endif /*MAC_FW_CATEGORY_NIC*/
-#ifdef CONFIG_WOWLAN
-#ifdef MAC_FW_CATEGORY_WOWLAN
-			case RTW_FW_WOWLAN:
-				*fw_len = array_length_8852c_u1_wowlan;
-				*fw = array_8852c_u1_wowlan;
-				break;
-#endif /*MAC_FW_CATEGORY_WOWLAN*/
-#endif /*CONFIG_WOWLAN*/
-#endif /*PHL_FEATURE_NIC*/
-			default:
-				PLTFM_MSG_ERR("[ERR]%s: no cat\n", __func__);
-				*fw_len = 0;
-				fw = 0;
-				ret = MACNOFW;
-				break;
-				}
-				break;
-#endif /*MAC_FW_8852C_U1*/
-#ifdef MAC_FW_8852C_U2
-		case FWDL_CBV:
-			// fall through
-		default:
-			switch (cat) {
-#ifdef PHL_FEATURE_AP
-#ifdef MAC_FW_CATEGORY_AP
-			case RTW_FW_AP:
-				*fw_len = array_length_8852c_u2_ap;
-				*fw = array_8852c_u2_ap;
-				break;
-#endif /*MAC_FW_CATEGORY_AP*/
-#endif /*PHL_FEATURE_AP*/
-#ifdef PHL_FEATURE_NIC
-#ifdef MAC_FW_CATEGORY_NIC
-			case RTW_FW_NIC:
-				*fw_len = array_length_8852c_u2_nic;
-				*fw = array_8852c_u2_nic;
-				break;
-#endif /*MAC_FW_CATEGORY_NIC*/
-#ifdef CONFIG_WOWLAN
-#ifdef MAC_FW_CATEGORY_WOWLAN
-			case RTW_FW_WOWLAN:
-				*fw_len = array_length_8852c_u2_wowlan;
-				*fw = array_8852c_u2_wowlan;
-				break;
-#endif /*#ifdef MAC_FW_CATEGORY_WOWLAN*/
-#endif /*CONFIG_WOWLAN*/
-#endif /*PHL_FEATURE_NIC*/
-			default:
-				PLTFM_MSG_ERR("[ERR]%s: no cat\n", __func__);
-				*fw_len = 0;
-				fw = 0;
-				ret = MACNOFW;
-				break;
-			}
-			break;
-#endif /*MAC_FW_8852C_U2*/
-		}
-		break;
-#endif /*MAC_8852C_SUPPORT*/
-#ifdef MAC_8192XB_SUPPORT
-	case RTL8192XB_ID:
-		switch (cv) {
-#ifdef MAC_FW_8192XB_U1
-		case FWDL_CAV:
-			switch (cat) {
-#ifdef PHL_FEATURE_AP
-#ifdef MAC_FW_CATEGORY_AP
-			case RTW_FW_AP:
-				*fw_len = array_length_8192xb_u1_ap;
-				*fw = array_8192xb_u1_ap;
-				break;
-#endif /*MAC_FW_CATEGORY_AP*/
-#endif /*PHL_FEATURE_AP*/
-#ifdef PHL_FEATURE_NIC
-#ifdef MAC_FW_CATEGORY_NIC
-			case RTW_FW_NIC:
-				*fw_len = array_length_8192xb_u1_nic;
-				*fw = array_8192xb_u1_nic;
-				break;
-#endif /*MAC_FW_CATEGORY_NIC*/
-
-#ifdef CONFIG_WOWLAN
-#ifdef MAC_FW_CATEGORY_WOWLAN
-			case RTW_FW_WOWLAN:
-				*fw_len = array_length_8192xb_u1_wowlan;
-				*fw = array_8192xb_u1_wowlan;
-				break;
-#endif /*MAC_FW_CATEGORY_WOWLAN*/
-#endif /*CONFIG_WOWLAN*/
-#endif /*PHL_FEATURE_NIC*/
-			default:
-				PLTFM_MSG_ERR("[ERR]%s: no cat\n", __func__);
-				*fw_len = 0;
-				fw = 0;
-				ret = MACNOFW;
-				break;
-			}
-			break;
-#endif /*MAC_FW_8192XB_U1*/
-#ifdef MAC_FW_8192XB_U2
-		case FWDL_CBV:
-			// fall through
-		default:
-			switch (cat) {
-#ifdef PHL_FEATURE_AP
-#ifdef MAC_FW_CATEGORY_AP
-			case RTW_FW_AP:
-				*fw_len = array_length_8192xb_u2_ap;
-				*fw = array_8192xb_u2_ap;
-				break;
-#endif /*MAC_FW_CATEGORY_AP*/
-#endif /*PHL_FEATURE_AP*/
-#ifdef PHL_FEATURE_NIC
-#ifdef MAC_FW_CATEGORY_NIC
-			case RTW_FW_NIC:
-				*fw_len = array_length_8192xb_u2_nic;
-				*fw = array_8192xb_u2_nic;
-				break;
-#endif /*MAC_FW_CATEGORY_NIC*/
-
-#ifdef CONFIG_WOWLAN
-#ifdef MAC_FW_CATEGORY_WOWLAN
-			case RTW_FW_WOWLAN:
-				*fw_len = array_length_8192xb_u2_wowlan;
-				*fw = array_8192xb_u2_wowlan;
-				break;
-#endif /*MAC_FW_CATEGORY_WOWLAN*/
-#endif /*CONFIG_WOWLAN*/
-#endif /*PHL_FEATURE_NIC*/
-			default:
-				PLTFM_MSG_ERR("[ERR]%s: no cat\n", __func__);
-				*fw_len = 0;
-				fw = 0;
-				ret = MACNOFW;
-				break;
-			}
-			break;
-#endif /*MAC_FW_8192XB_U2*/
-		}
-		break;
-#endif /*MAC_8192XB_SUPPORT*/
-#ifdef MAC_8851B_SUPPORT
-	case RTL8851B_ID:
-		switch (cv) {
-#ifdef MAC_FW_8851B_U1
-		case FWDL_CAV:
-			// fall through
-		default:
-			switch (cat) {
-#ifdef PHL_FEATURE_AP
-#ifdef MAC_FW_CATEGORY_AP
-			case RTW_FW_AP:
-				PLTFM_MSG_ERR("[ERR]%s: 8851b does not have ap image\n", __func__);
-				*fw_len = 0;
-				fw = 0;
-				ret = MACNOFW;
-				break;
-#endif /*MAC_FW_CATEGORY_AP*/
-#endif /*PHL_FEATURE_AP*/
-#ifdef PHL_FEATURE_NIC
-#ifdef MAC_FW_CATEGORY_NIC
-			case RTW_FW_NIC:
-				if (dle_info == DLE_RSVD_INFO_FW) {
-#ifdef MAC_FW_CATEGORY_NIC_PLE
-					PLTFM_MSG_WARN("PLE FW is not in use\n");
-					// disable PLE FW temporarily
-					//#ifdef MAC_FW_CATEGORY_NIC_PLE
-					// *fw_len = array_length_8851b_u1_nic_ple;
-					// *fw = array_8851b_u1_nic_ple;
-					//#endif //MAC_FW_CATEGORY_NIC_PLE
-					*fw_len = array_length_8851b_u1_nic;
-					*fw = array_8851b_u1_nic;
-#else
-					*fw_len = array_length_8851b_u1_nic;
-					*fw = array_8851b_u1_nic;
-#endif
-				} else {
-					*fw_len = array_length_8851b_u1_nic;
-					*fw = array_8851b_u1_nic;
-				}
-				break;
-#endif /*MAC_FW_CATEGORY_NIC*/
-#ifdef CONFIG_WOWLAN
-#ifdef MAC_FW_CATEGORY_WOWLAN
-			case RTW_FW_WOWLAN:
-				*fw_len = array_length_8851b_u1_wowlan;
-				*fw = array_8851b_u1_wowlan;
-				break;
-#endif /*#ifdef MAC_FW_CATEGORY_WOWLAN*/
-#endif /*CONFIG_WOWLAN*/
-#endif /*PHL_FEATURE_NIC*/
-			default:
-				PLTFM_MSG_ERR("[ERR]%s: no cat\n", __func__);
-				*fw_len = 0;
-				fw = 0;
-				ret = MACNOFW;
-				break;
-			}
-			break;
-#endif /*MAC_FW_8851B_U1*/
-		}
-		break;
-#endif /*MAC_8851B_SUPPORT*/
-
-#ifdef MAC_8851E_SUPPORT
-	case RTL8851E_ID:
-		switch (cv) {
-#ifdef MAC_FW_8851E_U1
-		case FWDL_CAV:
-			// fall through
-		default:
-			switch (cat) {
-#ifdef PHL_FEATURE_AP
-#ifdef MAC_FW_CATEGORY_AP
-			case RTW_FW_AP:
-				*fw_len = array_length_8851e_u1_ap;
-				*fw = array_8851e_u1_ap;
-				break;
-#endif /*MAC_FW_CATEGORY_AP*/
-#endif /*PHL_FEATURE_AP*/
-#ifdef PHL_FEATURE_NIC
-#ifdef MAC_FW_CATEGORY_NIC
-			case RTW_FW_NIC:
-				*fw_len = array_length_8851e_u1_nic;
-				*fw = array_8851e_u1_nic;
-				break;
-#endif /*MAC_FW_CATEGORY_NIC*/
-#ifdef CONFIG_WOWLAN
-#ifdef MAC_FW_CATEGORY_WOWLAN
-			case RTW_FW_WOWLAN:
-				*fw_len = array_length_8851e_u1_wowlan;
-				*fw = array_8851e_u1_wowlan;
-				break;
-#endif /*MAC_FW_CATEGORY_WOWLAN*/
-#endif /*CONFIG_WOWLAN*/
-#endif /*PHL_FEATURE_NIC*/
-			default:
-				PLTFM_MSG_ERR("[ERR]%s: no cat:%d\n", __func__, cat);
-				*fw_len = 0;
-				fw = 0;
-				ret = MACNOFW;
-				break;
-			}
-			break;
-#endif /*MAC_FW_8851E_U1*/
-		}
-		break;
-#endif /*MAC_8851E_SUPPORT*/
-
-#ifdef MAC_8852D_SUPPORT
-	case RTL8852D_ID:
-		switch (cv) {
-#ifdef MAC_FW_8852D_U1
-		case FWDL_CAV:
-			// fall through
-		default:
-			switch (cat) {
-#ifdef PHL_FEATURE_AP
-#ifdef MAC_FW_CATEGORY_AP
-			case RTW_FW_AP:
-				*fw_len = array_length_8852d_u1_ap;
-				*fw = array_8852d_u1_ap;
-				break;
-#endif /*MAC_FW_CATEGORY_AP*/
-#endif /*PHL_FEATURE_AP*/
-#ifdef PHL_FEATURE_NIC
-#ifdef MAC_FW_CATEGORY_NIC
-			case RTW_FW_NIC:
-				*fw_len = array_length_8852d_u1_nic;
-				*fw = array_8852d_u1_nic;
-				break;
-#endif /*MAC_FW_CATEGORY_NIC*/
-#ifdef CONFIG_WOWLAN
-#ifdef MAC_FW_CATEGORY_WOWLAN
-			case RTW_FW_WOWLAN:
-				*fw_len = array_length_8852d_u1_wowlan;
-				*fw = array_8852d_u1_wowlan;
-				break;
-#endif /*MAC_FW_CATEGORY_WOWLAN*/
-#endif /*CONFIG_WOWLAN*/
-#endif /*PHL_FEATURE_NIC*/
-			default:
-				PLTFM_MSG_ERR("[ERR]%s: no cat:%d\n", __func__, cat);
-				*fw_len = 0;
-				fw = 0;
-				ret = MACNOFW;
-				break;
-			}
-			break;
-#endif /*MAC_FW_8852D_U1*/
-		}
-		break;
-#endif /*MAC_8852D_SUPPORT*/
-
-	default:
-		PLTFM_MSG_ERR("[ERR]%s: invalid chip\n", __func__);
-		*fw_len = 0;
-		fw = 0;
-		ret = MACNOFW;
-		break;
 	}
 
-#endif /* #if defined(PHL_FEATURE_AP) || defined(PHL_FEATURE_NIC) */
+	*fw = FWDL_NO_INTERNAL_FW;
+	*fw_len = FWDL_NO_INTERNAL_FW;
+
+	// Due To Halmac Code Rule Checker, Do Not change siwtch (cv) to if,else case
+	if (FWDL_IS_8852A) { /**************** 8852A Internal FW Block ****************/
+		switch (cv) {
+		case FWDL_CBV:
+			if (cat == RTW_FW_AP) {
+				*fw = INTERNAL_FW_CONTENT_8852A_CBV_AP;
+				*fw_len = INTERNAL_FW_LEN_8852A_CBV_AP;
+			} else if (cat == RTW_FW_NIC) {
+				*fw = INTERNAL_FW_CONTENT_8852A_CBV_NIC;
+				*fw_len = INTERNAL_FW_LEN_8852A_CBV_NIC;
+			} else if (cat == RTW_FW_WOWLAN) {
+				*fw = INTERNAL_FW_CONTENT_8852A_CBV_WOWLAN;
+				*fw_len = INTERNAL_FW_LEN_8852A_CBV_WOWLAN;
+			}
+			break;
+		case FWDL_CCV:
+			// fall through
+		default:
+			if (cat == RTW_FW_AP) {
+				*fw = INTERNAL_FW_CONTENT_8852A_CCV_AP;
+				*fw_len = INTERNAL_FW_LEN_8852A_CCV_AP;
+			} else if (cat == RTW_FW_NIC) {
+				*fw = INTERNAL_FW_CONTENT_8852A_CCV_NIC;
+				*fw_len = INTERNAL_FW_LEN_8852A_CCV_NIC;
+			} else if (cat == RTW_FW_WOWLAN) {
+				*fw = INTERNAL_FW_CONTENT_8852A_CCV_WOWLAN;
+				*fw_len = INTERNAL_FW_LEN_8852A_CCV_WOWLAN;
+			}
+			break;
+		}
+	} else if (FWDL_IS_8852B) { /**************** 8852B Internal FW Block ****************/
+		switch (cv) {
+		case FWDL_CBV:
+			if (cat == RTW_FW_NIC) {
+				if (dle_info == DLE_RSVD_INFO_FW) {
+					PLTFM_MSG_WARN("[FWDL][WARN] PLE FW is not in use\n");
+					PLTFM_MSG_WARN("[FWDL][WARN] Fallback to NIC FW\n");
+				}
+				*fw = INTERNAL_FW_CONTENT_8852B_CBV_NIC;
+				*fw_len = INTERNAL_FW_LEN_8852B_CBV_NIC;
+				// RTL8852BP Special Case
+				if (PLTFM_GET_CHIP_ID(void) == CHIP_WIFI6_8852BP) {
+					PLTFM_MSG_ALWAYS("[FWDL] 8852B Use NIC BPLUS FW\n");
+					*fw = INTERNAL_FW_CONTENT_8852B_CBV_NIC_BPLUS;
+					*fw_len = INTERNAL_FW_LEN_8852B_CBV_NIC_BPLUS;
+				}
+			} else if (cat == RTW_FW_NIC_CE) {
+				*fw = INTERNAL_FW_CONTENT_8852B_CBV_NICCE;
+				*fw_len = INTERNAL_FW_LEN_8852B_CBV_NICCE;
+				// RTL8852BP Special Case
+				if (PLTFM_GET_CHIP_ID(void) == CHIP_WIFI6_8852BP) {
+					PLTFM_MSG_ALWAYS("[FWDL] 8852B Use NICCE BPLUS FW\n");
+					*fw = INTERNAL_FW_CONTENT_8852B_CBV_NICCE_BPLUS;
+					*fw_len = INTERNAL_FW_LEN_8852B_CBV_NICCE_BPLUS;
+				}
+			} else if (cat == RTW_FW_WOWLAN) {
+				*fw = INTERNAL_FW_CONTENT_8852B_CBV_WOWLAN;
+				*fw_len = INTERNAL_FW_LEN_8852B_CBV_WOWLAN;
+				// RTL8852BP Special Case
+				if (PLTFM_GET_CHIP_ID(void) == CHIP_WIFI6_8852BP) {
+					PLTFM_MSG_ALWAYS("[FWDL] 8852B Use WOWLAN BPLUS FW\n");
+					*fw = INTERNAL_FW_CONTENT_8852B_CBV_WOWLAN_BPLUS;
+					*fw_len = INTERNAL_FW_LEN_8852B_CBV_WOWLAN_BPLUS;
+				}
+			}
+			break;
+		case FWDL_CCV:
+			// fall through
+		default:
+			if (cat == RTW_FW_NIC) {
+				if (dle_info == DLE_RSVD_INFO_FW) {
+					PLTFM_MSG_WARN("[FWDL][WARN] PLE FW is not in use\n");
+					PLTFM_MSG_WARN("[FWDL][WARN] Fallback to NIC FW\n");
+				}
+				*fw = INTERNAL_FW_CONTENT_8852B_CCV_NIC;
+				*fw_len = INTERNAL_FW_LEN_8852B_CCV_NIC;
+				// RTL8852BP Special Case
+				if (PLTFM_GET_CHIP_ID(void) == CHIP_WIFI6_8852BP) {
+					PLTFM_MSG_ALWAYS("[FWDL] 8852B Use NIC BPLUS FW\n");
+					*fw = INTERNAL_FW_CONTENT_8852B_CCV_NIC_BPLUS;
+					*fw_len = INTERNAL_FW_LEN_8852B_CCV_NIC_BPLUS;
+				}
+			} else if (cat == RTW_FW_NIC_CE) {
+				*fw = INTERNAL_FW_CONTENT_8852B_CCV_NICCE;
+				*fw_len = INTERNAL_FW_LEN_8852B_CCV_NICCE;
+				// RTL8852BP Special Case
+				if (PLTFM_GET_CHIP_ID(void) == CHIP_WIFI6_8852BP) {
+					PLTFM_MSG_ALWAYS("[FWDL] 8852B Use NICCE BPLUS FW\n");
+					*fw = INTERNAL_FW_CONTENT_8852B_CCV_NICCE_BPLUS;
+					*fw_len = INTERNAL_FW_LEN_8852B_CCV_NICCE_BPLUS;
+				}
+			} else if (cat == RTW_FW_WOWLAN) {
+				*fw = INTERNAL_FW_CONTENT_8852B_CCV_WOWLAN;
+				*fw_len = INTERNAL_FW_LEN_8852B_CCV_WOWLAN;
+				// RTL8852BP Special Case
+				if (PLTFM_GET_CHIP_ID(void) == CHIP_WIFI6_8852BP) {
+					PLTFM_MSG_ALWAYS("[FWDL] 8852B Use WOWLAN BPLUS FW\n");
+					*fw = INTERNAL_FW_CONTENT_8852B_CCV_WOWLAN_BPLUS;
+					*fw_len = INTERNAL_FW_LEN_8852B_CCV_WOWLAN_BPLUS;
+				}
+			}
+			break;
+		}
+	} else if (FWDL_IS_8852C) {
+		switch (cv) {
+		case FWDL_CAV:
+			if (cat == RTW_FW_AP) {
+				*fw = INTERNAL_FW_CONTENT_8852C_CAV_AP;
+				*fw_len = INTERNAL_FW_LEN_8852C_CAV_AP;
+			} else if (cat == RTW_FW_NIC) {
+				*fw = INTERNAL_FW_CONTENT_8852C_CAV_NIC;
+				*fw_len = INTERNAL_FW_LEN_8852C_CAV_NIC;
+			} else if (cat == RTW_FW_WOWLAN) {
+				*fw = INTERNAL_FW_CONTENT_8852C_CAV_WOWLAN;
+				*fw_len = INTERNAL_FW_LEN_8852C_CAV_WOWLAN;
+			}
+			break;
+		case FWDL_CBV:
+			// fall through
+		default:
+			if (cat == RTW_FW_AP) {
+				*fw = INTERNAL_FW_CONTENT_8852C_CBV_AP;
+				*fw_len = INTERNAL_FW_LEN_8852C_CBV_AP;
+			} else if (cat == RTW_FW_NIC) {
+				*fw = INTERNAL_FW_CONTENT_8852C_CBV_NIC;
+				*fw_len = INTERNAL_FW_LEN_8852C_CBV_NIC;
+			} else if (cat == RTW_FW_WOWLAN) {
+				*fw = INTERNAL_FW_CONTENT_8852C_CBV_WOWLAN;
+				*fw_len = INTERNAL_FW_LEN_8852C_CBV_WOWLAN;
+			}
+			break;
+		}
+	} else if (FWDL_IS_8192XB) {
+		switch (cv) {
+		case FWDL_CAV:
+			if (cat == RTW_FW_AP) {
+				*fw = INTERNAL_FW_CONTENT_8192XB_CAV_AP;
+				*fw_len = INTERNAL_FW_LEN_8192XB_CAV_AP;
+			} else if (cat == RTW_FW_NIC) {
+				*fw = INTERNAL_FW_CONTENT_8192XB_CAV_NIC;
+				*fw_len = INTERNAL_FW_LEN_8192XB_CAV_NIC;
+			} else if (cat == RTW_FW_WOWLAN) {
+				*fw = INTERNAL_FW_CONTENT_8192XB_CAV_WOWLAN;
+				*fw_len = INTERNAL_FW_LEN_8192XB_CAV_WOWLAN;
+			}
+			break;
+		case FWDL_CBV:
+			// fall through
+		default:
+			if (cat == RTW_FW_AP) {
+				*fw = INTERNAL_FW_CONTENT_8192XB_CBV_AP;
+				*fw_len = INTERNAL_FW_LEN_8192XB_CBV_AP;
+			} else if (cat == RTW_FW_NIC) {
+				*fw = INTERNAL_FW_CONTENT_8192XB_CBV_NIC;
+				*fw_len = INTERNAL_FW_LEN_8192XB_CBV_NIC;
+			} else if (cat == RTW_FW_WOWLAN) {
+				*fw = INTERNAL_FW_CONTENT_8192XB_CBV_WOWLAN;
+				*fw_len = INTERNAL_FW_LEN_8192XB_CBV_WOWLAN;
+			}
+			break;
+		}
+	} else if (FWDL_IS_8851B) {
+		switch (cv) {
+		case FWDL_CAV:
+			if (cat == RTW_FW_NIC) {
+				if (dle_info == DLE_RSVD_INFO_FW) {
+					PLTFM_MSG_WARN("[FWDL][WARN] PLE FW is not in use\n");
+					PLTFM_MSG_WARN("[FWDL][WARN] Fallback to NIC FW\n");
+				}
+				*fw = INTERNAL_FW_CONTENT_8851B_CAV_NIC;
+				*fw_len = INTERNAL_FW_LEN_8851B_CAV_NIC;
+			} else if (cat == RTW_FW_NIC_CE) {
+				*fw = INTERNAL_FW_CONTENT_8851B_CAV_NICCE;
+				*fw_len = INTERNAL_FW_LEN_8851B_CAV_NICCE;
+			} else if (cat == RTW_FW_WOWLAN) {
+				*fw = INTERNAL_FW_CONTENT_8851B_CAV_WOWLAN;
+				*fw_len = INTERNAL_FW_LEN_8851B_CAV_WOWLAN;
+			}
+			break;
+		case FWDL_CBV:
+			// fall through
+		default:
+			if (cat == RTW_FW_NIC) {
+				if (dle_info == DLE_RSVD_INFO_FW) {
+					PLTFM_MSG_WARN("[FWDL][WARN] PLE FW is not in use\n");
+					PLTFM_MSG_WARN("[FWDL][WARN] Fallback to NIC FW\n");
+				}
+				*fw = INTERNAL_FW_CONTENT_8851B_CBV_NIC;
+				*fw_len = INTERNAL_FW_LEN_8851B_CBV_NIC;
+			} else if (cat == RTW_FW_NIC_CE) {
+				*fw = INTERNAL_FW_CONTENT_8851B_CBV_NICCE;
+				*fw_len = INTERNAL_FW_LEN_8851B_CBV_NICCE;
+			} else if (cat == RTW_FW_WOWLAN) {
+				*fw = INTERNAL_FW_CONTENT_8851B_CBV_WOWLAN;
+				*fw_len = INTERNAL_FW_LEN_8851B_CBV_WOWLAN;
+			}
+			break;
+		}
+	} else if (FWDL_IS_8851E) {
+		switch (cv) {
+		case FWDL_CAV:
+			// fall through
+		default:
+			if (cat == RTW_FW_AP) {
+				*fw = INTERNAL_FW_CONTENT_8851E_CAV_AP;
+				*fw_len = INTERNAL_FW_LEN_8851E_CAV_AP;
+			} else if (cat == RTW_FW_NIC) {
+				*fw = INTERNAL_FW_CONTENT_8851E_CAV_NIC;
+				*fw_len = INTERNAL_FW_LEN_8851E_CAV_NIC;
+			} else if (cat == RTW_FW_WOWLAN) {
+				*fw = INTERNAL_FW_CONTENT_8851E_CAV_WOWLAN;
+				*fw_len = INTERNAL_FW_LEN_8851E_CAV_WOWLAN;
+			}
+			break;
+		}
+	} else if (FWDL_IS_8852D) {
+		switch (cv) {
+		case FWDL_CAV:
+			if (cat == RTW_FW_AP) {
+				*fw = INTERNAL_FW_CONTENT_8852D_CAV_AP;
+				*fw_len = INTERNAL_FW_LEN_8852D_CAV_AP;
+			} else if (cat == RTW_FW_NIC) {
+				*fw = INTERNAL_FW_CONTENT_8852D_CAV_NIC;
+				*fw_len = INTERNAL_FW_LEN_8852D_CAV_NIC;
+			} else if (cat == RTW_FW_WOWLAN) {
+				*fw = INTERNAL_FW_CONTENT_8852D_CAV_WOWLAN;
+				*fw_len = INTERNAL_FW_LEN_8852D_CAV_WOWLAN;
+			}
+			break;
+		case FWDL_CBV:
+			// fall through
+		default:
+			if (cat == RTW_FW_AP) {
+				*fw = INTERNAL_FW_CONTENT_8852D_CBV_AP;
+				*fw_len = INTERNAL_FW_LEN_8852D_CBV_AP;
+			} else if (cat == RTW_FW_NIC) {
+				*fw = INTERNAL_FW_CONTENT_8852D_CBV_NIC;
+				*fw_len = INTERNAL_FW_LEN_8852D_CBV_NIC;
+			} else if (cat == RTW_FW_WOWLAN) {
+				*fw = INTERNAL_FW_CONTENT_8852D_CBV_WOWLAN;
+				*fw_len = INTERNAL_FW_LEN_8852D_CBV_WOWLAN;
+			}
+			break;
+		}
+	} else if (FWDL_IS_8852BT) {
+		switch (cv) {
+		case FWDL_CAV:
+			// fall through
+		default:
+			if (cat == RTW_FW_NIC) {
+				if (dle_info == DLE_RSVD_INFO_FW) {
+					PLTFM_MSG_WARN("[FWDL][WARN] PLE FW is not in use\n");
+					PLTFM_MSG_WARN("[FWDL][WARN] Fallback to NIC FW\n");
+				}
+				*fw = INTERNAL_FW_CONTENT_8852BT_CAV_NIC;
+				*fw_len = INTERNAL_FW_LEN_8852BT_CAV_NIC;
+			} else if (cat == RTW_FW_NIC_CE) {
+				*fw = INTERNAL_FW_CONTENT_8852BT_CAV_NICCE;
+				*fw_len = INTERNAL_FW_LEN_8852BT_CAV_NICCE;
+			} else if (cat == RTW_FW_WOWLAN) {
+				*fw = INTERNAL_FW_CONTENT_8852BT_CAV_WOWLAN;
+				*fw_len = INTERNAL_FW_LEN_8852BT_CAV_WOWLAN;
+			}
+			break;
+		}
+	}
+
+	if (*fw == FWDL_NO_INTERNAL_FW || *fw_len == FWDL_NO_INTERNAL_FW) {
+		PLTFM_MSG_ERR("[FWDL][ERROR][%s] Query Internal FW Fail.\n", __func__);
+		ret = MACNOFW;
+	}
 	return ret;
 }
-

@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2019 Realtek Corporation.
+ * Copyright(c) 2019 - 2023 Realtek Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -57,10 +57,14 @@ enum rtl_ic_id {
 	RTL8834A,
 	RTL8852B,
 	RTL8852C,
+	RTL8842A,
+	RTL8852D,
 	RTL8192XB,
 	RTL8832BR,
 	RTL8852BP,
 	RTL8851B,
+	RTL8852BT,
+	RTL8852BPT,
 	MAX_IC_ID
 };
 
@@ -71,6 +75,13 @@ enum rtw_hci_type {
 	RTW_HCI_SDIO = BIT2,
 	RTW_HCI_GSPI = BIT3,
 	RTW_HCI_MAX,
+};
+
+enum rtw_pcie_gen {
+	RTW_PCIE_GEN_UNKNOWN,
+	RTW_PCIE_GEN_1 = 1,
+	RTW_PCIE_GEN_2 = 2,
+	RTW_PCIE_GEN_MAX
 };
 
 #define	SM_PS_STATIC	0
@@ -90,6 +101,7 @@ enum rtw_dev_state {
 	RTW_DEV_SURPRISE_REMOVAL = BIT3,
 	RTW_DEV_IN_DFS_CAC_PERIOD = BIT4,
 	RTW_DEV_SHUTTING_DOWN = BIT5, /* set by core */
+	RTW_DEV_SUSPENDED = BIT6,
 	RTW_DEV_MAX
 };
 
@@ -552,7 +564,8 @@ enum rtw_ac {
 	RTW_AC_BE = 0,
 	RTW_AC_BK = 1,
 	RTW_AC_VI = 2,
-	RTW_AC_VO = 3
+	RTW_AC_VO = 3,
+	RTW_AC_MAX
 };
 
 enum rtw_edcca_mode {
@@ -584,6 +597,17 @@ enum rtw_gpio_mode {
 	RTW_AX_SW_IO_MODE_OUTPUT_OD,
 	RTW_AX_SW_IO_MODE_OUTPUT_PP,
 	RTW_AX_SW_IO_MODE_MAX
+};
+
+enum rtw_p2p_app_type {
+	RTW_P2P_APP_NONE = 0,
+	RTW_P2P_APP_UNKNOWN = 1,
+	RTW_P2P_APP_GC = 2,
+	RTW_P2P_APP_GO_HOTSPOT =3,
+	RTW_P2P_APP_GO_SRC = 4,
+	RTW_P2P_APP_GO_SINK = 5,
+	RTW_P2P_APP_GO_SRC_SINK = 6,
+	RTW_P2P_SESSION_MAX
 };
 
 /*MAC_AX_PCIE_L0SDLY_IGNORE = 0xFF, MAC_AX_PCIE_L1DLY_IGNORE = 0xFF, MAC_AX_PCIE_CLKDLY_IGNORE = 0xFF */
@@ -638,5 +662,18 @@ enum rtw_gpio_mode {
 #define RTW_MAX_ETH_PKT_LEN 1536
 
 #define WL_SEQ_MASK 0xfff /* PHL_RXSC_AMPDU */
+
+#define RX_DESC_PPDU_T_LCCK 0
+#define RX_DESC_PPDU_T_SCCK 1
+#define RX_DESC_PPDU_T_OFDM 2
+#define RX_DESC_PPDU_T_HT 3
+#define RX_DESC_PPDU_T_HTGF 4
+#define RX_DESC_PPDU_T_VHT_SU 5
+#define RX_DESC_PPDU_T_VHT_MU 6
+#define RX_DESC_PPDU_T_HE_SU 7
+#define RX_DESC_PPDU_T_HE_ERSU 8
+#define RX_DESC_PPDU_T_HE_MU 9
+#define RX_DESC_PPDU_T_HE_TB 10
+#define RX_DESC_PPDU_T_UNKNOWN 15
 
 #endif /*_RTW_GENERAL_DEF_H_*/

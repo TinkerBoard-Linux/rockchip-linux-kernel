@@ -702,12 +702,7 @@ void _hal_fill_wp_addr_info_8852ce(struct rtw_hal_com_t *hal_com,
 	SET_ADDR_INFO_LEN(addr_info, pkt->length);
 	SET_ADDR_INFO_ADDR_LOW_LSB(addr_info, pkt->phy_addr_l & 0xFFFF);
 	SET_ADDR_INFO_ADDR_LOW_MSB(addr_info, (pkt->phy_addr_l & 0xFFFF0000)>>16);
-#ifdef PHL_DMA_ADDR_64
-	SET_ADDR_INFO_ADDR_HIGH_SEL(addr_info, pkt->phy_addr_h & 0xf);
-	_os_warn_on(pkt->phy_addr_h > 0xf);
-#else
-	SET_ADDR_INFO_ADDR_HIGH_SEL(addr_info, 0);
-#endif
+	SET_ADDR_INFO_ADDR_HIGH_SEL(addr_info, pkt->phy_addr_h);
 
 	/* because there isn't MSDU_LS for 8852C, driver should fill LS, provide by WD1 daniel */
 	if(lastwp) {
@@ -755,6 +750,38 @@ static u8 tid_ind[] = {
 	TID_4_IND, TID_5_IND, TID_6_IND, TID_7_IND
 };
 
+static inline u8
+_get_hdr_with_llc(struct hal_info_t *hal,struct rtw_t_meta_data *mdata)
+{
+	u8 hdr_len = 0;
+	bool dmac_wllc = false;
+
+#if defined(CONFIG_PHL_CSUM_OFFLOAD_RX) || defined(CONFIG_PHL_CSUM_OFFLOAD_TX)
+	if (hal->phl_com->dev_cap.chksum_ofld_rx ||
+	    hal->phl_com->dev_cap.chksum_ofld_tx)
+		dmac_wllc = true;
+#endif
+
+	if (mdata->msdu_type == RTW_PHL_MSDU_TYPE_80211) {
+		hdr_len = mdata->mac_hdr_len;
+		if (mdata->with_llc || dmac_wllc)
+			hdr_len += 8;
+		if (mdata->with_vlantag)
+			hdr_len += 4;
+		hdr_len += mdata->sec_hdr_len;
+	} else if (mdata->msdu_type == RTW_PHL_MSDU_TYPE_ETHII) {
+		hdr_len = 14;
+		if (mdata->with_vlantag)
+			hdr_len += 4;
+	} else if (mdata->msdu_type == RTW_PHL_MSDU_TYPE_8023SNAP) {
+		hdr_len = 22;
+		if (mdata->with_vlantag)
+			hdr_len += 4;
+	}
+	hdr_len /= 2;
+	return hdr_len;
+}
+
 static enum rtw_hal_status
 _hal_txsc_update_wd_8852ce(struct hal_info_t *hal,
 						struct rtw_phl_pkt_req *req, u32 *wd_len)
@@ -765,6 +792,7 @@ _hal_txsc_update_wd_8852ce(struct hal_info_t *hal,
 	u8 dma_ch;
 	u32 *wd_words;
 	u32 w0, w1, w2, w3, w9, w12;
+	u8 hdr_with_llc;
 
 #ifdef CONFIG_RTW_TXSC_USE_HW_SEQ
 	/* HW SEQ EN policy. Temporarily map TID to 4 Q and use QSEL as HWSEQ index. */
@@ -810,11 +838,12 @@ _hal_txsc_update_wd_8852ce(struct hal_info_t *hal,
 					& ~(AX_TXD_RTS_EN | AX_TXD_HW_RTS_EN | AX_TXD_CTS2SELF | (AX_TXD_CCA_RTS_MSK << AX_TXD_CCA_RTS_SH));
 
 		/* Update SSN SEL, DMA CH, QSEL, and TID indicator in WD cache */
+		hdr_with_llc = _get_hdr_with_llc(hal, mdata);
 		w0 |= (((mdata->hw_ssn_sel & AX_TXD_HW_SSN_SEL_MSK) << AX_TXD_HW_SSN_SEL_SH)
 				| ((mdata->dma_ch & AX_TXD_CH_DMA_MSK) << AX_TXD_CH_DMA_SH)
 #if defined(CONFIG_RTW_TX_HW_AMSDU_SW_MERGE_MODE) || defined(CONFIG_RTW_TX_HW_AMSDU_HW_MERGE_MODE)
 			   | (mdata->hw_amsdu ? AX_TXD_HWAMSDU : 0)
-			   | ((mdata->hdr_len & AX_TXD_HDR_LLC_LEN_MSK) << AX_TXD_HDR_LLC_LEN_SH)
+			   | ((hdr_with_llc & AX_TXD_HDR_LLC_LEN_MSK) << AX_TXD_HDR_LLC_LEN_SH)
 #endif
 			   );
 		wd_words[0] = cpu_to_le32(w0);
@@ -984,10 +1013,11 @@ hal_update_txbd_8852ce(struct hal_info_t *hal,
 	enum rtw_hal_status hstatus = RTW_HAL_STATUS_SUCCESS;
 	struct rtw_hal_com_t *hal_com = hal->hal_com;
 	struct bus_hw_cap_t *bus_hw_cap = &hal_com->bus_hw_cap;
+	struct dvobj_priv *pobj = (struct dvobj_priv *)hal_com->drv_priv;
+	struct pci_dev *pdev = dvobj_to_pci(pobj)->ppcidev;
 	u8 *ring_head = 0;
 	u8 *target_txbd = 0;
-	u16 host_idx = 0, txbd_host_idx = 0, hw_idx = 0;
-	u16 avail_txbd = 0, wcnt = 0;
+	u16 host_idx = 0;
 	u16 txbd_num = hal_com->bus_cap.txbd_num;
 
 	do {
@@ -998,16 +1028,12 @@ hal_update_txbd_8852ce(struct hal_info_t *hal,
 
 		/* connect with halmac */
 		host_idx = txbd_ring[ch_idx].host_idx;
-		rtw_hal_mac_tx_res_query(hal, ch_idx, &txbd_host_idx, &hw_idx, &avail_txbd);
-
-		wcnt = (wd_num > avail_txbd) ? avail_txbd : wd_num;
 
 		PHL_TRACE(COMP_PHL_XMIT, _PHL_DEBUG_,
-			  "hal_update_txbd_8852ce => ch_idx %d, host_idx %d, "
-			  "hw_idx %d, avail_txbd %d, wcnt %d\n",
-			  ch_idx, txbd_host_idx, hw_idx, avail_txbd, wcnt);
+		          "hal_update_txbd_8852ce => ch_idx %d, wd_num %d\n",
+			  ch_idx, wd_num);
 
-		while (wcnt > 0) {
+		while (wd_num > 0) {
 
 			ring_head = txbd_ring[ch_idx].vir_addr;
 			target_txbd = ring_head + (host_idx *
@@ -1027,11 +1053,11 @@ hal_update_txbd_8852ce(struct hal_info_t *hal,
 
 			host_idx = (host_idx + 1) % txbd_num;
 			wd_page->host_idx = host_idx;
-			wcnt--;
+			wd_num--;
 
 			//multi wd page in one update txbd
 			#if 0//S_TODO
-			if(wcnt > 0){
+			if(wd_num > 0){
 				wd_page = list_first_entry(wd_page->list,
 								struct rtw_wd_page,
 								wd_page->list);
@@ -1042,6 +1068,10 @@ hal_update_txbd_8852ce(struct hal_info_t *hal,
 		}
 
 		txbd_ring[ch_idx].host_idx = host_idx;
+
+		if (txbd_ring[ch_idx].cache == CACHE_ADDR)
+			pci_cache_wback(pdev, (dma_addr_t *)&txbd_ring[ch_idx].phy_addr_l, txbd_ring[ch_idx].buf_len, DMA_TO_DEVICE);
+
 	} while (false);
 
 	return hstatus;
@@ -1141,7 +1171,7 @@ static u8 hal_check_rxrdy_8852ce(struct rtw_phl_com_t *phl_com,
 	#if defined(PHL_DMA_NONCOHERENT) \
 	    && defined(HAL_TO_NONCACHE_ADDR)
 	/* Use non-cache address to polling RXBD info if available */
-	if (cache)
+	if (cache == CACHE_ADDR)
 		rxbd_info = (u8 *)HAL_TO_NONCACHE_ADDR(rxbd_info);
 	#endif /* HAL_TO_NONCACHE_ADDR */
 
@@ -1152,7 +1182,7 @@ static u8 hal_check_rxrdy_8852ce(struct rtw_phl_com_t *phl_com,
 		 * RX tag from it if required */
 		#if defined(PHL_DMA_NONCOHERENT) \
 		    && !defined(HAL_TO_NONCACHE_ADDR)
-		if (cache == true) {
+		if (cache == CACHE_ADDR) {
 			_os_cache_inv(drv_priv,
 			              &rx_buf->phy_addr_l,
 			              &rx_buf->phy_addr_h,
@@ -1186,7 +1216,7 @@ static u8 hal_check_rxrdy_8852ce(struct rtw_phl_com_t *phl_com,
 	   fresh mapped RX buffer should be $ chean. For now, considering
 	   RX buffer recycle, $ is always cleared for RX DMA length
 	    right after RX ready to  minimize $ clear cost. */
-	if ((res == true) && cache) {
+	if ((res == true) && cache == CACHE_ADDR) {
 		u16 pld_size = (u16)GET_RX_BD_INFO_HW_W_SIZE(rxbd_info);
 
 		if (pld_size != 0)
@@ -1625,55 +1655,6 @@ static void _hal_select_rxbd_mode(struct hal_info_t *hal,
 	}
 }
 
-static void hal_cfg_wow_txdma_8852ce(struct hal_info_t *hal, u8 en)
-{
-	struct mac_ax_txdma_ch_map ch_map;
-
-	ch_map.ch0 = en ? MAC_AX_PCIE_ENABLE : MAC_AX_PCIE_DISABLE;
-	ch_map.ch1 = en ? MAC_AX_PCIE_ENABLE : MAC_AX_PCIE_DISABLE;
-	ch_map.ch2 = en ? MAC_AX_PCIE_ENABLE : MAC_AX_PCIE_DISABLE;
-	ch_map.ch3 = en ? MAC_AX_PCIE_ENABLE : MAC_AX_PCIE_DISABLE;
-	ch_map.ch4 = en ? MAC_AX_PCIE_ENABLE : MAC_AX_PCIE_DISABLE;
-	ch_map.ch5 = en ? MAC_AX_PCIE_ENABLE : MAC_AX_PCIE_DISABLE;
-	ch_map.ch6 = en ? MAC_AX_PCIE_ENABLE : MAC_AX_PCIE_DISABLE;
-	ch_map.ch7 = en ? MAC_AX_PCIE_ENABLE : MAC_AX_PCIE_DISABLE;
-	ch_map.ch8 = en ? MAC_AX_PCIE_ENABLE : MAC_AX_PCIE_DISABLE;
-	ch_map.ch9 = en ? MAC_AX_PCIE_ENABLE : MAC_AX_PCIE_DISABLE;
-	ch_map.ch10 = en ? MAC_AX_PCIE_ENABLE : MAC_AX_PCIE_DISABLE;
-	ch_map.ch11 = en ? MAC_AX_PCIE_ENABLE : MAC_AX_PCIE_DISABLE;
-	ch_map.ch12 = MAC_AX_PCIE_IGNORE;
-
-	if (RTW_HAL_STATUS_SUCCESS != rtw_hal_mac_cfg_txdma(hal, &ch_map))
-		PHL_ERR("%s failure \n", __func__);
-
-}
-static u8 hal_poll_txdma_idle_8852ce(struct hal_info_t *hal)
-{
-	struct mac_ax_txdma_ch_map ch_map;
-
-	ch_map.ch0 = MAC_AX_PCIE_ENABLE;
-	ch_map.ch1 = MAC_AX_PCIE_ENABLE;
-	ch_map.ch2 = MAC_AX_PCIE_ENABLE;
-	ch_map.ch3 = MAC_AX_PCIE_ENABLE;
-	ch_map.ch4 = MAC_AX_PCIE_ENABLE;
-	ch_map.ch5 = MAC_AX_PCIE_ENABLE;
-	ch_map.ch6 = MAC_AX_PCIE_ENABLE;
-	ch_map.ch7 = MAC_AX_PCIE_ENABLE;
-	ch_map.ch8 = MAC_AX_PCIE_ENABLE;
-	ch_map.ch9 = MAC_AX_PCIE_ENABLE;
-	ch_map.ch10 = MAC_AX_PCIE_ENABLE;
-	ch_map.ch11 = MAC_AX_PCIE_ENABLE;
-	ch_map.ch12 = MAC_AX_PCIE_ENABLE;
-
-
-	if (RTW_HAL_STATUS_SUCCESS != rtw_hal_mac_poll_txdma_idle(hal, &ch_map)) {
-
-		PHL_ERR("%s failure \n", __func__);
-
-		return false;
-	}
-	return true;
-}
 static void _hal_clear_trx_state(struct hal_info_t *hal)
 {
 	u32 value = 0;
@@ -1732,8 +1713,6 @@ void hal_trx_ops_init_8852ce(void)
 	ops.get_rxbd_num = hal_get_rxbd_num_8852ce;
 	ops.get_rxbuf_num = hal_get_rxbuf_num_8852ce;
 	ops.get_rxbuf_size = hal_get_rxbuf_size_8852ce;
-	ops.cfg_wow_txdma = hal_cfg_wow_txdma_8852ce;
-	ops.poll_txdma_idle = hal_poll_txdma_idle_8852ce;
 	ops.map_hw_tx_chnl = hal_mapping_hw_tx_chnl_8852ce;
 	ops.qsel_to_tid = hal_qsel_to_tid_8852ce;
 	ops.query_txch_hwband = hal_query_txch_hwband_8852ce;

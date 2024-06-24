@@ -74,12 +74,6 @@ u32 mac_txdesc_len_8852c(struct mac_ax_adapter *adapter,
 	case RTW_PHL_PKT_TYPE_H2C:
 	case RTW_PHL_PKT_TYPE_FWDL:
 		len = RXD_SHORT_LEN;
-		/* to prevent from USB 512-bytes alignment */
-		if (adapter->hw_info->intf == MAC_AX_INTF_USB) {
-			if (((info->pktlen + len) &
-			     (0x200 - 1)) == 0)
-				len = RXD_LONG_LEN;
-		}
 		break;
 	default:
 		len = WD_BODY_LEN_V1;
@@ -96,7 +90,6 @@ static u32 txdes_proc_h2c_fwdl_8852c(struct mac_ax_adapter *adapter,
 				     u8 *buf, u32 len)
 {
 	struct rxd_short_t *s_rxd;
-	struct rxd_long_t *l_rxd;
 	struct mac_ax_ops *ops = adapter_to_mac_ops(adapter);
 
 	if (len != ops->txdesc_len(adapter, info))
@@ -111,15 +104,6 @@ static u32 txdes_proc_h2c_fwdl_8852c(struct mac_ax_adapter *adapter,
 	s_rxd->dword1 = 0;
 	s_rxd->dword2 = 0;
 	s_rxd->dword3 = 0;
-
-	if (len == sizeof(struct rxd_long_t)) {
-		l_rxd = (struct rxd_long_t *)buf;
-		l_rxd->dword0 |= AX_RXD_LONG_RXD;
-		l_rxd->dword4 = 0;
-		l_rxd->dword5 = 0;
-		l_rxd->dword6 = 0;
-		l_rxd->dword7 = 0;
-	}
 
 	return MACSUCCESS;
 }
@@ -153,6 +137,8 @@ static u32 txdes_proc_data_8852c(struct mac_ax_adapter *adapter,
 	u32 sec_iv_h;
 	u16 sec_iv_l;
 	u8 qsel, dbcc_wmm;
+	u8 header_with_llc, smh_en, upd_wlan_hdr;
+	u32 ret;
 
 	if (len != mac_txdesc_len_8852c(adapter, info))
 		return MACBUFSZ;
@@ -177,10 +163,10 @@ static u32 txdes_proc_data_8852c(struct mac_ax_adapter *adapter,
 	wdb->dword6 = 0;
 	wdb->dword7 = 0;
 
-	if (adapter->hw_info->intf == MAC_AX_INTF_SDIO)
+	if (adapter->env_info.intf == MAC_AX_INTF_SDIO)
 		wdb->dword0 =
 			cpu_to_le32(AX_TXD_STF_MODE);
-	else if (adapter->hw_info->intf == MAC_AX_INTF_USB)
+	else if (adapter->env_info.intf == MAC_AX_INTF_USB)
 		wdb->dword0 =
 			cpu_to_le32(AX_TXD_STF_MODE |
 				    (info->usb_pkt_ofst ?
@@ -194,20 +180,28 @@ static u32 txdes_proc_data_8852c(struct mac_ax_adapter *adapter,
 				     MAC_AX_QTA_DBCC_STF ?
 				     AX_TXD_STF_MODE : 0));
 
+	ret = get_hdr_with_llc(adapter, info, &header_with_llc);
+	if (ret != MACSUCCESS)
+		return ret;
+	ret = get_hw_hdr_conv(adapter, info, &smh_en, &upd_wlan_hdr);
+	if (ret != MACSUCCESS)
+		return ret;
+
 	wdb->dword0 |=
 		cpu_to_le32(SET_WORD(info->hw_seq_mode,
 				     AX_TXD_EN_HWSEQ_MODE) |
 			    SET_WORD(info->hw_ssn_sel,
 				     AX_TXD_HW_SSN_SEL) |
-			    SET_WORD(info->hdr_len,
+			    SET_WORD(header_with_llc,
 				     AX_TXD_HDR_LLC_LEN) |
 			    SET_WORD(info->dma_ch, AX_TXD_CH_DMA) |
 			    (info->hw_amsdu ? AX_TXD_HWAMSDU : 0) |
-			    (info->smh_en ? AX_TXD_SMH_EN : 0) |
+			    (smh_en ? AX_TXD_SMH_EN : 0) |
 			    (info->wdinfo_en ? AX_TXD_WDINFO_EN : 0) |
 			    (info->no_ack ? AX_TXD_NO_ACK : 0) |
-			    (info->upd_wlan_hdr ? AX_TXD_UPD_WLAN_HDR : 0) |
+			    (upd_wlan_hdr ? AX_TXD_UPD_WLAN_HDR : 0) |
 			    (info->hw_sec_iv ? AX_TXD_HW_SEC_IV : 0) |
+			    (info->chk_en ? AX_TXD_CHK_EN : 0) |
 			    SET_WORD(info->wp_offset,
 				     AX_TXD_WP_OFFSET_V1));
 
@@ -333,6 +327,8 @@ static u32 txdes_proc_mgnt_8852c(struct mac_ax_adapter *adapter,
 	u32 sec_iv_h;
 	u16 sec_iv_l;
 	u8 wd_info_tmpl[WD_INFO_PKT_MAX][24] = {{0}};
+	u8 header_with_llc, smh_en, upd_wlan_hdr;
+	u32 ret;
 
 	if (len != mac_txdesc_len_8852c(adapter, info)) {
 		PLTFM_MSG_ERR("[ERR] illegal len %d\n", len);
@@ -348,10 +344,10 @@ static u32 txdes_proc_mgnt_8852c(struct mac_ax_adapter *adapter,
 	/* and modify it for normal using later.*/
 	/* wd_info is always appended in initial development phase */
 	wdb = (struct wd_body_t_v1 *)buf;
-	if (adapter->hw_info->intf == MAC_AX_INTF_SDIO)
+	if (adapter->env_info.intf == MAC_AX_INTF_SDIO)
 		wdb->dword0 =
 			cpu_to_le32(AX_TXD_STF_MODE);
-	else if (adapter->hw_info->intf == MAC_AX_INTF_USB)
+	else if (adapter->env_info.intf == MAC_AX_INTF_USB)
 		wdb->dword0 =
 			cpu_to_le32(AX_TXD_STF_MODE |
 				    (info->usb_pkt_ofst ?
@@ -365,22 +361,29 @@ static u32 txdes_proc_mgnt_8852c(struct mac_ax_adapter *adapter,
 				     MAC_AX_QTA_DBCC_STF ?
 				     AX_TXD_STF_MODE : 0));
 
+	ret = get_hdr_with_llc(adapter, info, &header_with_llc);
+	if (ret != MACSUCCESS)
+		return ret;
+	ret = get_hw_hdr_conv(adapter, info, &smh_en, &upd_wlan_hdr);
+	if (ret != MACSUCCESS)
+		return ret;
+
 	wdb->dword0 |=
 		cpu_to_le32(SET_WORD(info->hw_seq_mode,
 				     AX_TXD_EN_HWSEQ_MODE) |
 			    SET_WORD(info->hw_ssn_sel,
 				     AX_TXD_HW_SSN_SEL) |
-			    SET_WORD(info->hdr_len,
+			    SET_WORD(header_with_llc,
 				     AX_TXD_HDR_LLC_LEN) |
 			    SET_WORD((info->band ?
 				       MAC_AX_DMA_B1MG :
 				       MAC_AX_DMA_B0MG),
 				       AX_TXD_CH_DMA) |
 			    (info->hw_amsdu ? AX_TXD_HWAMSDU : 0) |
-			    (info->smh_en ? AX_TXD_SMH_EN : 0) |
+			    (smh_en ? AX_TXD_SMH_EN : 0) |
 			    (info->wdinfo_en ? AX_TXD_WDINFO_EN : 0) |
 			    (info->no_ack ? AX_TXD_NO_ACK : 0) |
-			    (info->upd_wlan_hdr ? AX_TXD_UPD_WLAN_HDR : 0) |
+			    (upd_wlan_hdr ? AX_TXD_UPD_WLAN_HDR : 0) |
 			    (info->hw_sec_iv ? AX_TXD_HW_SEC_IV : 0) |
 			    SET_WORD(info->wp_offset, AX_TXD_WP_OFFSET_V1));
 

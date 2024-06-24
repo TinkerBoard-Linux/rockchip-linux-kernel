@@ -404,19 +404,17 @@ void hal_csi_deinit(struct hal_info_t *hal_info)
 	struct rtw_hal_com_t *hal_com = hal_info->hal_com;
 	struct hal_csi_obj *csi_obj = (struct hal_csi_obj *)hal_com->csi_obj;
 	void *drv_priv = hal_to_drvpriv(hal_info);
-	struct hal_csi_buf *csi_buf = csi_obj->csi_buf;
 
 	if (csi_obj != NULL) {
-		if (csi_buf != NULL) {
-			_os_mem_free(hal_to_drvpriv(hal_info), csi_buf,
-			sizeof(struct hal_csi_buf) * csi_obj->max_csi_buf_nr);
+		if (csi_obj->csi_buf != NULL) {
+			_os_mem_free(drv_priv, csi_obj->csi_buf,
+			             sizeof(struct hal_csi_buf) * csi_obj->max_csi_buf_nr);
 			csi_obj->csi_buf = NULL;
 		}
 
 		_os_spinlock_free(drv_priv, &csi_obj->csi_lock);
 		/* bf obj need free as last */
-		_os_mem_free(hal_to_drvpriv(hal_info), csi_obj,
-					sizeof(struct hal_csi_obj));
+		_os_mem_free(drv_priv, csi_obj, sizeof(struct hal_csi_obj));
 		hal_com->csi_obj = NULL;
 	}
 }
@@ -515,10 +513,10 @@ enum rtw_hal_status hal_csi_release_csi_buf(
 		return status;
 	}
 
+	_os_spinlock(drv_priv, &csi_obj->csi_lock, _ps, NULL);
 	if (csi_buf->idx < csi_obj->max_csi_buf_nr) {
 		tmp_csi_buf = &csi_obj->csi_buf[csi_buf->idx];
 
-		_os_spinlock(drv_priv, &csi_obj->csi_lock, _ps, NULL);
 
 		switch (csi_buf->sub_idx) {
 		case CSI_BUF_SUB_IDX_FULL_BW:
@@ -549,9 +547,9 @@ enum rtw_hal_status hal_csi_release_csi_buf(
 		}
 		csi_buf->idx = 0;
 		csi_buf->sub_idx = CSI_BUF_SUB_IDX_NON;
-		_os_spinunlock(drv_priv, &csi_obj->csi_lock, _ps, NULL);
 		status = RTW_HAL_STATUS_SUCCESS;
 	}
+	_os_spinunlock(drv_priv, &csi_obj->csi_lock, _ps, NULL);
 	return status;
 }
 

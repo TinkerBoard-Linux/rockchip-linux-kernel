@@ -101,8 +101,10 @@ static void _btc_cmd_deinit(void *dispr, void *priv)
 static enum phl_mdl_ret_code _btc_cmd_start(void *dispr, void *priv)
 {
 	enum phl_mdl_ret_code ret = MDL_RET_SUCCESS;
+	struct phl_info_t *phl = (struct phl_info_t *)priv;
 
 	PHL_INFO("[BTCCMD], %s(): \n", __func__);
+	rtw_hal_btc_bk_mdl_start_ntfy(phl->hal);
 
 	return ret;
 }
@@ -617,6 +619,38 @@ _exit:
 #endif /* CONFIG_DBCC_SUPPORT */
 
 static enum phl_mdl_ret_code
+_btc_post_handle_client_ps_annc(struct phl_info_t *phl,
+			struct phl_msg *msg)
+{
+	enum phl_mdl_ret_code ret = MDL_RET_FAIL;
+	struct rtw_phl_stainfo_t *sta = NULL;
+	struct link_ntfy *ntfy = NULL;
+	u8 *cmd = NULL;
+	u32 cmd_len;
+
+	if (MSG_MDL_ID_FIELD(msg->msg_id) != PHL_MDL_GENERAL) {
+		ret = MDL_RET_IGNORE;
+		goto _exit;
+	}
+	if (RTW_PHL_STATUS_SUCCESS != phl_cmd_get_cur_cmdinfo(phl,
+				msg->band_idx, msg, &cmd, &cmd_len)) {
+		PHL_TRACE(COMP_PHL_BTC, _PHL_ERR_, "%s: Fail to get cmd info \n",
+			__FUNCTION__);
+		goto _exit;
+	}
+	ntfy = (struct link_ntfy *)cmd;
+	PHL_TRACE(COMP_PHL_BTC, _PHL_INFO_, "%s: Msg_band(%d), lstate(%d)\n",
+		__FUNCTION__, msg->band_idx, ntfy->lstate);
+	sta = (struct rtw_phl_stainfo_t *)ntfy->rsvd[0].ptr;
+	rtw_hal_btc_update_role_info_ntfy(phl->hal, sta->rlink->wrole->id,
+					sta->rlink->wrole, sta->rlink,
+					sta, ntfy->lstate);
+	ret = MDL_RET_SUCCESS;
+_exit:
+	return ret;
+}
+
+static enum phl_mdl_ret_code
 _btc_external_pre_msg_hdlr(struct phl_info_t *phl_info,
                            void *dispr,
                            struct phl_msg *msg)
@@ -739,6 +773,9 @@ _btc_external_post_msg_hdlr(struct phl_info_t *phl_info,
 		PHL_DBG("[BTCCMD], MSG_EVT_BTC_FWEVNT \n");
 		rtw_hal_btc_fwinfo_ntfy(phl_info->hal);
 		ret = MDL_RET_SUCCESS;
+		break;
+	case MSG_EVT_CLIENT_PS_ANNC:
+		ret = _btc_post_handle_client_ps_annc(phl_info, msg);
 		break;
 	default:
 		PHL_TRACE(COMP_PHL_BTC, _PHL_INFO_, "%s: MDL(%d), EVT(%d), Not handle event in post-phase\n",

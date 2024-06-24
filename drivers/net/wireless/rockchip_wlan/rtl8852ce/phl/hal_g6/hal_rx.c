@@ -40,11 +40,11 @@ rtw_hal_set_rxfltr_opt_by_mode(void *hal, u8 band, enum rtw_rx_fltr_opt_mode mod
 	 * sniffer mode, it effectively records the mode before entering monitor
 	 * mode and the subsequent modes set after entering monitor mode.
 	 */
-	if ((mode == RX_FLTR_OPT_MODE_SNIFFER && hal_info->monitor_mode) ||
-	    (mode == RX_FLTR_OPT_MODE_RESTORE && !hal_info->monitor_mode))
+	if ((mode == RX_FLTR_OPT_MODE_SNIFFER && hal_info->monitor_mode[band]) ||
+	    (mode == RX_FLTR_OPT_MODE_RESTORE && !hal_info->monitor_mode[band]))
 		return RTW_HAL_STATUS_FAILURE;
 
-	if (hal_info->monitor_mode && mode != RX_FLTR_OPT_MODE_RESTORE) {
+	if (hal_info->monitor_mode[band] && mode != RX_FLTR_OPT_MODE_RESTORE) {
 		hal_com->band[band].rx_fltr_opt_mode = mode;
 		return RTW_HAL_STATUS_SUCCESS;
 	}
@@ -56,7 +56,7 @@ rtw_hal_set_rxfltr_opt_by_mode(void *hal, u8 band, enum rtw_rx_fltr_opt_mode mod
 	if (hstatus != RTW_HAL_STATUS_SUCCESS)
 		return hstatus;
 
-	hal_info->monitor_mode = (mode == RX_FLTR_OPT_MODE_SNIFFER);
+	hal_info->monitor_mode[band] = (mode == RX_FLTR_OPT_MODE_SNIFFER);
 
 	/* Record @hal_com->band[band].rx_fltr_opt_mode only when the mode is not monitor and
 	 * restore, otherwise, it is kept intact.
@@ -73,7 +73,7 @@ enum rtw_rx_fltr_opt_mode rtw_hal_get_rxfltr_opt_mode(void *hal, u8 band)
 	struct hal_info_t *hal_info = (struct hal_info_t *)hal;
 	struct rtw_hal_com_t *hal_com = hal_info->hal_com;
 
-	return (hal_info->monitor_mode) ? RX_FLTR_OPT_MODE_SNIFFER :
+	return (hal_info->monitor_mode[band]) ? RX_FLTR_OPT_MODE_SNIFFER :
 		hal_com->band[band].rx_fltr_opt_mode;
 }
 
@@ -98,12 +98,16 @@ enum rtw_hal_status rtw_hal_scan_set_rxfltr_by_mode(void *hinfo,
 enum rtw_hal_status
 rtw_hal_enter_mon_mode(void *hinfo, enum phl_phy_idx phy_idx)
 {
+	rtw_hal_bb_snif_mode_ctrl((struct hal_info_t *)hinfo, true);
+
 	return rtw_hal_set_rxfltr_opt_by_mode(hinfo, phy_idx, RX_FLTR_OPT_MODE_SNIFFER);
 }
 
 enum rtw_hal_status
 rtw_hal_leave_mon_mode(void *hinfo, enum phl_phy_idx phy_idx)
 {
+	rtw_hal_bb_snif_mode_ctrl((struct hal_info_t *)hinfo, false);
+
 	return rtw_hal_set_rxfltr_opt_by_mode(hinfo, phy_idx, RX_FLTR_OPT_MODE_RESTORE);
 }
 
@@ -114,6 +118,28 @@ enum rtw_hal_status rtw_hal_acpt_crc_err_pkt(void *hal, u8 band, u8 enable)
 
 
 	return rtw_hal_mac_set_rxfltr_acpt_crc_err(hal_com, band, enable);
+}
+
+enum rtw_hal_status rtw_hal_cfg_ppdu_sts_fltr(void *hal, struct rtw_phl_com_t *phl_com, u8 band, u8 fltr)
+{
+	struct hal_info_t *hal_info = (struct hal_info_t *)hal;
+	struct rtw_hal_com_t *hal_com = hal_info->hal_com;
+	enum rtw_hal_status hal_sts;
+	struct hal_ppdu_sts_cfg cfg;
+
+	hal_com->band[band].ppdu_sts_filter = fltr;
+
+	cfg.appen_info = hal_com->band[band].ppdu_sts_appen_info;
+	cfg.band_idx = band;
+	cfg.filter = hal_com->band[band].ppdu_sts_filter;
+	cfg.ppdu_stat_en = phl_com->ppdu_sts_info.en_ppdu_sts[band];
+	cfg.todcpu = false;
+	cfg.towcpu = false;
+
+
+	hal_sts = rtw_hal_mac_ppdu_stat_cfg(hal_info, &cfg);
+
+	return hal_sts;
 }
 
 enum rtw_hal_status rtw_hal_set_rxfltr_mpdu_size(void *hal, u8 band, u16 size)
@@ -537,6 +563,37 @@ enum rtw_hal_status rtw_hal_set_rxfltr_type_by_mode(void *hal, u8 band, enum rtw
 				break;
 		} while (0);
 		break;
+#ifdef CONFIG_PHL_TEST_MP
+	case RX_FLTR_TYPE_MODE_MP:
+		do {
+			struct rxfltr_cap_to_set_mgnt cap_mgnt = {0};
+
+			type = RTW_PHL_PKT_TYPE_CTRL;
+			target = RXFLTR_TARGET_DROP;
+			hstats = rtw_hal_set_rxfltr_by_type(hal, band, type, target);
+			if (RTW_HAL_STATUS_SUCCESS != hstats)
+				break;
+
+			type = RTW_PHL_PKT_TYPE_MGNT;
+			target = RXFLTR_TARGET_DROP;
+			hstats = rtw_hal_set_rxfltr_by_type(hal, band, type, target);
+			if (RTW_HAL_STATUS_SUCCESS != hstats)
+				break;
+
+			type = RTW_PHL_PKT_TYPE_DATA;
+			target = RXFLTR_TARGET_TO_HOST;
+			hstats = rtw_hal_set_rxfltr_by_type(hal, band, type, target);
+			if (RTW_HAL_STATUS_SUCCESS != hstats)
+				break;
+
+			cap_mgnt.stype[RXFLTR_STYPE_BEACON].set = true;
+			cap_mgnt.stype[RXFLTR_STYPE_BEACON].target = RXFLTR_TARGET_TO_HOST;
+			hstats = rtw_hal_set_rxfltr_by_stype_mgnt(hal, band, &cap_mgnt);
+			if (RTW_HAL_STATUS_SUCCESS != hstats)
+				break;
+		} while (0);
+		break;
+#endif
 	default:
 		PHL_TRACE(COMP_PHL_RECV, _PHL_ERR_, "%s: does not handle rxfltr mode(%u)\n", __func__, mode);
 		break;
@@ -889,7 +946,7 @@ hal_rx_ppdu_sts_normal_data(struct rtw_phl_com_t *phl_com,
 #endif
 
 	do {
-		if ((NULL == phl_com) || (NULL == meta))
+		if (NULL == meta)
 			break;
 		ppdu_info = &phl_com->ppdu_sts_info;
 		band = (meta->bb_sel > 0) ? HW_BAND_1 : HW_BAND_0;
@@ -914,6 +971,7 @@ hal_rx_ppdu_sts_normal_data(struct rtw_phl_com_t *phl_com,
 		ppdu_info->sts_ent[band][meta->ppdu_cnt].crc32 = meta->crc32;
 		ppdu_info->sts_ent[band][meta->ppdu_cnt].rx_rate = meta->rx_rate;
 		ppdu_info->sts_ent[band][meta->ppdu_cnt].ppdu_type = meta->ppdu_type;
+		ppdu_info->sts_ent[band][meta->ppdu_cnt].pkt_freerun_cnt = meta->freerun_cnt;
 
 		if(RTW_IS_BEACON_OR_PROBE_RESP_PKT(ppdu_info->sts_ent[band][meta->ppdu_cnt].frame_type)) {
 			PHL_GET_80211_HDR_ADDRESS3(phl_com->drv_priv, hdr,
@@ -1006,7 +1064,8 @@ hal_rx_ppdu_sts(struct rtw_phl_com_t *phl_com,
 	if (meta->crc32 || sts_ent->crc32) {
 		UPDATE_MA_RSSI(rssi_stat, RTW_RSSI_UNKNOWN,
 			 phy_info->rssi);
-		return;
+		if (phl_com->drv_mode != RTW_DRV_MODE_SNIFFER)
+			return;
 	}
 	if (sts_ent->rx_rate != meta->rx_rate) {
 		PHL_TRACE(COMP_PHL_PSTS, _PHL_INFO_,
@@ -1049,6 +1108,7 @@ hal_rx_ppdu_sts(struct rtw_phl_com_t *phl_com,
 
 	/* update rssi stat */
 	_os_spinlock(phl_com->drv_priv, &rssi_stat->lock, _bh, NULL);
+	rssi_stat->last_rx_freerun = sts_ent->pkt_freerun_cnt;
 	switch (sts_ent->frame_type &
 		(BIT(1) | BIT(0))) {
 		case RTW_FRAME_TYPE_MGNT :

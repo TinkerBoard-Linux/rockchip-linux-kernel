@@ -21,6 +21,7 @@
 #include "hw.h"
 #include "init.h"
 #include "role.h"
+#include "security_cam.h"
 #include "cmac_tx.h"
 #include "rx_filter.h"
 #include "dle.h"
@@ -59,6 +60,7 @@
 #define WMAC_SPEC_SIFS_OFDM_52B 0x11
 #define WMAC_SPEC_SIFS_OFDM_52C 0x11
 #define WMAC_SPEC_SIFS_OFDM_51B 0x11
+#define WMAC_SPEC_SIFS_OFDM_52BT 0x11
 #define WMAC_SPEC_SIFS_CCK	 0xA
 
 /* RRSR disable 5.5M CCK*/
@@ -71,10 +73,8 @@
 #define CMAC1_START_ADDR	0xE000
 #define CMAC1_END_ADDR		0xFFFF
 
-#if MAC_AX_ASIC_TEMP
 #define R_AX_LTECOEX_CTRL 0x38
 #define R_AX_LTECOEX_CTRL_2 0x3C
-#endif
 
 #define S_AX_CTS2S_TH_1K 4
 #define S_AX_CTS2S_TH_SEC_256B 1
@@ -94,7 +94,8 @@
 
 #define BCN_IFS_25US 0x19
 #define SIFS_MACTXEN_T1_V0 0x47
-#define SIFS_MACTXEN_T1_V1 0x41
+#define SIFS_MACTXEN_T1_V1 0x40
+#define SIFS_MACTXEN_T1_V2 0x3E
 
 #define SDIO_DRV_INFO_SIZE 2
 

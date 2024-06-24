@@ -47,17 +47,17 @@
 #define ANTDIV_RSSI_TH_HIGH	30
 #define ANTDIV_RSSI_TH_LOW	20
 #define ANTDIV_PERIOD	1
-#define ANTDIV_TRAINING_NUM 6
+#define ANTDIV_TRAINING_NUM 2
 #define ANTDIV_NOTRAINING_NUM 3
 
 #define FORCE_RSSI_DIFF 10
 
-#define ANTDIV_DELAY 1
-#define ANTDIV_INTVL 10
+#define ANTDIV_DELAY 110
+#define ANTDIV_INTVL 30
 
 #define ANTDIV_DEC_TP_HIGH 100
 #define ANTDIV_DEC_TP_LOW 5
-#define ANTDIV_DEC_EVM 4
+#define ANTDIV_DEC_EVM 8
 #define ANTDIV_DEC_EVM_1SS 8
 #define TP_LOWER_BOUND 1
 
@@ -177,7 +177,17 @@ struct bb_antdiv_rate_info {
 	u16		main_pkt_cnt_vht[VHT_RATE_NUM];
 	/*HE*/
 	u16		main_pkt_cnt_he[HE_RATE_NUM];
-	
+	/*Rxsc case*/
+	u16		main_pkt_cnt_ht_sc20[HT_RATE_NUM];
+
+	u16		main_pkt_cnt_vht_sc20[VHT_RATE_NUM];
+	u16		main_pkt_cnt_vht_sc40[VHT_RATE_NUM];
+	u16		main_pkt_cnt_vht_sc80[VHT_RATE_NUM];
+
+	u16		main_pkt_cnt_he_sc20[HE_RATE_NUM];
+	u16		main_pkt_cnt_he_sc40[HE_RATE_NUM];
+	u16		main_pkt_cnt_he_sc80[HE_RATE_NUM];
+
 	u16		main_max_cnt;
 	u16		main_max_idx;
 	/*====[Phy rate counter] aux ant=============================================*/
@@ -194,15 +204,25 @@ struct bb_antdiv_rate_info {
 	u16		aux_pkt_cnt_vht[VHT_RATE_NUM];
 	/*HE*/
 	u16		aux_pkt_cnt_he[HE_RATE_NUM];
+	/*Rxsc case*/
+	u16		aux_pkt_cnt_ht_sc20[HT_RATE_NUM];
+
+	u16		aux_pkt_cnt_vht_sc20[VHT_RATE_NUM];
+	u16		aux_pkt_cnt_vht_sc40[VHT_RATE_NUM];
+	u16		aux_pkt_cnt_vht_sc80[VHT_RATE_NUM];
+
+	u16		aux_pkt_cnt_he_sc20[HE_RATE_NUM];
+	u16		aux_pkt_cnt_he_sc40[HE_RATE_NUM];
+	u16		aux_pkt_cnt_he_sc80[HE_RATE_NUM];
 
 	u16		aux_max_cnt;
 	u16		aux_max_idx;
 	u16		main_cnt_all;
 	u16		aux_cnt_all;
 
-	u64		main_tp;
-	u64		aux_tp;
-	u64		tp_diff;
+	u32		main_tp;
+	u32		aux_tp;
+	u32		tp_diff;
 
 	bool no_change_flag;
 	bool main_ht_pkt_not_zero;
@@ -211,6 +231,13 @@ struct bb_antdiv_rate_info {
 	bool aux_ht_pkt_not_zero;
 	bool aux_vht_pkt_not_zero;
 	bool aux_he_pkt_not_zero;
+
+	bool main_sc20_occur;
+	bool main_sc40_occur;
+	bool main_sc80_occur;
+	bool aux_sc20_occur;
+	bool aux_sc40_occur;
+	bool aux_sc80_occur;
 };
 
 struct bb_antdiv_cr_info {
@@ -250,8 +277,41 @@ struct bb_antdiv_cr_info {
 	u32 path0_r_rfsw_ant_127_96_m;		
 };
 
+struct bb_sub_bw_tp_info {
+	u32 main_max_tp_160;
+	u32 main_max_tp_80;
+	u32 main_max_tp_40;
+	u32 main_max_tp_20;
+	u32 aux_max_tp_160;
+	u32 aux_max_tp_80;
+	u32 aux_max_tp_40;
+	u32 aux_max_tp_20;
+	u16 main_max_cnt_160;
+	u16 main_max_cnt_80;
+	u16 main_max_cnt_40;
+	u16 main_max_cnt_20;
+	u16 aux_max_cnt_160;
+	u16 aux_max_cnt_80;
+	u16 aux_max_cnt_40;
+	u16 aux_max_cnt_20;
+	u16 main_max_idx_160;
+	u16 main_max_idx_80;
+	u16 main_max_idx_40;
+	u16 main_max_idx_20;
+	u16 aux_max_idx_160;
+	u16 aux_max_idx_80;
+	u16 aux_max_idx_40;
+	u16 aux_max_idx_20;
+
+	u16 COUNT_MAIN_HE[4][HE_RATE_NUM];
+	u16 COUNT_AUX_HE[4][HE_RATE_NUM];
+	u16 COUNT_MAIN_VHT[4][VHT_RATE_NUM];
+	u16 COUNT_AUX_VHT[4][VHT_RATE_NUM];
+	u16 COUNT_MAIN_HT[2][HT_RATE_NUM];
+	u16 COUNT_AUX_HT[2][HT_RATE_NUM];
+};
+
 struct bb_antdiv_info {
-	struct bb_antdiv_cr_info bb_antdiv_cr_i;
 	/* For CN cacluation */
 	struct bb_antdiv_cn_info bb_cn_i;
 	/* For EVM cacluation */
@@ -260,12 +320,15 @@ struct bb_antdiv_info {
 	struct bb_antdiv_rate_info bb_rate_i;
 	/* For RSSI */
 	struct bb_antdiv_rssi_info bb_rssi_i;
-	
+	/* For sub BW TP */
+	struct bb_sub_bw_tp_info bb_sub_bw_tp_i;
+
 	enum	bb_antdiv_mode_t antdiv_mode;
 	enum	bb_antdiv_method_t antdiv_method;
 	enum	bb_antdiv_mode_t pre_antdiv_mode;
 	enum	bb_tp_method_t tp_decision_method;
 	enum	bb_evm_method_t evm_decision_method;
+	bool	tx_by_ext_pwr_lmt;
 
 	/* Training state & period related*/
 	u8	antdiv_wd_cnt;
@@ -299,7 +362,19 @@ struct bb_antdiv_info {
 	bool get_stats;
 	bool antdiv_use_ctrl_frame;
 	struct halbb_timer_info antdiv_timer_i;
+	u32 rvrt_val; /*all rvrt_val for pause API must set to u32*/
+	/* ant_div new code : extend to sub BW */
+	bool ant_div_new;
 };
+
+typedef struct {
+	u32* sub_main_max_tp;
+	u32* sub_aux_max_tp;
+	u16* sub_main_max_cnt;
+	u16* sub_aux_max_cnt;
+	u16* sub_main_max_idx;
+	u16* sub_aux_max_idx;
+} Cnt_info;
 
 struct bb_info;
 /*@--------------------------[Prptotype]-------------------------------------*/
@@ -322,5 +397,6 @@ void halbb_antdiv_phy_sts(struct bb_info *bb, u32 physts_bitmap,
 		       struct physts_rxd *desc);
 void halbb_antdiv_dbg(struct bb_info *bb, char input[][16], u32 *_used,
 			      char *output, u32 *_out_len);
+void halbb_set_antdiv_pause_val(struct bb_info *bb, u32 *val_buf, u8 val_len);
 #endif
 

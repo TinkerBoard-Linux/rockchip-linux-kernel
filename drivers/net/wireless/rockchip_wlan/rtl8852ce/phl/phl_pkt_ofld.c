@@ -224,6 +224,52 @@ _phl_pkt_ofld_construct_null_data(struct pkt_ofld_obj *ofld_obj, u8 **pkt_buf,
 }
 
 static enum rtw_phl_status
+_phl_pkt_ofld_construct_qos_null_data(struct pkt_ofld_obj *ofld_obj, u8 **pkt_buf,
+	u16 *len, struct rtw_phl_stainfo_t *phl_sta,
+	struct rtw_pkt_ofld_null_info *null_info)
+{
+	void *d = phl_to_drvpriv(ofld_obj->phl_info);
+	struct rtw_wifi_role_t *wrole = phl_sta->wrole;
+	*len = QOS_NULL_PACKET_LEN;
+
+	*pkt_buf = _os_mem_alloc(d, QOS_NULL_PACKET_LEN);
+	if (*pkt_buf == NULL) {
+		return RTW_PHL_STATUS_RESOURCE;
+	}
+
+	_os_mem_set(d, *pkt_buf, 0, QOS_NULL_PACKET_LEN);
+
+	SET_80211_PKT_HDR_FRAME_CONTROL(*pkt_buf, 0);
+	SET_80211_PKT_HDR_TYPE_AND_SUBTYPE(*pkt_buf, TYPE_QOS_NULL_FRAME);
+
+	switch (wrole->type) {
+	case PHL_RTYPE_STATION:
+	case PHL_RTYPE_P2P_GC:
+		SET_80211_PKT_HDR_TO_DS(*pkt_buf, 1);
+		SET_80211_PKT_HDR_ADDRESS1(d, *pkt_buf, null_info->a1);
+		SET_80211_PKT_HDR_ADDRESS2(d, *pkt_buf, null_info->a2);
+		SET_80211_PKT_HDR_ADDRESS3(d, *pkt_buf, null_info->a3);
+		break;
+	case PHL_RTYPE_P2P_GO:
+	case PHL_RTYPE_AP:
+		SET_80211_PKT_HDR_FROM_DS(*pkt_buf, 1);
+		SET_80211_PKT_HDR_ADDRESS1(d, *pkt_buf, null_info->a1);
+		SET_80211_PKT_HDR_ADDRESS2(d, *pkt_buf, null_info->a2);
+		SET_80211_PKT_HDR_ADDRESS3(d, *pkt_buf, null_info->a3);
+		break;
+	case PHL_RTYPE_ADHOC:
+	default:
+		break;
+	}
+	SET_80211_PKT_HDR_DURATION(*pkt_buf, 0);
+	SET_80211_PKT_HDR_FRAGMENT_SEQUENCE(*pkt_buf, 0);
+
+	SET_80211_PKT_HDR_QOS_CONTROL(*pkt_buf, 0);
+
+	return RTW_PHL_STATUS_SUCCESS;
+}
+
+static enum rtw_phl_status
 _phl_pkt_ofld_construct_na(struct pkt_ofld_obj *pkt, u8 **pkt_buf,
 	u16 *len, struct rtw_phl_stainfo_t *phl_sta,
 	struct rtw_pkt_ofld_na_info *na_info)
@@ -602,6 +648,10 @@ _phl_pkt_ofld_construct_packet(struct pkt_ofld_obj *ofld_obj, u16 macid,
 		status = _phl_pkt_ofld_construct_null_data(ofld_obj, pkt_buf,
 			len, phl_sta, (struct rtw_pkt_ofld_null_info *) buf);
 		break;
+	case PKT_TYPE_QOS_NULL:
+		status = _phl_pkt_ofld_construct_qos_null_data(ofld_obj, pkt_buf,
+			len, phl_sta, (struct rtw_pkt_ofld_null_info *) buf);
+		break;
 	case PKT_TYPE_ARP_RSP:
 		status = _phl_pkt_ofld_construct_arp_rsp(ofld_obj, pkt_buf,
 			len, phl_sta, (struct rtw_pkt_ofld_arp_rsp_info *) buf);
@@ -636,7 +686,6 @@ _phl_pkt_ofld_construct_packet(struct pkt_ofld_obj *ofld_obj, u16 macid,
 		break;
 	case PKT_TYPE_PROBE_RSP:
 	case PKT_TYPE_PS_POLL:
-	case PKT_TYPE_QOS_NULL:
 	case PKT_TYPE_CTS2SELF:
 	default:
 		PHL_ERR("[PKT] packet type %s is not implemented.\n",
@@ -929,7 +978,7 @@ void phl_pkt_ofld_del_all_entry_req(struct phl_info_t *phl_info)
 enum rtw_phl_status phl_pkt_ofld_add_entry(struct phl_info_t *phl_info, u16 macid)
 {
 	struct pkt_ofld_obj *ofld_obj = phl_info->pkt_ofld;
-	void *d = phl_to_drvpriv(ofld_obj->phl_info);
+	void *d = phl_to_drvpriv(phl_info);
 	struct pkt_ofld_entry *entry = NULL;
 
 	if (ofld_obj == NULL) {
@@ -965,7 +1014,7 @@ enum rtw_phl_status phl_pkt_ofld_add_entry(struct phl_info_t *phl_info, u16 maci
 enum rtw_phl_status phl_pkt_ofld_del_entry(struct phl_info_t *phl_info, u16 macid)
 {
 	struct pkt_ofld_obj *ofld_obj = phl_info->pkt_ofld;
-	void *d = phl_to_drvpriv(ofld_obj->phl_info);
+	void *d = phl_to_drvpriv(phl_info);
 	struct pkt_ofld_entry *entry = NULL;
 
 	if (ofld_obj == NULL) {
@@ -1038,7 +1087,7 @@ rtw_phl_pkt_ofld_request(struct phl_info_t *phl_info, u16 macid, u8 type,
 		u32 *token, void *buf, const char *req_name)
 {
 	struct pkt_ofld_obj *ofld_obj = phl_info->pkt_ofld;
-	void *d = phl_to_drvpriv(ofld_obj->phl_info);
+	void *d = phl_to_drvpriv(phl_info);
 	struct pkt_ofld_entry *entry = NULL;
 	struct pkt_ofld_req *req = NULL;
 
@@ -1094,7 +1143,7 @@ enum rtw_phl_status rtw_phl_pkt_ofld_cancel(struct phl_info_t *phl_info,
 					u16 macid, u8 type, u32 *token)
 {
 	struct pkt_ofld_obj *ofld_obj = phl_info->pkt_ofld;
-	void *d = phl_to_drvpriv(ofld_obj->phl_info);
+	void *d = phl_to_drvpriv(phl_info);
 	struct pkt_ofld_entry *entry = NULL;
 	struct pkt_ofld_req *req = NULL;
 	struct pkt_ofld_info *pkt_info = NULL;
@@ -1151,6 +1200,7 @@ rtw_phl_pkt_ofld_null_request(struct rtw_phl_com_t* phl_com,
 	enum rtw_phl_status pstatus = RTW_PHL_STATUS_FAILURE;
 	struct rtw_pkt_ofld_null_info null_info = {0};
 	struct phl_info_t *phl_info = (struct phl_info_t *)phl_com->phl_priv;
+	enum wlan_mode wmode = sta->wmode;
 	void *d = phl_com->drv_priv;
 
 	if (!rtw_phl_role_is_client_category(sta->wrole)) {
@@ -1173,6 +1223,14 @@ rtw_phl_pkt_ofld_null_request(struct rtw_phl_com_t* phl_com,
 	if (pstatus != RTW_PHL_STATUS_SUCCESS)
 		PHL_WARN("%s(): add null pkt ofld fail!\n", __func__);
 
+	if (wmode >= WLAN_MD_11N) {
+		pstatus = rtw_phl_pkt_ofld_request(phl_info, sta->macid,
+					PKT_TYPE_QOS_NULL, token, &null_info, __func__);
+
+		if (pstatus != RTW_PHL_STATUS_SUCCESS)
+			PHL_WARN("%s(): add qos null pkt ofld fail!\n", __func__);
+	}
+
 	return pstatus;
 }
 
@@ -1182,7 +1240,7 @@ rtw_phl_pkt_ofld_null_request(struct rtw_phl_com_t* phl_com,
 void phl_pkt_ofld_show_info(struct phl_info_t *phl_info)
 {
 	struct pkt_ofld_obj *ofld_obj = phl_info->pkt_ofld;
-	void *d = phl_to_drvpriv(ofld_obj->phl_info);
+	void *d = phl_to_drvpriv(phl_info);
 
 	_os_mutex_lock(d, &ofld_obj->mux);
 
@@ -1199,7 +1257,7 @@ void phl_pkt_ofld_show_info(struct phl_info_t *phl_info)
 u8 phl_pkt_ofld_get_id(struct phl_info_t *phl_info, u16 macid, u8 type)
 {
 	struct pkt_ofld_obj *ofld_obj = phl_info->pkt_ofld;
-	void *d = phl_to_drvpriv(ofld_obj->phl_info);
+	void *d = phl_to_drvpriv(phl_info);
 	struct pkt_ofld_entry *entry = NULL;
 	struct pkt_ofld_info *pkt_info = NULL;
 

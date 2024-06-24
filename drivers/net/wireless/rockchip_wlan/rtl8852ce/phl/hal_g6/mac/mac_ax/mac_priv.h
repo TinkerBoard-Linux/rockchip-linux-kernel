@@ -162,6 +162,16 @@ struct mac_ax_priv_ops {
 			   struct mac_ax_dle_dfi_info **info,
 			   u32 *target, u32 sel);
 	u32 (*bacam_init)(struct mac_ax_adapter *adapter);
+	/* ERROR FLAG CHECKER */
+	u32 (*err_flag_cmac) (struct mac_ax_adapter *adapter,
+			      u32 cat, u8 band, struct mac_ax_err_flag_sts *status);
+	u32 (*err_flag_dmac) (struct mac_ax_adapter *adapter, u32 cat,
+			      struct mac_ax_err_flag_sts *status);
+	u32 (*err_flag_rst_cmac) (struct mac_ax_adapter *adapter,
+				  u32 cat, u8 band);
+	u32 (*err_flag_rst_dmac) (struct mac_ax_adapter *adapter, u32 cat);
+	u32 (*err_flag_chk) (struct mac_ax_adapter *adapter,
+			     struct mac_ax_err_flag_sts *status);
 #if MAC_AX_PCIE_SUPPORT
 	struct mac_ax_intf_info *
 	(*get_pcie_info_def)(struct mac_ax_adapter *adapter);
@@ -179,6 +189,8 @@ struct mac_ax_priv_ops {
 				 enum pcie_bd_ctrl_type type, u32 val0, u32 val1, u32 val2);
 	u32 (*ltr_sw_trigger)(struct mac_ax_adapter *adapter,
 			      enum mac_ax_pcie_ltr_sw_ctrl ctrl);
+	u32 (*ltr_dyn_ctrl)(struct mac_ax_adapter *adapter,
+			    enum mac_ax_ltr_dyn_ctrl_tp type, void *param);
 	u32 (*pcie_cfgspc_write)(struct mac_ax_adapter *adapter,
 				 struct mac_ax_pcie_cfgspc_param *param);
 	u32 (*pcie_cfgspc_read)(struct mac_ax_adapter *adapter,
@@ -211,9 +223,16 @@ struct mac_ax_priv_ops {
 	u32 (*mac_auto_refclk_cal_pcie)(struct mac_ax_adapter *adapter,
 					enum mac_ax_pcie_func_ctrl en);
 	u32 (*sync_trx_bd_idx)(struct mac_ax_adapter *adapter);
+	u32 (*read_pcie_cfg_spc)(struct mac_ax_adapter *adapter, u16 addr, u32 *val);
+	u32 (*pcie_aspm_frontdoor_set)(struct mac_ax_adapter *adapter);
 #ifdef RTW_WKARD_GET_PROCESSOR_ID
 	u32 (*chk_proc_long_ldy_pcie)(struct mac_ax_adapter *adapter, u8 *val);
 #endif
+	u32(*get_pcie_support_width)(struct mac_ax_adapter *adapter, u16 *width);
+	u32(*get_pcie_link_width)(struct mac_ax_adapter *adapter, u16 *width);
+	u32(*set_pcie_link_width)(struct mac_ax_adapter *adapter,
+				  enum mac_ax_pcie_link_width set_width);
+
 #endif
 #if MAC_AX_SDIO_SUPPORT
 	u8 (*r_indir_cmd52_sdio)(struct mac_ax_adapter *adapter, u32 adr);
@@ -241,11 +260,21 @@ struct mac_ax_priv_ops {
 	void (*aval_page_cfg_sdio)(struct mac_ax_adapter *adapter,
 				   struct mac_ax_aval_page_cfg *cfg);
 	u32 (*get_sdio_rx_req_len)(struct mac_ax_adapter *adapter, u32 *rx_req_len);
+	u32 (*read_sdio_cccr)(struct mac_ax_adapter *adapter, u16 addr, u8 *val);
 #endif
 #if MAC_AX_USB_SUPPORT
 	u32 (*usb_ep_cfg)(struct mac_ax_adapter *adapter,
 			  struct mac_ax_usb_ep *cfg);
+	u32 (*read_usb2phy_para)(struct mac_ax_adapter *adapter, u16 offset);
+	u32 (*write_usb2phy_para)(struct mac_ax_adapter *adapter, u16 offset, u8 val);
+	u32 (*read_usb3phy_para)(struct mac_ax_adapter *adapter, u16 offset, u8 b_sel);
+	u32 (*write_usb3phy_para)(struct mac_ax_adapter *adapter,
+				  u16 offset, u8 b_sel, u8 val);
 #endif
+	/* QC */
+	u32 (*get_check_reg)(u32 *reg_num, struct check_reg_info **check_reg);
+	/* WOWLAN */
+	u32 (*get_wake_reason)(struct mac_ax_adapter *adapter, u8 *wowlan_wake_reason);
 };
 
 u32 get_mac_ax_priv_size(void);

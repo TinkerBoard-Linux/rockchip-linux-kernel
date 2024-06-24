@@ -349,4 +349,5 @@ u32 refresh_security_cam_info(struct mac_ax_adapter *adapter,
 u32 mac_wowlan_secinfo(struct mac_ax_adapter *adapter,
 		       struct mac_ax_sec_iv_info *sec_iv_info);
 
+u32 sec_eng_init(struct mac_ax_adapter *adapter);
 #endif

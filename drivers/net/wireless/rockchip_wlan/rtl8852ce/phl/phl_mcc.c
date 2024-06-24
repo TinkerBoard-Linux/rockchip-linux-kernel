@@ -340,7 +340,7 @@ void _mcc_up_fw_log_setting(struct phl_info_t *phl, struct phl_mcc_info *minfo)
 	struct phl_mcc_fw_log_info *fw_log_i = &minfo->fw_log_i;
 
 	if (fw_log_i->update) {
-		rtw_hal_en_fw_log(phl->hal, FL_COMP_MCC,
+		rtw_hal_en_fw_log_comp(phl->hal, FL_COMP_MCC,
 					fw_log_i->en_fw_mcc_log);
 		fw_log_i->update = false;
 	}

@@ -56,7 +56,10 @@ enum HALRF_CMD_ID {
 	HALRF_KFREE,
 	HALRF_CHL_RFK,
 	HALRF_OP5K,
-	HALRF_RFK
+	HALRF_RFK,
+	HALRF_PSD,
+	HALRF_DZ_DBG,
+	HALRF_BB_RESET
 };
 
 struct halrf_cmd_info halrf_cmd_i[] = {
@@ -96,6 +99,9 @@ struct halrf_cmd_info halrf_cmd_i[] = {
 	{"chl_rfk", HALRF_CHL_RFK},
 	{"op5k", HALRF_OP5K},
 	{"rfk", HALRF_RFK},
+	{"psd", HALRF_PSD},
+	{"dz_dbg",HALRF_DZ_DBG},
+	{"bb_reset", HALRF_BB_RESET},
 };
 
 void halrf_cmd_parser(struct rf_info *rf, char input[][RF_MAX_ARGV],
@@ -259,6 +265,20 @@ void halrf_cmd_parser(struct rf_info *rf, char input[][RF_MAX_ARGV],
 		break;
 	case HALRF_RFK:
 		halrf_rfk_dbg_cmd(rf, input, &used, output, &out_len);
+		break;
+	case HALRF_PSD:
+		halrf_psd_cmd(rf, input, &used, output, &out_len);
+		break;
+	case HALRF_DZ_DBG:
+#ifdef  HALRF_DZ_LOG
+		halrf_dz_dbg_cmd(rf, input, &used, output, &out_len);
+#endif
+		break;
+	case HALRF_BB_RESET:
+		_os_sscanf(input[1], "%d", &val_1);
+		halrf_bb_reset(rf, val_1);
+		RF_DBG_CNSL(out_len, used, output + used, out_len - used,
+			"PHY%d BB reset!!\n", val_1);
 		break;
 	default:
 		RF_DBG_CNSL(out_len, used, output + used, out_len - used,
