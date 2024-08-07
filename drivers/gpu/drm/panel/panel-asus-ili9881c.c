@@ -889,17 +889,17 @@ static const struct drm_display_mode asus_ili9881c_default_mode_7inch= {
 };
 
 static const struct drm_display_mode ili9881c_default_mode_10inch = {
-		.clock		= 64000,
+		.clock		= 72400,
 
 		.hdisplay	= 1280,
 		.hsync_start	= 1280 + 8,
-		.hsync_end	= 1280 + 8 + 45,
-		.htotal		= 1280 + 8 + 45 + 45,
+		.hsync_end	= 1280 + 8 + 80,
+		.htotal		= 1280 + 8 + 80 + 72,
 
 		.vdisplay	= 800,
 		.vsync_start	= 800 + 8,
-		.vsync_end	= 800 + 8 + 20,
-		.vtotal		= 800 + 8 + 20 + 20,
+		.vsync_end	= 800 + 8 + 15,
+		.vtotal		= 800 + 8 + 15 + 15,
 		.flags = DRM_MODE_FLAG_NVSYNC | DRM_MODE_FLAG_NHSYNC,
 };
 
@@ -1025,7 +1025,12 @@ int ili9881c_dsi_probe(struct mipi_dsi_device *dsi)
 					MIPI_DSI_MODE_VIDEO_BURST |
 					MIPI_DSI_MODE_LPM;
 	dsi->format = MIPI_DSI_FMT_RGB888;
-	dsi->lanes = 2;
+
+ 	if(lcd_size_flag[ctx->dsi_id] == 2)
+		dsi->lanes = 4;
+	else
+		dsi->lanes = 2;
+
 	printk("ili9881c_dsi_probe: dsi->mode_flags =%lx\n", dsi->mode_flags);
 
 	return mipi_dsi_attach(dsi);
