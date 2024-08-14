@@ -290,6 +290,23 @@
                 regulator-always-on;
                 regulator-boot-on;
         };
+	fourty_vcc3v3: fourty-vcc3v3 {
+                compatible = "regulator-fixed";
+                regulator-name = "fourty_vcc3v3";
+                gpio = <&gpio0 RK_PC5 GPIO_ACTIVE_HIGH>;
+                enable-active-high;
+                regulator-always-on;
+                regulator-boot-on;
+        };
+
+	fourty_vcc5v0: fourty-vcc5v0 {
+                compatible = "regulator-fixed";
+                regulator-name = "fourty_vcc5v0";
+                gpio = <&gpio0 RK_PC3 GPIO_ACTIVE_HIGH>;
+                enable-active-high;
+                regulator-always-on;
+                regulator-boot-on;
+        };
 };
 
 &bus_npu {
