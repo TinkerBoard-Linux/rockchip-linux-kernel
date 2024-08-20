@@ -151,6 +151,15 @@
 			rockchip,pins = <3 RK_PC1 RK_FUNC_GPIO &pcfg_pull_up>;
 		};
 	};
+
+	camera {
+		csi_gpio: csi-gpio {
+			rockchip,pins =
+					/* reset and power gpio */
+					<3 RK_PB4 RK_FUNC_GPIO &pcfg_output_high>,
+					<3 RK_PB6 RK_FUNC_GPIO &pcfg_output_high>;
+		};
+	};
 };
 
 &i2c2m0_xfer {
@@ -159,6 +168,54 @@
 		<0 RK_PB5 1 &pcfg_pull_none_smt>,
 		/* i2c2_sdam0 */
 		<0 RK_PB6 1 &pcfg_pull_up>;
+};
+
+&i2c1 {
+	status = "okay";
+
+	imx219: imx219@10 {
+		status = "okay";
+		compatible = "sony,imx219";
+		reg = <0x10>;
+		clocks = <&cru CLK_CIF_OUT>;
+		clock-names = "xvclk";
+		pinctrl-names = "rockchip,camera_default";
+		pinctrl-0 = <&cif_clk &csi_gpio>;
+		reset-gpios = <&gpio3 RK_PB4 GPIO_ACTIVE_HIGH>;
+		power-gpios = <&gpio3 RK_PB6 GPIO_ACTIVE_HIGH>;
+		rockchip,camera-module-index = <0>;
+		rockchip,camera-module-facing = "back";
+		rockchip,camera-module-name = "RPi_v21";
+		rockchip,camera-module-lens-name = "default";
+
+		port {
+			imx219_out: endpoint {
+				remote-endpoint = <&dphy0_in>;
+				data-lanes = <1 2>;
+			};
+		};
+	};
+
+	ov5647: ov5647@36 {
+		compatible = "ovti,ov5647";
+		status = "disabled";
+		reg = <0x36>;
+		clocks = <&cru CLK_CIF_OUT>;
+		clock-names = "xvclk";
+		pinctrl-names = "rockchip,camera_default";
+		pinctrl-0 = <&cif_clk &csi_gpio>;
+		reset-gpios = <&gpio3 RK_PB4 GPIO_ACTIVE_HIGH>;
+		power-gpios = <&gpio3 RK_PB6 GPIO_ACTIVE_HIGH>;
+		rockchip,camera-module-index = <0>;
+		rockchip,camera-module-facing = "back";
+		rockchip,camera-module-name = "RPi_v13";
+		rockchip,camera-module-lens-name = "default";
+
+		port {
+			ov5647_out: endpoint {
+			};
+		};
+	};
 };
 
 &i2c2 {
@@ -181,6 +238,10 @@
 	};
 };
 
+&csi2_dphy_hw {
+	status = "okay";
+};
+
 &spi2 {
 	status = "okay";
 	spidev@1 {
@@ -198,5 +259,62 @@
 		interrupt-names = "irq";
 		interrupts-extended = <&gpio3 RK_PA1 IRQ_TYPE_EDGE_FALLING>;
 		status = "okay";
+	};
+};
+
+&csi2_dphy0 {
+	status = "okay";
+	/*
+	 * dphy0 only used for full mode,
+	 * full mode and split mode are mutually exclusive
+	 */
+	ports {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		port@0 {
+			reg = <0>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			dphy0_in: endpoint@1 {
+				reg = <1>;
+				remote-endpoint = <&imx219_out>;
+				data-lanes = <1 2>;
+			};
+		};
+
+		port@1 {
+			reg = <1>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			dphy0_out: endpoint@1 {
+				reg = <1>;
+				remote-endpoint = <&isp0_in_dphy0>;
+			};
+		};
+	};
+};
+
+&rkisp {
+	status = "okay";
+};
+
+&rkisp_mmu {
+	status = "okay";
+};
+
+&rkisp_vir0 {
+	status = "okay";
+
+	port {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		isp0_in_dphy0: endpoint@1 {
+			reg = <0>;
+			remote-endpoint = <&dphy0_out>;
+		};
 	};
 };
