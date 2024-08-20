@@ -8,7 +8,7 @@
 #include "tb3-setting.h"
 #include "tb3n-setting.h"
 
-static const char *model;
+static const char *model, *board;
 
 static int projectid = -1, boardid = -1, ddrid = -1, emmcid = -1, odmid = -1;
 
@@ -40,15 +40,22 @@ static int boardinfo_probe(struct platform_device *pdev)
 		if (device_property_read_string(dev, "model", &model))
 			model = "unknow";
 
+		if (device_property_read_string(dev, "board", &board))
+			board = "unknow";
+
 		if (!strcmp(model, "rk3566"))
 			ret = tb3_gpios(dev, &emmcid, &ddrid);
 		else if (!strcmp(model, "rk3568"))
 			ret = tb3n_gpios(dev, &emmcid);
+		else
+			ret = 0;
 	} else {
 		if (!strcmp(model, "rk3566"))
-			ret = tb3_adcs(dev, compatible, &boardid, &projectid);
+			ret = tb3_adcs(dev, compatible, board, &boardid, &projectid);
 		else if (!strcmp(model, "rk3568"))
 			ret = tb3n_adcs(dev, compatible, &boardid, &projectid, &ddrid, &odmid);
+		else
+			ret = 0;
 	}
 
 	if (ret < 0)
