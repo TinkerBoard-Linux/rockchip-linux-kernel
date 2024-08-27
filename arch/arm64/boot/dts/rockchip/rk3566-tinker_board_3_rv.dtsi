@@ -18,6 +18,7 @@
 
 	vcc_camera: vcc-camera-regulator {
 		compatible = "regulator-fixed";
+		status = "disabled";
 		gpio = <&gpio0 RK_PC1 GPIO_ACTIVE_HIGH>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&camera_pwr>;
@@ -191,7 +192,7 @@
  * when dsi0 is enabled
  */
 &dsi0 {
-	status = "disabled";
+	status = "okay";
 };
 
 &dsi0_in_vp0 {
@@ -199,7 +200,7 @@
 };
 
 &dsi0_in_vp1 {
-	status = "disabled";
+	status = "okay";
 };
 
 /*
@@ -337,6 +338,7 @@
 &i2c4 {
 	/* i2c4 sda conflict with camera pwdn */
 	status = "okay";
+	pinctrl-names = "default";
 	pinctrl-0 = <&i2c4m1_xfer>;
 	//clock-frequency=<400000>;
 
@@ -724,7 +726,7 @@
 	//wifi-bt-power-toggle;
 	//uart_rts_gpios = <&gpio2 RK_PB5 GPIO_ACTIVE_LOW>;
 	pinctrl-names = "default", "rts_gpio";
-	pinctrl-0 = <&uart1m0_rtsn>;
+	//pinctrl-0 = <&uart1m0_rtsn>;
 	pinctrl-1 = <&uart1_gpios>;
 	BT,reset_gpio    = <&gpio2 RK_PB7 GPIO_ACTIVE_HIGH>;
 	BT,wake_gpio     = <&gpio2 RK_PC1 GPIO_ACTIVE_HIGH>;
