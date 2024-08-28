@@ -243,6 +243,12 @@ struct debugfs_entries {
 };
 #endif /* CONFIG_DEBUG_FS */
 
+#if defined(CONFIG_TINKER_MCU)
+extern int tinker_mcu_is_connected(int dsi_id);
+#else
+static int tinker_mcu_is_connected(int dsi_id){ return 0; }
+#endif
+
 struct dw_mipi_dsi {
 	struct drm_bridge bridge;
 	struct drm_connector connector;
@@ -408,17 +414,21 @@ static void dw_mipi_message_config(struct dw_mipi_dsi *dsi,
 	dsi_write(dsi, DSI_CMD_MODE_CFG, val);
 
 	val = dsi_read(dsi, DSI_VID_MODE_CFG);
-	ctrl = dsi_read(dsi, DSI_LPCLK_CTRL);
+	if(!tinker_mcu_is_connected(0))
+		ctrl = dsi_read(dsi, DSI_LPCLK_CTRL);
 	if (lpm) {
 		val |= ENABLE_LOW_POWER_CMD;
-		ctrl &= ~PHY_TXREQUESTCLKHS;
+		if(!tinker_mcu_is_connected(0))
+			ctrl &= ~PHY_TXREQUESTCLKHS;
 	} else {
 		val &= ~ENABLE_LOW_POWER_CMD;
-		ctrl |= PHY_TXREQUESTCLKHS;
+		if(!tinker_mcu_is_connected(0))
+			ctrl |= PHY_TXREQUESTCLKHS;
 	}
 
 	dsi_write(dsi, DSI_VID_MODE_CFG, val);
-	dsi_write(dsi, DSI_LPCLK_CTRL, ctrl);
+	if(!tinker_mcu_is_connected(0))
+		dsi_write(dsi, DSI_LPCLK_CTRL, ctrl);
 }
 
 static int dw_mipi_dsi_gen_pkt_hdr_write(struct dw_mipi_dsi *dsi, u32 hdr_val)
@@ -595,6 +605,7 @@ static void dw_mipi_dsi_video_mode_config(struct dw_mipi_dsi *dsi)
 static void dw_mipi_dsi_set_mode(struct dw_mipi_dsi *dsi,
 				 unsigned long mode_flags)
 {
+	u32 val=0;
 	dsi_write(dsi, DSI_PWR_UP, RESET);
 
 	if (mode_flags & MIPI_DSI_MODE_VIDEO) {
@@ -608,7 +619,13 @@ static void dw_mipi_dsi_set_mode(struct dw_mipi_dsi *dsi,
 		dsi_write(dsi, DSI_CMD_MODE_CFG, val);
 		dsi_write(dsi, DSI_MODE_CFG, ENABLE_CMD_MODE);
 	}
+	if (tinker_mcu_is_connected(0)){
+		val = PHY_TXREQUESTCLKHS;
+		if (dsi->mode_flags & MIPI_DSI_CLOCK_NON_CONTINUOUS)
+			val |= AUTO_CLKLANE_CTRL;
 
+		dsi_write(dsi, DSI_LPCLK_CTRL, val);
+	}
 	dsi_write(dsi, DSI_PWR_UP, POWERUP);
 }
 
@@ -1094,12 +1111,13 @@ static void dw_mipi_dsi_enable(struct dw_mipi_dsi *dsi, struct drm_crtc_state *o
 
 	if (old_crtc_state && old_crtc_state->self_refresh_active)
 		goto psr_out;
+	if (!tinker_mcu_is_connected(0)){
+		val = PHY_TXREQUESTCLKHS;
+		if (dsi->mode_flags & MIPI_DSI_CLOCK_NON_CONTINUOUS)
+			val |= AUTO_CLKLANE_CTRL;
 
-	val = PHY_TXREQUESTCLKHS;
-	if (dsi->mode_flags & MIPI_DSI_CLOCK_NON_CONTINUOUS)
-		val |= AUTO_CLKLANE_CTRL;
-
-	dsi_write(dsi, DSI_LPCLK_CTRL, val);
+		dsi_write(dsi, DSI_LPCLK_CTRL, val);
+	}
 #if defined(CONFIG_DRM_I2C_SN65DSI86)
 	if (sn65dsi86_is_connected())
 		sn65dsi86_bridge_enable();
