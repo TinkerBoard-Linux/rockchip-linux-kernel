@@ -1050,7 +1050,7 @@ static int rk817_hw_params(struct snd_pcm_substream *substream,
 	unsigned char apll_cfg3_val;
 	unsigned char dtop_digen_sr_lmt0;
 
-	DBG("%s : sample rate = %dHz\n", __func__, rate);
+	DBG("%s : pre sample rate = %d, cur sample rate = %dHz\n", __func__, rk817->rate, rate);
 
 	if (rk817->chip_ver <= 0x4) {
 		DBG("%s: 0x4 and previous versions\n", __func__);
@@ -1091,7 +1091,7 @@ static int rk817_hw_params(struct snd_pcm_substream *substream,
 	 * is before playback/capture_path_put, therefore, we need to configure
 	 * APLL_CFG3/DTOP_DIGEN_CLKE/DDAC_SR_LMT0 for different sample rates.
 	 */
-	if (!((substream->stream == SNDRV_PCM_STREAM_CAPTURE) && rk817->pdmdata_out_enable)) {
+	if ((rk817->rate != rate) && !((substream->stream == SNDRV_PCM_STREAM_CAPTURE) && rk817->pdmdata_out_enable)) {
 		snd_soc_component_write(component, RK817_CODEC_APLL_CFG3, apll_cfg3_val);
 		snd_soc_component_update_bits(component, RK817_CODEC_DDAC_SR_LMT0,
 					      DACSRT_MASK, dtop_digen_sr_lmt0);
@@ -1100,6 +1100,8 @@ static int rk817_hw_params(struct snd_pcm_substream *substream,
 		else
 			rk817_restart_adc_digital_clk_and_apll(component);
 	}
+
+	rk817->rate = rate;
 
 	switch (params_format(params)) {
 	case SNDRV_PCM_FORMAT_S16_LE:
