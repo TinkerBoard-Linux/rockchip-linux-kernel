@@ -406,8 +406,6 @@ static const struct file_operations debug_registers_fops = {
 	.llseek		= default_llseek,
 };
 
-static struct dentry *ehci_debug_root;
-
 struct debug_buffer {
 	ssize_t (*fill_func)(struct debug_buffer *);	/* fill method */
 	struct usb_bus *bus;
@@ -1105,7 +1103,7 @@ static inline void create_debug_files(struct ehci_hcd *ehci)
 {
 	struct usb_bus *bus = &ehci_to_hcd(ehci)->self;
 
-	ehci->debug_dir = debugfs_create_dir(bus->bus_name, ehci_debug_root);
+	ehci->debug_dir = debugfs_create_dir(bus->bus_name, usb_debug_root);
 
 	debugfs_create_file("async", S_IRUGO, ehci->debug_dir, bus,
 			    &debug_async_fops);
