@@ -149,6 +149,9 @@ static int rockchip_pvtm_add_debugfs(struct rockchip_pvtm *pvtm)
 	if (!rockchip_pvtm_debugfs_root)
 		return 0;
 
+	if (!strcmp(pvtm->info->name, "gpu") || !strcmp(pvtm->info->name, "npu"))
+		return 0;
+
 	pvtm->dentry = debugfs_create_dir(pvtm->info->name,
 					  rockchip_pvtm_debugfs_root);
 	if (!pvtm->dentry) {
