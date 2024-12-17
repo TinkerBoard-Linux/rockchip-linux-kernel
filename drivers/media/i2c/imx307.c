@@ -153,6 +153,7 @@ struct imx307_mode {
 	u32 link_freq_idx;
 	u32 lanes;
 	u32 bpp;
+	u32 vc[PAD_MAX];
 };
 
 struct imx307 {
@@ -888,6 +889,7 @@ static const struct imx307_mode mipi_supported_modes[] = {
 		.lanes = 4,
 		.link_freq_idx = 0,
 		.bpp = 10,
+		.vc[PAD0] = V4L2_MBUS_CSI2_CHANNEL_0,
 	}, {
 		.bus_fmt = MEDIA_BUS_FMT_SRGGB10_1X10,
 		.width = 1952,
@@ -904,6 +906,10 @@ static const struct imx307_mode mipi_supported_modes[] = {
 		.lanes = 4,
 		.link_freq_idx = 1,
 		.bpp = 10,
+		.vc[PAD0] = V4L2_MBUS_CSI2_CHANNEL_1,
+		.vc[PAD1] = V4L2_MBUS_CSI2_CHANNEL_0,//L->csi wr0
+		.vc[PAD2] = V4L2_MBUS_CSI2_CHANNEL_1,
+		.vc[PAD3] = V4L2_MBUS_CSI2_CHANNEL_1,//M->csi wr2
 	},
 };
 
@@ -1038,6 +1044,10 @@ imx307_find_best_fit(struct imx307 *imx307, struct v4l2_subdev_format *fmt)
 		if (cur_best_fit_dist == -1 || dist < cur_best_fit_dist) {
 			cur_best_fit_dist = dist;
 			cur_best_fit = i;
+		} else if (dist == cur_best_fit_dist &&
+			   framefmt->code == imx307->support_modes[i].bus_fmt) {
+			cur_best_fit = i;
+			break;
 		}
 	}
 	return &imx307->support_modes[cur_best_fit];
@@ -1477,17 +1487,32 @@ undo:
 }
 #endif
 
+static int imx307_get_channel_info(struct imx307 *imx307, struct rkmodule_channel_info *ch_info)
+{
+	if (ch_info->index < PAD0 || ch_info->index >= PAD_MAX)
+		return -EINVAL;
+	ch_info->vc = imx307->cur_mode->vc[ch_info->index];
+	ch_info->width = imx307->cur_mode->width;
+	ch_info->height = imx307->cur_mode->height;
+	ch_info->bus_fmt = imx307->cur_mode->bus_fmt;
+	return 0;
+}
+
 static long imx307_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 {
 	struct imx307 *imx307 = to_imx307(sd);
 	struct rkmodule_hdr_cfg *hdr;
 	struct rkmodule_lvds_cfg *lvds_cfg;
 	const struct imx307_mode *mode;
+	struct rkmodule_channel_info *ch_info;
 	u32 i, h, w;
 	long ret = 0;
 	s64 dst_pixel_rate = 0;
 	s32 dst_link_freq = 0;
 	u32 stream = 0;
+	int cur_best_fit = -1;
+	int cur_best_fit_dist = -1;
+	int cur_dist, cur_fps, dst_fps;
 
 	switch (cmd) {
 	case RKMODULE_GET_MODULE_INFO:
@@ -1506,19 +1531,32 @@ static long imx307_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 		break;
 	case RKMODULE_SET_HDR_CFG:
 		hdr = (struct rkmodule_hdr_cfg *)arg;
+		if (hdr->hdr_mode == imx307->cur_mode->hdr_mode)
+			return 0;
+		dst_fps = DIV_ROUND_CLOSEST(imx307->cur_mode->max_fps.denominator,
+			imx307->cur_mode->max_fps.numerator);
 		for (i = 0; i < imx307->cfg_num; i++) {
 			if (imx307->support_modes[i].hdr_mode == hdr->hdr_mode &&
 			    imx307->support_modes[i].bus_fmt == imx307->cur_mode->bus_fmt) {
-				imx307->cur_mode = &imx307->support_modes[i];
-				break;
+				cur_fps = DIV_ROUND_CLOSEST(imx307->support_modes[i].max_fps.denominator,
+					imx307->support_modes[i].max_fps.numerator);
+				cur_dist = abs(cur_fps - dst_fps);
+				if (cur_best_fit_dist == -1 || cur_dist < cur_best_fit_dist) {
+					cur_best_fit_dist = cur_dist;
+					cur_best_fit = i;
+				} else if (cur_dist == cur_best_fit_dist) {
+					cur_best_fit = i;
+					break;
+				}
 			}
 		}
-		if (i == imx307->cfg_num) {
+		if (cur_best_fit == -1) {
 			dev_err(&imx307->client->dev,
 				"not find hdr mode:%d config\n",
 				hdr->hdr_mode);
 			ret = -EINVAL;
 		} else {
+			imx307->cur_mode = &imx307->support_modes[cur_best_fit];
 			mode = imx307->cur_mode;
 			w = mode->hts_def - mode->width;
 			h = mode->vts_def - mode->height;
@@ -1562,6 +1600,10 @@ static long imx307_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 					       IMX307_REG_VALUE_08BIT,
 					       1);
 		break;
+	case RKMODULE_GET_CHANNEL_INFO:
+		ch_info = (struct rkmodule_channel_info *)arg;
+		ret = imx307_get_channel_info(imx307, ch_info);
+		break;
 	default:
 		ret = -ENOIOCTLCMD;
 		break;
@@ -1578,6 +1620,7 @@ static long imx307_compat_ioctl32(struct v4l2_subdev *sd,
 	struct rkmodule_awb_cfg *cfg;
 	struct rkmodule_hdr_cfg *hdr;
 	struct preisp_hdrae_exp_s *hdrae;
+	struct rkmodule_channel_info *ch_info;
 	long ret;
 	u32 cg = 0;
 	u32 stream = 0;
@@ -1651,6 +1694,21 @@ static long imx307_compat_ioctl32(struct v4l2_subdev *sd,
 		ret = copy_from_user(&stream, up, sizeof(u32));
 		if (!ret)
 			ret = imx307_ioctl(sd, cmd, &stream);
+		break;
+	case RKMODULE_GET_CHANNEL_INFO:
+		ch_info = kzalloc(sizeof(*ch_info), GFP_KERNEL);
+		if (!ch_info) {
+			ret = -ENOMEM;
+			return ret;
+		}
+
+		ret = imx307_ioctl(sd, cmd, ch_info);
+		if (!ret) {
+			ret = copy_to_user(up, ch_info, sizeof(*ch_info));
+			if (ret)
+				return -EFAULT;
+		}
+		kfree(ch_info);
 		break;
 	default:
 		ret = -ENOIOCTLCMD;

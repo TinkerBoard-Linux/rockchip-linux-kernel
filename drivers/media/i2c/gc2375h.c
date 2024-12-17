@@ -548,6 +548,10 @@ gc2375h_find_best_fit(struct gc2375h *gc2375h,
 		if (cur_best_fit_dist == -1 || dist < cur_best_fit_dist) {
 			cur_best_fit_dist = dist;
 			cur_best_fit = i;
+		} else if (dist == cur_best_fit_dist &&
+			   framefmt->code == MEDIA_BUS_FMT_SRGGB10_1X10) {
+			cur_best_fit = i;
+			break;
 		}
 	}
 

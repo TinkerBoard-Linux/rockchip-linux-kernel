@@ -246,6 +246,8 @@ struct imx415 {
 	struct v4l2_fwnode_endpoint bus_cfg;
 	struct cam_sw_info *cam_sw_inf;
 	struct v4l2_fract	cur_fps;
+	int			rhs1_old;
+	int			rhs2_old;
 };
 
 static struct rkmodule_csi_dphy_param dcphy_param = {
@@ -1460,10 +1462,13 @@ imx415_find_best_fit(struct imx415 *imx415, struct v4l2_subdev_format *fmt)
 
 	for (i = 0; i < imx415->cfg_num; i++) {
 		dist = imx415_get_reso_dist(&imx415->supported_modes[i], framefmt);
-		if ((cur_best_fit_dist == -1 || dist < cur_best_fit_dist) &&
-			imx415->supported_modes[i].bus_fmt == framefmt->code) {
+		if (cur_best_fit_dist == -1 || dist < cur_best_fit_dist) {
 			cur_best_fit_dist = dist;
 			cur_best_fit = i;
+		} else if (dist == cur_best_fit_dist &&
+			   framefmt->code == supported_modes[i].bus_fmt) {
+			cur_best_fit = i;
+			break;
 		}
 	}
 	dev_info(&imx415->client->dev, "%s: cur_best_fit(%d)",
@@ -1732,8 +1737,6 @@ static int imx415_set_hdrae_3frame(struct imx415 *imx415,
 	u32 l_a_gain, m_a_gain, s_a_gain;
 	int shr2, shr1, shr0, rhs2, rhs1 = 0;
 	int rhs1_change_limit, rhs2_change_limit = 0;
-	static int rhs1_old = IMX415_RHS1_DEFAULT;
-	static int rhs2_old = IMX415_RHS2_DEFAULT;
 	int ret = 0;
 	u32 fsc;
 	int rhs1_max = 0;
@@ -1823,13 +1826,13 @@ static int imx415_set_hdrae_3frame(struct imx415 *imx415,
 		rhs1 = rhs1_max;
 	dev_dbg(&client->dev,
 		"line(%d) rhs1 %d, m_exp_time %d rhs1_old %d\n",
-		__LINE__, rhs1, m_exp_time, rhs1_old);
+		__LINE__, rhs1, m_exp_time, imx415->rhs1_old);
 
 	//Dynamic adjustment rhs2 must meet the following conditions
 	if (imx415->cur_mode->height == 2192)
-		rhs1_change_limit = rhs1_old + 3 * BRL_ALL - fsc + 3;
+		rhs1_change_limit = imx415->rhs1_old + 3 * BRL_ALL - fsc + 3;
 	else
-		rhs1_change_limit = rhs1_old + 3 * BRL_BINNING - fsc + 3;
+		rhs1_change_limit = imx415->rhs1_old + 3 * BRL_BINNING - fsc + 3;
 	rhs1_change_limit = (rhs1_change_limit < 25) ? 25 : rhs1_change_limit;
 	rhs1_change_limit = (rhs1_change_limit + 5) / 6 * 6 + 1;
 	if (rhs1_max < rhs1_change_limit) {
@@ -1843,9 +1846,9 @@ static int imx415_set_hdrae_3frame(struct imx415 *imx415,
 
 	dev_dbg(&client->dev,
 		"line(%d) m_exp_time %d rhs1_old %d, rhs1_new %d\n",
-		__LINE__, m_exp_time, rhs1_old, rhs1);
+		__LINE__, m_exp_time, imx415->rhs1_old, rhs1);
 
-	rhs1_old = rhs1;
+	imx415->rhs1_old = rhs1;
 
 	/* shr1 = rhs1 - s_exp_time */
 	if (rhs1 - m_exp_time <= SHR1_MIN_X3) {
@@ -1863,13 +1866,13 @@ static int imx415_set_hdrae_3frame(struct imx415 *imx415,
 		rhs2 = 50;
 	dev_dbg(&client->dev,
 		"line(%d) rhs2 %d, s_exp_time %d, rhs2_old %d\n",
-		__LINE__, rhs2, s_exp_time, rhs2_old);
+		__LINE__, rhs2, s_exp_time, imx415->rhs2_old);
 
 	//Dynamic adjustment rhs2 must meet the following conditions
 	if (imx415->cur_mode->height == 2192)
-		rhs2_change_limit = rhs2_old + 3 * BRL_ALL - fsc + 3;
+		rhs2_change_limit = imx415->rhs2_old + 3 * BRL_ALL - fsc + 3;
 	else
-		rhs2_change_limit = rhs2_old + 3 * BRL_BINNING - fsc + 3;
+		rhs2_change_limit = imx415->rhs2_old + 3 * BRL_BINNING - fsc + 3;
 	rhs2_change_limit = (rhs2_change_limit < 50) ?  50 : rhs2_change_limit;
 	rhs2_change_limit = (rhs2_change_limit + 5) / 6 * 6 + 2;
 	if ((shr0 - 13) < rhs2_change_limit) {
@@ -1881,7 +1884,7 @@ static int imx415_set_hdrae_3frame(struct imx415 *imx415,
 	if (rhs2 < rhs2_change_limit)
 		rhs2 = rhs2_change_limit;
 
-	rhs2_old = rhs2;
+	imx415->rhs2_old = rhs2;
 
 	/* shr2 = rhs2 - s_exp_time */
 	if (rhs2 - s_exp_time <= shr2_min) {
@@ -1987,7 +1990,6 @@ static int imx415_set_hdrae(struct imx415 *imx415,
 	u32 l_exp_time, m_exp_time, s_exp_time;
 	u32 l_a_gain, m_a_gain, s_a_gain;
 	int shr1, shr0, rhs1, rhs1_max, rhs1_min;
-	static int rhs1_old = IMX415_RHS1_DEFAULT;
 	int ret = 0;
 	u32 fsc;
 
@@ -2053,10 +2055,10 @@ static int imx415_set_hdrae(struct imx415 *imx415,
 
 	if (imx415->cur_mode->height == 2192) {
 		rhs1_max = min(RHS1_MAX_X2(BRL_ALL), ((shr0 - 9u) / 4 * 4 + 1));
-		rhs1_min = max(SHR1_MIN_X2 + 8u, rhs1_old + 2 * BRL_ALL - fsc + 2);
+		rhs1_min = max(SHR1_MIN_X2 + 8u, imx415->rhs1_old + 2 * BRL_ALL - fsc + 2);
 	} else {
 		rhs1_max = min(RHS1_MAX_X2(BRL_BINNING), ((shr0 - 9u) / 4 * 4 + 1));
-		rhs1_min = max(SHR1_MIN_X2 + 8u, rhs1_old + 2 * BRL_BINNING - fsc + 2);
+		rhs1_min = max(SHR1_MIN_X2 + 8u, imx415->rhs1_old + 2 * BRL_BINNING - fsc + 2);
 	}
 	rhs1_min = (rhs1_min + 3) / 4 * 4 + 1;
 	rhs1 = (SHR1_MIN_X2 + s_exp_time + 3) / 4 * 4 + 1;/* shall be 4n + 1 */
@@ -2072,9 +2074,9 @@ static int imx415_set_hdrae(struct imx415 *imx415,
 	rhs1 = clamp(rhs1, rhs1_min, rhs1_max);
 	dev_dbg(&client->dev,
 		"line(%d) rhs1 %d, short time %d rhs1_old %d, rhs1_new %d\n",
-		__LINE__, rhs1, s_exp_time, rhs1_old, rhs1);
+		__LINE__, rhs1, s_exp_time, imx415->rhs1_old, rhs1);
 
-	rhs1_old = rhs1;
+	imx415->rhs1_old = rhs1;
 
 	/* shr1 = rhs1 - s_exp_time */
 	if (rhs1 - s_exp_time <= SHR1_MIN_X2) {
@@ -2161,6 +2163,9 @@ static long imx415_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 	u64 pixel_rate = 0;
 	struct rkmodule_csi_dphy_param *dphy_param;
 	u8 lanes = imx415->bus_cfg.bus.mipi_csi2.num_data_lanes;
+	int cur_best_fit = -1;
+	int cur_best_fit_dist = -1;
+	int cur_dist, cur_fps, dst_fps;
 
 	switch (cmd) {
 	case PREISP_CMD_SET_HDRAE_EXP:
@@ -2179,24 +2184,37 @@ static long imx415_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 		break;
 	case RKMODULE_SET_HDR_CFG:
 		hdr = (struct rkmodule_hdr_cfg *)arg;
+		if (hdr->hdr_mode == imx415->cur_mode->hdr_mode)
+			return 0;
 		w = imx415->cur_mode->width;
 		h = imx415->cur_mode->height;
+		dst_fps = DIV_ROUND_CLOSEST(imx415->cur_mode->max_fps.denominator,
+			imx415->cur_mode->max_fps.numerator);
 		for (i = 0; i < imx415->cfg_num; i++) {
 			if (w == imx415->supported_modes[i].width &&
 			    h == imx415->supported_modes[i].height &&
 			    imx415->supported_modes[i].bus_fmt == imx415->cur_mode->bus_fmt &&
 			    imx415->supported_modes[i].hdr_mode == hdr->hdr_mode) {
 				dev_info(&imx415->client->dev, "set hdr cfg, set mode to %d\n", i);
-				imx415_change_mode(imx415, &imx415->supported_modes[i]);
-				break;
+				cur_fps = DIV_ROUND_CLOSEST(supported_modes[i].max_fps.denominator,
+					supported_modes[i].max_fps.numerator);
+				cur_dist = abs(cur_fps - dst_fps);
+				if (cur_best_fit_dist == -1 || cur_dist < cur_best_fit_dist) {
+					cur_best_fit_dist = cur_dist;
+					cur_best_fit = i;
+				} else if (cur_dist == cur_best_fit_dist) {
+					cur_best_fit = i;
+					break;
+				}
 			}
 		}
-		if (i == imx415->cfg_num) {
+		if (cur_best_fit == -1) {
 			dev_err(&imx415->client->dev,
 				"not find hdr mode:%d %dx%d config\n",
 				hdr->hdr_mode, w, h);
 			ret = -EINVAL;
 		} else {
+			imx415_change_mode(imx415, &imx415->supported_modes[cur_best_fit]);
 			mode = imx415->cur_mode;
 			if (imx415->streaming) {
 				ret = imx415_write_reg(imx415->client, IMX415_GROUP_HOLD_REG,
@@ -2424,6 +2442,8 @@ static int __imx415_start_stream(struct imx415 *imx415)
 	if (ret)
 		return ret;
 	if (imx415->has_init_exp && imx415->cur_mode->hdr_mode != NO_HDR) {
+		imx415->rhs1_old = IMX415_RHS1_DEFAULT;
+		imx415->rhs2_old = IMX415_RHS2_DEFAULT;
 		ret = imx415_ioctl(&imx415->subdev, PREISP_CMD_SET_HDRAE_EXP,
 			&imx415->init_hdrae_exp);
 		if (ret) {

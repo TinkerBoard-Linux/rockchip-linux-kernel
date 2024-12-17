@@ -10,6 +10,8 @@
  *
  * V1.01.00 support pinctrl and passthrough
  *
+ * V1.02.00 Remove driver adaptation for rk671
+ *
  */
 #include <linux/version.h>
 #include <linux/delay.h>
@@ -23,7 +25,7 @@
 #include "rkx11x_reg.h"
 #include "rkx11x_api.h"
 
-#define DRIVER_VERSION		KERNEL_VERSION(1, 0x01, 0x00)
+#define DRIVER_VERSION		KERNEL_VERSION(1, 0x02, 0x00)
 
 #define IOMUX_PINSET_API_EN	1 /* 1: PINCTRL API enable */
 
@@ -1372,9 +1374,6 @@ static const struct of_device_id rkx11x_of_match[] = {
 		.data = (const void *)RKX11X_SER_CHIP_ID_V0
 	}, {
 		.compatible = "rockchip,ser,rkx111",
-		.data = (const void *)RKX11X_SER_CHIP_ID_V1
-	}, {
-		.compatible = "rockchip,ser,rk671",
 		.data = (const void *)RKX11X_SER_CHIP_ID_V1
 	},
 	{ /* sentinel */ },

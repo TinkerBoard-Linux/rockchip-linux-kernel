@@ -907,7 +907,7 @@ static const struct regmap_config rockchip_i2s_regmap_config = {
 	.reg_bits = 32,
 	.reg_stride = 4,
 	.val_bits = 32,
-	.max_register = I2S_RXDR,
+	.max_register = I2S_RXFIFOLR,
 	.reg_defaults = rockchip_i2s_reg_defaults,
 	.num_reg_defaults = ARRAY_SIZE(rockchip_i2s_reg_defaults),
 	.writeable_reg = rockchip_i2s_wr_reg,
@@ -1111,6 +1111,39 @@ static const struct snd_dlp_config dconfig = {
 	.get_fifo_count = rockchip_i2s_get_fifo_count,
 };
 
+static int rockchip_i2s_wait_time_init(struct rk_i2s_dev *i2s)
+{
+	unsigned int wait_time;
+
+	if (!device_property_read_u32(i2s->dev, "rockchip,i2s-tx-wait-time-ms", &wait_time)) {
+		dev_info(i2s->dev, "Init TX wait-time-ms: %d\n", wait_time);
+		i2s->wait_time[SNDRV_PCM_STREAM_PLAYBACK] = wait_time;
+	}
+
+	if (!device_property_read_u32(i2s->dev, "rockchip,i2s-rx-wait-time-ms", &wait_time)) {
+		dev_info(i2s->dev, "Init RX wait-time-ms: %d\n", wait_time);
+		i2s->wait_time[SNDRV_PCM_STREAM_CAPTURE] = wait_time;
+	}
+	return 0;
+}
+
+static int rockchip_i2s_register_platform(struct device *dev)
+{
+	int ret = 0;
+
+	if (device_property_read_bool(dev, "rockchip,no-dmaengine")) {
+		dev_info(dev, "Used for Multi-DAI\n");
+		return 0;
+	}
+
+	if (device_property_read_bool(dev, "rockchip,digital-loopback"))
+		ret = devm_snd_dmaengine_dlp_register(dev, &dconfig);
+	else
+		ret = devm_snd_dmaengine_pcm_register(dev, NULL, 0);
+
+	return ret;
+}
+
 static int rockchip_i2s_probe(struct platform_device *pdev)
 {
 	struct device_node *node = pdev->dev.of_node;
@@ -1149,6 +1182,8 @@ static int rockchip_i2s_probe(struct platform_device *pdev)
 	for (i = 0; i < ARRAY_SIZE(of_quirks); i++)
 		if (device_property_read_bool(i2s->dev, of_quirks[i].quirk))
 			i2s->quirks |= of_quirks[i].id;
+
+	rockchip_i2s_wait_time_init(i2s);
 
 	regs = devm_platform_get_and_ioremap_resource(pdev, 0, &res);
 	if (IS_ERR(regs))
@@ -1231,27 +1266,16 @@ static int rockchip_i2s_probe(struct platform_device *pdev)
 			goto err_pm_disable;
 	}
 
+	ret = rockchip_i2s_register_platform(&pdev->dev);
+	if (ret)
+		goto err_suspend;
+
 	ret = devm_snd_soc_register_component(&pdev->dev,
 					      &rockchip_i2s_component,
 					      dai, 1);
 
 	if (ret) {
 		dev_err(&pdev->dev, "Could not register DAI\n");
-		goto err_suspend;
-	}
-
-	if (device_property_read_bool(&pdev->dev, "rockchip,no-dmaengine")) {
-		dev_info(&pdev->dev, "Used for Multi-DAI\n");
-		return 0;
-	}
-
-	if (device_property_read_bool(&pdev->dev, "rockchip,digital-loopback"))
-		ret = devm_snd_dmaengine_dlp_register(&pdev->dev, &dconfig);
-	else
-		ret = devm_snd_dmaengine_pcm_register(&pdev->dev, NULL, 0);
-
-	if (ret) {
-		dev_err(&pdev->dev, "Could not register PCM\n");
 		goto err_suspend;
 	}
 

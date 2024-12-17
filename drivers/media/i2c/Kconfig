@@ -2207,6 +2207,16 @@ config VIDEO_MT9V111
 	  To compile this driver as a module, choose M here: the
 	  module will be called mt9v111.
 
+config VIDEO_PS5458
+	tristate "Prime PS5458 sensor support"
+	depends on I2C && VIDEO_V4L2
+	select MEDIA_CONTROLLER
+	select VIDEO_V4L2_SUBDEV_API
+	select V4L2_FWNODE
+	help
+	  This is a Video4Linux2 sensor driver for the Prime
+	  PS5458 camera.
+
 config VIDEO_SC031GS
 	tristate "SmartSens SC031GS sensor support"
 	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API

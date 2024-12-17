@@ -423,6 +423,11 @@ static void rockchip_pcie_resize_bar_nsticky(struct rockchip_pcie *rockchip)
 	dw_pcie_writel_dbi(pci, resbar_base + 0x8 + bar * 0x8, 0x2c0);
 	rockchip_pcie_ep_set_bar_flag(rockchip, bar, PCI_BASE_ADDRESS_MEM_TYPE_32);
 
+	bar = BAR_1;
+	dw_pcie_writel_dbi(pci, resbar_base + 0x4 + bar * 0x8, 0x10);
+	dw_pcie_writel_dbi(pci, resbar_base + 0x8 + bar * 0x8, 0xc0);
+	rockchip_pcie_ep_set_bar_flag(rockchip, bar, PCI_BASE_ADDRESS_MEM_TYPE_32);
+
 	bar = BAR_2;
 	dw_pcie_writel_dbi(pci, resbar_base + 0x4 + bar * 0x8, 0x400);
 	dw_pcie_writel_dbi(pci, resbar_base + 0x8 + bar * 0x8, 0x6c0);
@@ -434,11 +439,18 @@ static void rockchip_pcie_resize_bar_nsticky(struct rockchip_pcie *rockchip)
 	dw_pcie_writel_dbi(pci, resbar_base + 0x8 + bar * 0x8, 0xc0);
 	rockchip_pcie_ep_set_bar_flag(rockchip, bar, PCI_BASE_ADDRESS_MEM_TYPE_32);
 
+	bar = BAR_5;
+	dw_pcie_writel_dbi(pci, resbar_base + 0x4 + bar * 0x8, 0x10);
+	dw_pcie_writel_dbi(pci, resbar_base + 0x8 + bar * 0x8, 0xc0);
+	rockchip_pcie_ep_set_bar_flag(rockchip, bar, PCI_BASE_ADDRESS_MEM_TYPE_32);
+
 	/* Disable BAR1 BAR5*/
 	bar = BAR_1;
-	dw_pcie_writel_dbi(pci, PCIE_TYPE0_HDR_DBI2_OFFSET + 0x10 + bar * 4, 0);
+	if (!rockchip->ib_target_size[bar])
+		dw_pcie_writel_dbi(pci, PCIE_TYPE0_HDR_DBI2_OFFSET + 0x10 + bar * 4, 0);
 	bar = BAR_5;
-	dw_pcie_writel_dbi(pci, PCIE_TYPE0_HDR_DBI2_OFFSET + 0x10 + bar * 4, 0);
+	if (!rockchip->ib_target_size[bar])
+		dw_pcie_writel_dbi(pci, PCIE_TYPE0_HDR_DBI2_OFFSET + 0x10 + bar * 4, 0);
 	dw_pcie_dbi_ro_wr_dis(&rockchip->pci);
 }
 
@@ -672,7 +684,16 @@ static int rockchip_pcie_init_host(struct rockchip_pcie *rockchip)
 	if (ret)
 		goto disable_phy;
 
+	ret = phy_calibrate(rockchip->phy);
+	if (ret) {
+		dev_err(dev, "phy lock failed\n");
+		goto disable_controller;
+	}
+
 	return 0;
+
+disable_controller:
+	reset_control_assert(rockchip->rst);
 
 disable_phy:
 	phy_exit(rockchip->phy);
@@ -697,7 +718,7 @@ static int rockchip_pcie_config_host(struct rockchip_pcie *rockchip)
 	struct device *dev = rockchip->pci.dev;
 	struct dw_pcie *pci = &rockchip->pci;
 	u32 reg, val;
-	int ret, retry, i;
+	int ret, retries, i;
 
 	if (dw_pcie_link_up(&rockchip->pci))
 		goto already_linkup;
@@ -759,7 +780,8 @@ static int rockchip_pcie_config_host(struct rockchip_pcie *rockchip)
 	}
 	rockchip_pcie_writel_apb(rockchip, reg, PCIE_CLIENT_INTR_STATUS_MISC);
 
-	for (retry = 0; retry < 1000; retry++) {
+	retries = 1000;
+	for (i = 0; i < retries; i++) {
 		if (dw_pcie_link_up(&rockchip->pci)) {
 			/*
 			 * We may be here in case of L0 in Gen1. But if EP is capable
@@ -768,10 +790,13 @@ static int rockchip_pcie_config_host(struct rockchip_pcie *rockchip)
 			 * that LTSSM max timeout is 24ms per period, we can wait a bit
 			 * more for Gen switch.
 			 */
-			msleep(2000);
-			dev_info(dev, "PCIe Link up, LTSSM is 0x%x\n",
-				 rockchip_pcie_readl_apb(rockchip, PCIE_CLIENT_LTSSM_STATUS));
-			break;
+			msleep(50);
+			/* In case link drop after linkup, double check it */
+			if (dw_pcie_link_up(pci)) {
+				dev_info(pci->dev, "PCIe Link up, LTSSM is 0x%x\n",
+					 rockchip_pcie_readl_apb(rockchip, PCIE_CLIENT_LTSSM_STATUS));
+				break;
+			}
 		}
 
 		dev_info_ratelimited(dev, "PCIe Linking... LTSSM is 0x%x\n",
@@ -779,7 +804,7 @@ static int rockchip_pcie_config_host(struct rockchip_pcie *rockchip)
 		msleep(20);
 	}
 
-	if (retry >= 10000) {
+	if (i >= retries) {
 		ret = -ENODEV;
 		return ret;
 	}
@@ -1101,12 +1126,26 @@ static int pcie_ep_mmap(struct file *file, struct vm_area_struct *vma)
 		}
 		addr = rockchip->ib_target_address[0];
 		break;
+	case PCIE_EP_MMAP_RESOURCE_BAR1:
+		if (size > rockchip->ib_target_size[1]) {
+			dev_warn(rockchip->pci.dev, "bar1 mmap size is out of limitation\n");
+			return -EINVAL;
+		}
+		addr = rockchip->ib_target_address[1];
+		break;
 	case PCIE_EP_MMAP_RESOURCE_BAR2:
 		if (size > rockchip->ib_target_size[2]) {
 			dev_warn(rockchip->pci.dev, "bar2 mmap size is out of limitation\n");
 			return -EINVAL;
 		}
 		addr = rockchip->ib_target_address[2];
+		break;
+	case PCIE_EP_MMAP_RESOURCE_BAR5:
+		if (size > rockchip->ib_target_size[5]) {
+			dev_warn(rockchip->pci.dev, "bar5 mmap size is out of limitation\n");
+			return -EINVAL;
+		}
+		addr = rockchip->ib_target_address[5];
 		break;
 	default:
 		dev_err(rockchip->pci.dev, "cur mmap_res %d is unsurreport\n", rockchip->cur_mmap_res);

@@ -21,7 +21,7 @@
 
 #define DRIVER_NAME			"rk-dma"
 #define DMA_MAX_SIZE			(0x1000000)
-#define LLI_BLOCK_SIZE			(4 * PAGE_SIZE)
+#define LLI_BLOCK_SIZE			(SZ_4K)
 
 #define RK_MAX_BURST_LEN		16
 #define RK_DMA_BUSWIDTHS \
@@ -433,6 +433,7 @@ struct rk_dma_dev {
 	struct dma_pool		*pool;
 	void __iomem		*base;
 	int			irq;
+	u32			bus_width;
 	u32			dma_channels;
 	u32			dma_requests;
 	u32			version;
@@ -497,6 +498,7 @@ static int rk_dma_init(struct rk_dma_dev *d)
 	maxburst = CMN_AXI_LEN(cap1);
 
 	d->version = ver;
+	d->bus_width = buswidth;
 	d->dma_channels = CMN_LCH_NUM(cap0);
 	d->dma_requests = CMN_LCH_NUM(cap0);
 
@@ -814,6 +816,7 @@ static int rk_dma_set_perisel(struct dma_chan *chan, enum dma_transfer_direction
 static int rk_pre_config(struct dma_chan *chan, enum dma_transfer_direction dir)
 {
 	struct rk_dma_chan *c = to_rk_chan(chan);
+	struct rk_dma_dev *d = to_rk_dma(chan->device);
 	struct dma_slave_config *cfg = &c->slave_cfg;
 	enum rk_dma_burst_width src_width;
 	enum rk_dma_burst_width dst_width;
@@ -823,13 +826,15 @@ static int rk_pre_config(struct dma_chan *chan, enum dma_transfer_direction dir)
 
 	switch (dir) {
 	case DMA_MEM_TO_MEM:
+		/* DMAC use the min(addr_align, bus_width, len) automatically */
+		src_width = rk_dma_burst_width(d->bus_width);
 		c->ctl0 = PCH_TRF_CTL0_LLI_VALID | PCH_TRF_CTL0_MSIZE(0);
 		c->ctl1 = PCH_TRF_CTL1_AROSR(4) |
 			  PCH_TRF_CTL1_AWOSR(4) |
 			  PCH_TRF_CTL1_ARLEN(RK_MAX_BURST_LEN) |
 			  PCH_TRF_CTL1_AWLEN(RK_MAX_BURST_LEN) |
-			  PCH_TRF_CTL1_ARSIZE(DMA_BURST_WIDTH_16_BYTES) |
-			  PCH_TRF_CTL1_AWSIZE(DMA_BURST_WIDTH_16_BYTES) |
+			  PCH_TRF_CTL1_ARSIZE(src_width) |
+			  PCH_TRF_CTL1_AWSIZE(src_width) |
 			  PCH_TRF_CTL1_ARBURST_INCR |
 			  PCH_TRF_CTL1_AWBURST_INCR;
 		c->ccfg = PCH_TRF_CFG_TT_FC(DMA_MEM_TO_MEM) |
@@ -1176,8 +1181,8 @@ static int rk_dma_probe(struct platform_device *pdev)
 	if (ret)
 		return ret;
 
-	/* A DMA memory pool for LLIs, align on 32-byte boundary */
-	d->pool = dmam_pool_create(DRIVER_NAME, &pdev->dev, LLI_BLOCK_SIZE, PAGE_SIZE, 0);
+	/* A DMA memory pool for LLIs, align on 4k-bytes boundary */
+	d->pool = dmam_pool_create(DRIVER_NAME, &pdev->dev, LLI_BLOCK_SIZE, SZ_4K, 0);
 	if (!d->pool)
 		return -ENOMEM;
 

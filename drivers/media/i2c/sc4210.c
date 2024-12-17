@@ -1528,6 +1528,10 @@ sc4210_find_best_fit(struct sc4210 *sc4210, struct v4l2_subdev_format *fmt)
 		if (cur_best_fit_dist == -1 || dist < cur_best_fit_dist) {
 			cur_best_fit_dist = dist;
 			cur_best_fit = i;
+		} else if (dist == cur_best_fit_dist &&
+			   framefmt->code == sc4210->support_modes[i].bus_fmt) {
+			cur_best_fit = i;
+			break;
 		}
 	}
 
@@ -1946,6 +1950,9 @@ static long sc4210_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 	u32 i, h = 0, w;
 	u32 stream = 0;
 	int pixel_rate = 0;
+	int cur_best_fit = -1;
+	int cur_best_fit_dist = -1;
+	int cur_dist, cur_fps, dst_fps;
 
 	switch (cmd) {
 	case RKMODULE_GET_MODULE_INFO:
@@ -1958,23 +1965,36 @@ static long sc4210_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 		break;
 	case RKMODULE_SET_HDR_CFG:
 		hdr = (struct rkmodule_hdr_cfg *)arg;
+		if (hdr->hdr_mode == sc4210->cur_mode->hdr_mode)
+			return 0;
 		w = sc4210->cur_mode->width;
 		h = sc4210->cur_mode->height;
+		dst_fps = DIV_ROUND_CLOSEST(sc4210->cur_mode->max_fps.denominator,
+			sc4210->cur_mode->max_fps.numerator);
 		for (i = 0; i < sc4210->support_modes_num; i++) {
 			if (w == sc4210->support_modes[i].width &&
 			    h == sc4210->support_modes[i].height &&
 			    sc4210->support_modes[i].hdr_mode == hdr->hdr_mode &&
 			    sc4210->support_modes[i].bus_fmt == sc4210->cur_mode->bus_fmt) {
-				sc4210->cur_mode = &sc4210->support_modes[i];
-				break;
+				cur_fps = DIV_ROUND_CLOSEST(sc4210->support_modes[i].max_fps.denominator,
+					sc4210->support_modes[i].max_fps.numerator);
+				cur_dist = abs(cur_fps - dst_fps);
+				if (cur_best_fit_dist == -1 || cur_dist < cur_best_fit_dist) {
+					cur_best_fit_dist = cur_dist;
+					cur_best_fit = i;
+				} else if (cur_dist == cur_best_fit_dist) {
+					cur_best_fit = i;
+					break;
+				}
 			}
 		}
-		if (i == sc4210->support_modes_num) {
+		if (cur_best_fit == -1) {
 			dev_err(&sc4210->client->dev,
 				"not find hdr mode:%d %dx%d config\n",
 				hdr->hdr_mode, w, h);
 			ret = -EINVAL;
 		} else {
+			sc4210->cur_mode = &sc4210->support_modes[cur_best_fit];
 			mode = sc4210->cur_mode;
 			w = sc4210->cur_mode->hts_def -
 					sc4210->cur_mode->width;

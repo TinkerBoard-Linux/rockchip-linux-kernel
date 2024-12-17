@@ -640,7 +640,7 @@ static ssize_t rk630_phy_disable_switch_store(struct device *dev,
 
 	mutex_lock(&priv->lock);
 	if (disabled) {
-		cancel_delayed_work_sync(&priv->service_task);
+		cancel_delayed_work(&priv->service_task);
 
 		/* Save to default config */
 		rk630_phy_10m_switch_config(priv->phydev, false);
@@ -697,9 +697,8 @@ static int rk630_phy_probe(struct phy_device *phydev)
 						IRQF_TRIGGER_FALLING | IRQF_SHARED | IRQF_ONESHOT,
 						"wol_irq", priv);
 		if (ret) {
-			wake_lock_destroy(&priv->wol_wake_lock);
 			phydev_err(phydev, "request wol_irq failed: %d\n", ret);
-			return ret;
+			goto irq_err;
 		}
 		disable_irq(priv->wol_irq);
 		enable_irq_wake(priv->wol_irq);
@@ -720,16 +719,29 @@ static int rk630_phy_probe(struct phy_device *phydev)
 
 	ret = device_create_file(&phydev->mdio.dev, &dev_attr_rk630_phy_disable_switch);
 	if (ret)
-		return ret;
+		goto file_err;
 
 	priv->phydev = phydev;
 
 	return 0;
+
+file_err:
+	cancel_delayed_work_sync(&priv->service_task);
+	mutex_destroy(&priv->lock);
+irq_err:
+	if (priv->wol_irq > 0)
+		wake_lock_destroy(&priv->wol_wake_lock);
+	return ret;
 }
 
 static void rk630_phy_remove(struct phy_device *phydev)
 {
 	struct rk630_phy_priv *priv = phydev->priv;
+
+	device_remove_file(&phydev->mdio.dev, &dev_attr_rk630_phy_disable_switch);
+
+	cancel_delayed_work_sync(&priv->service_task);
+	mutex_destroy(&priv->lock);
 
 	if (priv->wol_irq > 0)
 		wake_lock_destroy(&priv->wol_wake_lock);

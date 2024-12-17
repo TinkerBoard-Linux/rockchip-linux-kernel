@@ -878,10 +878,13 @@ imx347_find_best_fit(struct imx347 *imx347, struct v4l2_subdev_format *fmt)
 
 	for (i = 0; i < imx347->cfg_num; i++) {
 		dist = imx347_get_reso_dist(&supported_modes[i], framefmt);
-		if ((cur_best_fit_dist == -1 || dist <= cur_best_fit_dist) &&
-			supported_modes[i].bus_fmt == framefmt->code) {
+		if (cur_best_fit_dist == -1 || dist < cur_best_fit_dist) {
 			cur_best_fit_dist = dist;
 			cur_best_fit = i;
+		} else if (dist == cur_best_fit_dist &&
+			   framefmt->code == supported_modes[i].bus_fmt) {
+			cur_best_fit = i;
+			break;
 		}
 	}
 
@@ -1373,12 +1376,27 @@ undo:
 }
 #endif
 
+static int imx347_get_channel_info(struct imx347 *imx347, struct rkmodule_channel_info *ch_info)
+{
+	if (ch_info->index < PAD0 || ch_info->index >= PAD_MAX)
+		return -EINVAL;
+	ch_info->vc = imx347->cur_mode->vc[ch_info->index];
+	ch_info->width = imx347->cur_mode->width;
+	ch_info->height = imx347->cur_mode->height;
+	ch_info->bus_fmt = imx347->cur_mode->bus_fmt;
+	return 0;
+}
+
 static long imx347_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 {
 	struct imx347 *imx347 = to_imx347(sd);
 	struct rkmodule_hdr_cfg *hdr;
+	struct rkmodule_channel_info *ch_info;
 	u32 i, h, w, stream;
 	long ret = 0;
+	int cur_best_fit = -1;
+	int cur_best_fit_dist = -1;
+	int cur_dist, cur_fps, dst_fps;
 
 	switch (cmd) {
 	case PREISP_CMD_SET_HDRAE_EXP:
@@ -1394,23 +1412,36 @@ static long imx347_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 		break;
 	case RKMODULE_SET_HDR_CFG:
 		hdr = (struct rkmodule_hdr_cfg *)arg;
+		if (hdr->hdr_mode == imx347->cur_mode->hdr_mode)
+			return 0;
 		w = imx347->cur_mode->width;
 		h = imx347->cur_mode->height;
+		dst_fps = DIV_ROUND_CLOSEST(imx347->cur_mode->max_fps.denominator,
+			imx347->cur_mode->max_fps.numerator);
 		for (i = 0; i < imx347->cfg_num; i++) {
 			if (w == supported_modes[i].width &&
 			    h == supported_modes[i].height &&
 			    supported_modes[i].bus_fmt == imx347->cur_mode->bus_fmt &&
 			    supported_modes[i].hdr_mode == hdr->hdr_mode) {
-				imx347->cur_mode = &supported_modes[i];
-				break;
+				cur_fps = DIV_ROUND_CLOSEST(supported_modes[i].max_fps.denominator,
+					supported_modes[i].max_fps.numerator);
+				cur_dist = abs(cur_fps - dst_fps);
+				if (cur_best_fit_dist == -1 || cur_dist < cur_best_fit_dist) {
+					cur_best_fit_dist = cur_dist;
+					cur_best_fit = i;
+				} else if (cur_dist == cur_best_fit_dist) {
+					cur_best_fit = i;
+					break;
+				}
 			}
 		}
-		if (i == imx347->cfg_num) {
+		if (cur_best_fit == -1) {
 			dev_err(&imx347->client->dev,
 				"not find hdr mode:%d %dx%d config\n",
 				hdr->hdr_mode, w, h);
 			ret = -EINVAL;
 		} else {
+			imx347->cur_mode = &supported_modes[cur_best_fit];
 			w = imx347->cur_mode->hts_def - imx347->cur_mode->width;
 			h = imx347->cur_mode->vts_def - imx347->cur_mode->height;
 			__v4l2_ctrl_modify_range(imx347->hblank, w, w, 1, w);
@@ -1439,6 +1470,10 @@ static long imx347_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 			ret = imx347_write_reg(imx347->client, IMX347_REG_CTRL_MODE,
 				IMX347_REG_VALUE_08BIT, IMX347_MODE_SW_STANDBY);
 		break;
+	case RKMODULE_GET_CHANNEL_INFO:
+		ch_info = (struct rkmodule_channel_info *)arg;
+		ret = imx347_get_channel_info(imx347, ch_info);
+		break;
 	default:
 		ret = -ENOIOCTLCMD;
 		break;
@@ -1455,6 +1490,7 @@ static long imx347_compat_ioctl32(struct v4l2_subdev *sd,
 	struct rkmodule_inf *inf;
 	struct rkmodule_hdr_cfg *hdr;
 	struct preisp_hdrae_exp_s *hdrae;
+	struct rkmodule_channel_info *ch_info;
 	long ret;
 	u32 cg = 0;
 	u32  stream;
@@ -1531,6 +1567,21 @@ static long imx347_compat_ioctl32(struct v4l2_subdev *sd,
 			return -EFAULT;
 
 		ret = imx347_ioctl(sd, cmd, &stream);
+		break;
+	case RKMODULE_GET_CHANNEL_INFO:
+		ch_info = kzalloc(sizeof(*ch_info), GFP_KERNEL);
+		if (!ch_info) {
+			ret = -ENOMEM;
+			return ret;
+		}
+
+		ret = imx347_ioctl(sd, cmd, ch_info);
+		if (!ret) {
+			ret = copy_to_user(up, ch_info, sizeof(*ch_info));
+			if (ret)
+				return -EFAULT;
+		}
+		kfree(ch_info);
 		break;
 	default:
 		ret = -ENOIOCTLCMD;

@@ -28,6 +28,8 @@
  *     1. support multi-channel information configuration
  *     2. mode vc initialization when vc-array isn't configured
  *
+ * V1.05.00 Remove driver adaptation for rk682 and rk671
+ *
  */
 #include <linux/module.h>
 #include <linux/delay.h>
@@ -54,7 +56,7 @@
 #include "rkx12x_api.h"
 #include "rkx12x_remote.h"
 
-#define DRIVER_VERSION		KERNEL_VERSION(1, 0x04, 0x00)
+#define DRIVER_VERSION		KERNEL_VERSION(1, 0x05, 0x00)
 
 #define RKX12X_NAME		"rkx12x"
 
@@ -1999,9 +2001,6 @@ static const struct of_device_id rkx12x_of_match[] = {
 		.data = (const void *)RKX12X_DES_CHIP_ID_V0
 	}, {
 		.compatible = "rockchip,des,rkx121",
-		.data = (const void *)RKX12X_DES_CHIP_ID_V1
-	}, {
-		.compatible = "rockchip,des,rk682",
 		.data = (const void *)RKX12X_DES_CHIP_ID_V1
 	},
 	{ /* sentinel */ }

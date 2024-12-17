@@ -80,6 +80,8 @@ static struct rv1106_sleep_ddr_data ddr_data;
 
 static const struct rk_sleep_config *slp_cfg;
 
+static u32 rv1106_chip_version;
+
 static void __iomem *pmucru_base;
 static void __iomem *cru_base;
 static void __iomem *pvtpllcru_base;
@@ -648,7 +650,9 @@ static void pvtm_32k_config(void)
 	ddr_data.pmucru_sel_con7 =
 		readl_relaxed(pmucru_base + RV1106_PMUCRU_CLKSEL_CON(7));
 
-	if (slp_cfg->mode_config & RKPM_SLP_32K_EXT) {
+	/* We can use clk-32k from rtc when chip_version > 0 only */
+	if ((slp_cfg->mode_config & RKPM_SLP_32K_EXT) &&
+	    (rv1106_chip_version > 0)) {
 		writel_relaxed(BITS_WITH_WMASK(0x3, 0x3, 14),
 			       pmugrf_base + RV1106_PMUGRF_SOC_CON(1));
 		writel_relaxed(BITS_WITH_WMASK(0x1, 0x3, 0),
@@ -1327,6 +1331,8 @@ static int __init rv1106_suspend_init(struct device_node *np)
 	gpio_base[4] = dev_reg_base + RV1106_GPIO4_OFFSET;
 
 	rv1106_bootram_base = dev_reg_base + RV1106_PMUSRAM_OFFSET;
+
+	rv1106_chip_version = readl_relaxed(pmugrf_base + RV1106_PMUGRF_OS_REG(1)) & 0x7;
 
 	rv1106_config_bootdata();
 

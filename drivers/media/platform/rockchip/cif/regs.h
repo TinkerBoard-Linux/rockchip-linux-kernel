@@ -199,6 +199,18 @@ enum cif_reg_index {
 	CIF_REG_TOISP1_CTRL,
 	CIF_REG_TOISP1_SIZE,
 	CIF_REG_TOISP1_CROP,
+	CIF_REG_TOISP0_CH1_CTRL,
+	CIF_REG_TOISP0_CH1_SIZE,
+	CIF_REG_TOISP0_CH1_CROP,
+	CIF_REG_TOISP1_CH1_CTRL,
+	CIF_REG_TOISP1_CH1_SIZE,
+	CIF_REG_TOISP1_CH1_CROP,
+	CIF_REG_TOISP0_CH2_CTRL,
+	CIF_REG_TOISP0_CH2_SIZE,
+	CIF_REG_TOISP0_CH2_CROP,
+	CIF_REG_TOISP1_CH2_CTRL,
+	CIF_REG_TOISP1_CH2_SIZE,
+	CIF_REG_TOISP1_CH2_CROP,
 	CIF_REG_INDEX_MAX
 };
 
@@ -506,6 +518,9 @@ enum cif_reg_index {
 #define TOISP1_CH_CTRL			0x78C
 #define TOISP1_CROP_SIZE		0x790
 #define TOISP1_CROP			0x794
+#define TOISP0_CH1_CTRL			0x7A0
+#define TOISP0_CH1_CROP_SIZE		0x7A4
+#define TOISP0_CH1_CROP			0x7A8
 
 /* The key register bit description */
 
@@ -527,6 +542,7 @@ enum cif_reg_index {
 #define DVP_SW_WATER_LINE_50_RK3576	(0x1 << 20)
 #define DVP_SW_WATER_LINE_25_RK3576	(0x2 << 20)
 #define DVP_SW_WATER_LINE_00_RK3576	(0x3 << 20)
+#define DVP_SW_DMA_IDLE			(0x1 << 4)
 
 /* CIF_INTEN */
 #define INTEN_DISABLE			(0x0 << 0)
@@ -1081,9 +1097,10 @@ enum cif_reg_index {
 #define RKCIF_SKIP_SHIFT	0X15
 #define RKCIF_SKIP_EN(x)	(0x1 << (8 + x))
 
-#define RKCIF_CAP_SHIFT_RK3576		0x12
-#define RKCIF_SKIP_SHIFT_RK3576		0x09
+#define RKCIF_CAP_SHIFT_RK3576		(0x0c)
+#define RKCIF_SKIP_SHIFT_RK3576		(0x09)
 #define RKCIF_SKIP_EN_RK3576		(0x1 << 2)
+#define RKCIF_SKIP_EN_TOTAL_RK3576	(0x1 << 8)
 
 /* CIF LVDS SAV EAV Define */
 #define SW_LVDS_EAV_ACT(code)	(((code) & 0xfff) << 16)
@@ -1144,4 +1161,10 @@ enum cif_reg_index {
 #define GLB_RESET_IDI_EN_RK3576			(BIT(30))
 #define SW_DPHY1_SPLIT_EN_RK3576		(BIT(25))
 #define SW_DPHY2_SPLIT_EN_RK3576		(BIT(26))
+#define SW_DPHY_SPLIT_EN_RV1103B		(BIT(24))
+
+/*mask for rv1103b*/
+#define ROUNDING_2BIT_RV1103B			(1 << 18)
+#define ROUNDING_4BIT_RV1103B			(2 << 18)
+
 #endif

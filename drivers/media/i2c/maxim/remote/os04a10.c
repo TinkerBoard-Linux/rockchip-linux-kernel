@@ -2005,11 +2005,23 @@ undo:
 }
 #endif
 
+static int os04a10_get_channel_info(struct os04a10 *os04a10, struct rkmodule_channel_info *ch_info)
+{
+	if (ch_info->index < PAD0 || ch_info->index >= PAD_MAX)
+		return -EINVAL;
+	ch_info->vc = os04a10->cur_mode->vc[ch_info->index];
+	ch_info->width = os04a10->cur_mode->width;
+	ch_info->height = os04a10->cur_mode->height;
+	ch_info->bus_fmt = os04a10->cur_mode->bus_fmt;
+	return 0;
+}
+
 static long os04a10_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 {
 	struct os04a10 *os04a10 = to_os04a10(sd);
 	struct rkmodule_hdr_cfg *hdr_cfg;
 	struct rkmodule_dcg_ratio *dcg;
+	struct rkmodule_channel_info *ch_info;
 	long ret = 0;
 	u32 i, h, w;
 	u64 dst_link_freq = 0;
@@ -2081,6 +2093,10 @@ static long os04a10_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 			 "get dcg ratio integer %d, decimal %d div_coeff %d\n",
 			 dcg->integer, dcg->decimal, dcg->div_coeff);
 		break;
+	case RKMODULE_GET_CHANNEL_INFO:
+		ch_info = (struct rkmodule_channel_info *)arg;
+		ret = os04a10_get_channel_info(os04a10, ch_info);
+		break;
 	default:
 		ret = -ENOIOCTLCMD;
 		break;
@@ -2098,6 +2114,7 @@ static long os04a10_compat_ioctl32(struct v4l2_subdev *sd,
 	struct rkmodule_hdr_cfg *hdr;
 	struct preisp_hdrae_exp_s *hdrae;
 	struct rkmodule_dcg_ratio *dcg;
+	struct rkmodule_channel_info *ch_info;
 	long ret;
 	u32 cg = 0;
 
@@ -2178,6 +2195,21 @@ static long os04a10_compat_ioctl32(struct v4l2_subdev *sd,
 				return -EFAULT;
 		}
 		kfree(dcg);
+		break;
+	case RKMODULE_GET_CHANNEL_INFO:
+		ch_info = kzalloc(sizeof(*ch_info), GFP_KERNEL);
+		if (!ch_info) {
+			ret = -ENOMEM;
+			return ret;
+		}
+
+		ret = os04a10_ioctl(sd, cmd, ch_info);
+		if (!ret) {
+			ret = copy_to_user(up, ch_info, sizeof(*ch_info));
+			if (ret)
+				return -EFAULT;
+		}
+		kfree(ch_info);
 		break;
 	default:
 		ret = -ENOIOCTLCMD;

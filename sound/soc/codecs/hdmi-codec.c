@@ -276,6 +276,7 @@ struct hdmi_codec_priv {
 	struct mutex lock;
 	bool busy;
 	bool eld_bypass;
+	bool tx_dlp;
 	struct snd_soc_jack *jack;
 	unsigned int jack_status;
 	u8 iec_status[24];
@@ -464,6 +465,9 @@ static int hdmi_codec_startup(struct snd_pcm_substream *substream,
 	bool tx = substream->stream == SNDRV_PCM_STREAM_PLAYBACK;
 	int ret = 0;
 
+	if (hcp->tx_dlp && substream->stream != SNDRV_PCM_STREAM_PLAYBACK)
+		return 0;
+
 	mutex_lock(&hcp->lock);
 	if (hcp->busy) {
 		dev_err(dai->dev, "Only one simultaneous stream supported!\n");
@@ -503,6 +507,9 @@ static void hdmi_codec_shutdown(struct snd_pcm_substream *substream,
 				struct snd_soc_dai *dai)
 {
 	struct hdmi_codec_priv *hcp = snd_soc_dai_get_drvdata(dai);
+
+	if (hcp->tx_dlp && substream->stream != SNDRV_PCM_STREAM_PLAYBACK)
+		return;
 
 	hcp->chmap_idx = HDMI_CODEC_CHMAP_IDX_UNKNOWN;
 	if (hcp->hcd.ops->audio_shutdown)
@@ -566,6 +573,9 @@ static int hdmi_codec_hw_params(struct snd_pcm_substream *substream,
 	};
 	int ret;
 
+	if (hcp->tx_dlp && substream->stream != SNDRV_PCM_STREAM_PLAYBACK)
+		return 0;
+
 	if (!hcp->hcd.ops->hw_params)
 		return 0;
 
@@ -606,6 +616,9 @@ static int hdmi_codec_prepare(struct snd_pcm_substream *substream,
 	unsigned int rate = runtime->rate;
 	struct hdmi_codec_params hp;
 	int ret;
+
+	if (hcp->tx_dlp && substream->stream != SNDRV_PCM_STREAM_PLAYBACK)
+		return 0;
 
 	if (!hcp->hcd.ops->prepare)
 		return 0;
@@ -1070,6 +1083,8 @@ static int hdmi_codec_probe(struct platform_device *pdev)
 
 	hcp->hcd = *hcd;
 	mutex_init(&hcp->lock);
+
+	hcp->tx_dlp = device_property_read_bool(dev->parent, "audio,digital-loopback");
 
 	ret = snd_pcm_create_iec958_consumer_default(hcp->iec_status,
 						     sizeof(hcp->iec_status));

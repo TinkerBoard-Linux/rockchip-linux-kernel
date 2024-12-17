@@ -49,9 +49,9 @@
 #define GC1084_REG_VTS_H	0x0000
 #define GC1084_REG_VTS_L	0x0001
 
-#define GC1084_REG_CTRL_MODE	0x003E
-#define GC1084_MODE_SW_STANDBY	0x11
-#define GC1084_MODE_STREAMING	0x91
+#define GC1084_REG_CTRL_MODE	0x023E
+#define GC1084_MODE_SW_STANDBY	0x18
+#define GC1084_MODE_STREAMING	0x98
 
 #define GC1084_CHIP_ID		0x1084
 
@@ -292,7 +292,7 @@ static const struct reg_sequence gc1084_1280x720_liner_settings[] = {
 	{0x0213, 0x40},
 	{0x0215, 0x12},
 	{0x0229, 0x05},
-	{0x023e, 0x98},
+	{0x023e, 0x88},
 	{0x031e, 0x3e},
 };
 

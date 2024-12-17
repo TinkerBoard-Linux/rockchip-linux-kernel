@@ -677,10 +677,13 @@ sc830ai_find_best_fit(struct sc830ai *sc830ai, struct v4l2_subdev_format *fmt)
 
 	for (i = 0; i < ARRAY_SIZE(supported_modes); i++) {
 		dist = sc830ai_get_reso_dist(&supported_modes[i], framefmt);
-		if ((cur_best_fit_dist == -1 || dist < cur_best_fit_dist) &&
-			supported_modes[i].bus_fmt == framefmt->code) {
+		if (cur_best_fit_dist == -1 || dist < cur_best_fit_dist) {
 			cur_best_fit_dist = dist;
 			cur_best_fit = i;
+		} else if (dist == cur_best_fit_dist &&
+			   framefmt->code == supported_modes[i].bus_fmt) {
+			cur_best_fit = i;
+			break;
 		}
 	}
 	dev_info(&sc830ai->client->dev, "%s: cur_best_fit(%d)",
@@ -1000,6 +1003,9 @@ static long sc830ai_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 	long ret = 0;
 	u64 pixel_rate = 0;
 	u32 i, h, w, stream;
+	int cur_best_fit = -1;
+	int cur_best_fit_dist = -1;
+	int cur_dist, cur_fps, dst_fps;
 
 	switch (cmd) {
 	case PREISP_CMD_SET_HDRAE_EXP:
@@ -1010,6 +1016,8 @@ static long sc830ai_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 
 	case RKMODULE_SET_HDR_CFG:
 		hdr_cfg = (struct rkmodule_hdr_cfg *)arg;
+		if (hdr_cfg->hdr_mode == sc830ai->cur_mode->hdr_mode)
+			return 0;
 		if (sc830ai->streaming) {
 			ret = sc830ai_write_array(sc830ai->client, sc830ai->cur_mode->reg_list);
 			if (ret)
@@ -1017,21 +1025,32 @@ static long sc830ai_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 		}
 		w = sc830ai->cur_mode->width;
 		h = sc830ai->cur_mode->height;
+		dst_fps = DIV_ROUND_CLOSEST(sc830ai->cur_mode->max_fps.denominator,
+			sc830ai->cur_mode->max_fps.numerator);
 		for (i = 0; i < sc830ai->cfg_num; i++) {
 			if (w == supported_modes[i].width &&
 			    h == supported_modes[i].height &&
 			    supported_modes[i].hdr_mode == hdr_cfg->hdr_mode &&
 			    supported_modes[i].bus_fmt == sc830ai->cur_mode->bus_fmt) {
-				sc830ai_change_mode(sc830ai, &supported_modes[i]);
-				break;
+				cur_fps = DIV_ROUND_CLOSEST(supported_modes[i].max_fps.denominator,
+					supported_modes[i].max_fps.numerator);
+				cur_dist = abs(cur_fps - dst_fps);
+				if (cur_best_fit_dist == -1 || cur_dist < cur_best_fit_dist) {
+					cur_best_fit_dist = cur_dist;
+					cur_best_fit = i;
+				} else if (cur_dist == cur_best_fit_dist) {
+					cur_best_fit = i;
+					break;
+				}
 			}
 		}
-		if (i == sc830ai->cfg_num) {
+		if (cur_best_fit == -1) {
 			dev_err(&sc830ai->client->dev,
 				"not find hdr mode:%d %dx%d config\n",
 				hdr_cfg->hdr_mode, w, h);
 			ret = -EINVAL;
 		} else {
+			sc830ai_change_mode(sc830ai, &supported_modes[cur_best_fit]);
 			mode = sc830ai->cur_mode;
 			w = mode->hts_def - mode->width;
 			h = mode->vts_def - mode->height;

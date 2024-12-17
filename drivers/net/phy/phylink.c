@@ -1134,6 +1134,7 @@ int phylink_of_phy_connect(struct phylink *pl, struct device_node *dn,
 
 	ret = phy_attach_direct(pl->netdev, phy_dev, flags,
 				pl->link_interface);
+	phy_device_free(phy_dev);
 	if (ret)
 		return ret;
 

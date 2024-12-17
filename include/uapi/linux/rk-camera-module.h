@@ -12,8 +12,6 @@
 
 #define RKMODULE_API_VERSION		KERNEL_VERSION(0, 1, 0x2)
 
-/* using for rk3588 dual isp unite */
-#define RKMOUDLE_UNITE_EXTEND_PIXEL	128
 /* using for rv1109 and rv1126 */
 #define RKMODULE_EXTEND_LINE		24
 
@@ -37,6 +35,7 @@
 #define RKMODULE_INTERNAL_MASTER_MODE	"internal_master"
 #define RKMODULE_EXTERNAL_MASTER_MODE	"external_master"
 #define RKMODULE_SLAVE_MODE		"slave"
+#define RKMODULE_SOFT_SYNC_MODE		"soft_sync"
 
 #define RKMODULE_CAMERA_STANDBY_HW	"rockchip,camera-module-stb"
 
@@ -193,6 +192,9 @@
 
 #define RKCIS_CMD_FLASH_LIGHT_CTRL  \
 	_IOW('V', BASE_VIDIOC_PRIVATE + 43, struct rk_light_param)
+
+#define RKCIS_CMD_SELECT_SETTING  \
+	_IOW('V', BASE_VIDIOC_PRIVATE + 44, struct rk_sensor_setting)
 
 struct rkmodule_i2cdev_info {
 	__u8 slave_addr;
@@ -422,29 +424,25 @@ enum rkmodule_hdr_mode {
 	HDR_COMPR,
 };
 
-enum rkmodule_hdr_compr_segment {
-	HDR_COMPR_SEGMENT_4 = 4,
-	HDR_COMPR_SEGMENT_12 = 12,
-	HDR_COMPR_SEGMENT_16 = 16,
-};
+#define HDR_COMPR_POINT_MAX 32
 
 /* rkmodule_hdr_compr
  * linearised and compressed data for hdr: data_src = K * data_compr + XX
  *
- * bit: bit of src data, max 20 bit.
- * segment: linear segment, support 4, 6 or 16.
+ * src_bit: bit of src data, max 20 bit.
+ * point: linear point number, max 32 for rk3576.
  * k_shift: left shift bit of slop amplification factor, 2^k_shift, [0 15].
  * slope_k: K * 2^k_shift.
- * data_src_shitf: left shift bit of source data, data_src = 2^data_src_shitf
+ * data_src: source data.
  * data_compr: compressed data.
  */
 struct rkmodule_hdr_compr {
-	enum rkmodule_hdr_compr_segment segment;
-	__u8 bit;
+	__u8 point;
+	__u8 src_bit;
 	__u8 k_shift;
-	__u8 data_src_shitf[HDR_COMPR_SEGMENT_16];
-	__u16 data_compr[HDR_COMPR_SEGMENT_16];
-	__u32 slope_k[HDR_COMPR_SEGMENT_16];
+	__u16 data_compr[HDR_COMPR_POINT_MAX];
+	__u32 data_src[HDR_COMPR_POINT_MAX];
+	__u32 slope_k[HDR_COMPR_POINT_MAX];
 };
 
 /**
@@ -723,6 +721,7 @@ enum rkmodule_sync_mode {
 	EXTERNAL_MASTER_MODE,
 	INTERNAL_MASTER_MODE,
 	SLAVE_MODE,
+	SOFT_SYNC_MODE,
 };
 
 struct rkmodule_mclk_data {
@@ -845,6 +844,14 @@ struct rk_light_param {
 	__u64 duty_cycle;
 	__u64 period;
 	__u32 polarity;
+} __attribute__ ((packed));
+
+struct rk_sensor_setting {
+	__u32 width;
+	__u32 height;
+	__u32 fps;
+	__u32 fmt;
+	__u32 mode;
 } __attribute__ ((packed));
 
 #endif /* _UAPI_RKMODULE_CAMERA_H */

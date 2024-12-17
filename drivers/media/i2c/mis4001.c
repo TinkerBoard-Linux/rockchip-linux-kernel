@@ -35,7 +35,7 @@
 
 #define MIS4001_LANES			2
 #define MIS4001_BITS_PER_SAMPLE		10
-#define MIS4001_LINK_FREQ		337500000
+#define MIS4001_LINK_FREQ		378000000
 #define PIXEL_RATE_WITH_337M_10BIT	(MIS4001_LINK_FREQ * 2 * \
                             MIS4001_LANES / MIS4001_BITS_PER_SAMPLE)
 #define MIS4001_XVCLK_FREQ		    27000000
@@ -169,23 +169,22 @@ static const struct regval mis4001_global_regs[] = {
 static const struct regval mis4001_linear_10_2560x1440_regs[] = {
 	{0x300a, 0x01},
 	{0x3006, 0x02},
-	{REG_DELAY, 100},
 	{0x4220, 0x2b},
 	{0x4221, 0x6b},
 	{0x4222, 0xab},
 	{0x4223, 0xeb},
 	{0x3011, 0x2b},
 	{0x3302, 0x02},
-	{0x3307, 0x64},
+	{0x3307, 0x70},
 	{0x3306, 0x01},
 	{0x3309, 0x01},
-	{0x3308, 0x05},
+	{0x3308, 0x05}, //ACKL分频增大
 	{0x330a, 0x04},
 	{0x330b, 0x09},
 	{0x310f, 0xB8},
 	{0x310e, 0x0B},
-	{0x310d, 0xDC},
-	{0x310c, 0x05},
+	{0x310d, 0x90},
+	{0x310c, 0x06},
 	{0x3115, 0x10},
 	{0x3114, 0x00},
 	{0x3117, 0x0f},
@@ -194,7 +193,7 @@ static const struct regval mis4001_linear_10_2560x1440_regs[] = {
 	{0x3110, 0x00},
 	{0x3113, 0x9d},
 	{0x3112, 0x06},
-	{0x3128, 0x0f},//FW<4096 FFF
+	{0x3128, 0x0f}, //FW<4096 FFF
 	{0x3129, 0xff},
 	{0x3012, 0x03},
 	{0x3f00, 0x01},
@@ -260,7 +259,7 @@ static const struct regval mis4001_linear_10_2560x1440_regs[] = {
 	{0x3f50, 0x02},
 	{0x3f53, 0x5d},
 	{0x3f52, 0x02},
-	{0x3f55, 0x50},
+	{0x3f55, 0x5d},
 	{0x3f54, 0x02},
 	{0x3f3c, 0x9a},
 	{0x3f3b, 0x00},
@@ -272,6 +271,8 @@ static const struct regval mis4001_linear_10_2560x1440_regs[] = {
 	{0x3f41, 0x00},
 	{0x3f44, 0xb0},
 	{0x3f43, 0x04},
+	{0x3129, 0x45},
+	{0x3128, 0x00},
 	{0x312b, 0x4a},
 	{0x312a, 0x00},
 	{0x312f, 0xb2},
@@ -279,14 +280,8 @@ static const struct regval mis4001_linear_10_2560x1440_regs[] = {
 	{0x3124, 0x09},
 	{0x4200, 0x09},
 	{0x4201, 0x00},
-	{0x4204, 0xff},
-	{0x4205, 0x3f},
 	{0x4214, 0x60},
-	{0x420c, 0x50},
 	{0x420E, 0x94},
-	{0x4216, 0x6c},
-	{0x4217, 0xdc},
-	{0x4218, 0x02},
 	{0x4240, 0x8d},
 	{0x4242, 0x03},
 	{0x4224, 0x00},
@@ -320,7 +315,7 @@ static const struct regval mis4001_linear_10_2560x1440_regs[] = {
 	{0x3E00, 0x00},
 	{0x3E01, 0x10},
 	{0x400D, 0x30},
-	{0x3500, 0x1b},//1b/13
+	{0x3500, 0x1b}, //1b/13
 	{0x3501, 0x03},
 	{0x3508, 0x0a},
 	{0x3508, 0x04},
@@ -331,20 +326,17 @@ static const struct regval mis4001_linear_10_2560x1440_regs[] = {
 	{0x3704, 0x80},
 	{0x3706, 0x80},
 	{0x3708, 0x80},
-	{0x400D, 0x30},  //优化奇偶行及行噪
-	{0x4004, 0x40},
+	{0x400D, 0x30}, //优化奇偶行及行噪
+	{0x4004, 0x20}, //rcs尾电流改小
 	{0x4005, 0x0c},
+	{0x4007, 0x78},
 	{0x4009, 0x09},
 	{0x400a, 0x48},
 	{0x4006, 0x86},
 	{0x4019, 0x08},
-	{0x401b, 0x00},
 	{0x3f42, 0x58},
 	{0x3f49, 0x60},
 	{0x3f38, 0x38},
-	{0x4103, 0x3f},//mipi驱动能力加强
-	{0x4104, 0x07},//mipi阻抗减小
-	{0x3006, 0x00},
 	{REG_NULL, 0x00},
 };
 
@@ -357,8 +349,8 @@ static const struct mis4001_mode supported_modes[] = {
 			.denominator = 300000,
 		},
 		.exp_def = 0x0040,
-		.hts_def = 3432,
-		.vts_def = 1500,
+		.hts_def = 3000,
+		.vts_def = 1680,
 		.bus_fmt = MEDIA_BUS_FMT_SGRBG10_1X10,
 		.reg_list = mis4001_linear_10_2560x1440_regs,
 		.hdr_mode = NO_HDR,
@@ -646,6 +638,10 @@ mis4001_find_best_fit(struct v4l2_subdev_format *fmt)
 		if (cur_best_fit_dist == -1 || dist < cur_best_fit_dist) {
 			cur_best_fit_dist = dist;
 			cur_best_fit = i;
+		} else if (dist == cur_best_fit_dist &&
+			   framefmt->code == supported_modes[i].bus_fmt) {
+			cur_best_fit = i;
+			break;
 		}
 	}
 
@@ -884,6 +880,9 @@ static long mis4001_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 	long ret = 0;
 	u32 stream = 0;
 	u64 sleep_time = 0;
+	int cur_best_fit = -1;
+	int cur_best_fit_dist = -1;
+	int cur_dist, cur_fps, dst_fps;
 
 	switch (cmd) {
 	case RKMODULE_GET_MODULE_INFO:
@@ -896,23 +895,36 @@ static long mis4001_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 		break;
 	case RKMODULE_SET_HDR_CFG:
 		hdr = (struct rkmodule_hdr_cfg *)arg;
+		if (hdr->hdr_mode == mis4001->cur_mode->hdr_mode)
+			return 0;
 		w = mis4001->cur_mode->width;
 		h = mis4001->cur_mode->height;
+		dst_fps = DIV_ROUND_CLOSEST(mis4001->cur_mode->max_fps.denominator,
+			mis4001->cur_mode->max_fps.numerator);
 		for (i = 0; i < ARRAY_SIZE(supported_modes); i++) {
 			if (w == supported_modes[i].width &&
 			    h == supported_modes[i].height &&
 			    supported_modes[i].hdr_mode == hdr->hdr_mode &&
 			    supported_modes[i].bus_fmt == mis4001->cur_mode->bus_fmt) {
-				mis4001->cur_mode = &supported_modes[i];
-				break;
+				cur_fps = DIV_ROUND_CLOSEST(supported_modes[i].max_fps.denominator,
+					supported_modes[i].max_fps.numerator);
+				cur_dist = abs(cur_fps - dst_fps);
+				if (cur_best_fit_dist == -1 || cur_dist < cur_best_fit_dist) {
+					cur_best_fit_dist = cur_dist;
+					cur_best_fit = i;
+				} else if (cur_dist == cur_best_fit_dist) {
+					cur_best_fit = i;
+					break;
+				}
 			}
 		}
-		if (i == ARRAY_SIZE(supported_modes)) {
+		if (cur_best_fit == -1) {
 			dev_err(&mis4001->client->dev,
 				"not find hdr mode:%d %dx%d config\n",
 				hdr->hdr_mode, w, h);
 			ret = -EINVAL;
 		} else {
+			mis4001->cur_mode = &supported_modes[cur_best_fit];
 			w = mis4001->cur_mode->hts_def - mis4001->cur_mode->width;
 			h = mis4001->cur_mode->vts_def - mis4001->cur_mode->height;
 			__v4l2_ctrl_modify_range(mis4001->hblank, w, w, 1, w);

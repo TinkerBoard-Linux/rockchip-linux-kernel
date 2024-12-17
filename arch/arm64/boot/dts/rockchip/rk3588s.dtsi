@@ -337,6 +337,7 @@
 			clocks = <&cru I2S0_8CH_MCLKOUT>;
 			#clock-cells = <0>;
 			clock-output-names = "i2s0_mclkout_to_io";
+			power-domains = <&power RK3588_PD_AUDIO>;
 			rockchip,bit-shift = <0>;
 			rockchip,bit-set-to-disable;
 			rockchip,clk-ignore-unused; /* for OLD SDK */
@@ -369,6 +370,7 @@
 			clocks = <&cru I2S2_2CH_MCLKOUT>;
 			#clock-cells = <0>;
 			clock-output-names = "i2s2_mclkout_to_io";
+			power-domains = <&power RK3588_PD_AUDIO>;
 			rockchip,bit-shift = <2>;
 			rockchip,bit-set-to-disable;
 			rockchip,clk-ignore-unused; /* for OLD SDK */
@@ -380,6 +382,7 @@
 			clocks = <&cru I2S3_2CH_MCLKOUT>;
 			#clock-cells = <0>;
 			clock-output-names = "i2s3_mclkout_to_io";
+			power-domains = <&power RK3588_PD_AUDIO>;
 			rockchip,bit-shift = <7>;
 			rockchip,bit-set-to-disable;
 			rockchip,clk-ignore-unused; /* for OLD SDK */
@@ -6514,8 +6517,8 @@
 		#address-cells = <1>;
 		#size-cells = <1>;
 		clocks = <&cru CLK_OTPC_NS>, <&cru PCLK_OTPC_NS>,
-			 <&cru CLK_OTPC_ARB>, <&cru CLK_OTP_PHY_G>;
-		clock-names = "otpc", "apb", "arb", "phy";
+			 <&cru CLK_OTP_PHY_G>;
+		clock-names = "otpc", "apb", "phy";
 		resets = <&cru SRST_OTPC_NS>, <&cru SRST_P_OTPC_NS>,
 			 <&cru SRST_OTPC_ARB>;
 		reset-names = "otpc", "apb", "arb";

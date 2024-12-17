@@ -719,10 +719,13 @@ sc2310_find_best_fit(struct sc2310 *sc2310, struct v4l2_subdev_format *fmt)
 
 	for (i = 0; i < sc2310->cfg_num; i++) {
 		dist = sc2310_get_reso_dist(&supported_modes[i], framefmt);
-		if ((cur_best_fit_dist == -1 || dist <= cur_best_fit_dist) &&
-			(supported_modes[i].bus_fmt == framefmt->code)) {
+		if (cur_best_fit_dist == -1 || dist < cur_best_fit_dist) {
 			cur_best_fit_dist = dist;
 			cur_best_fit = i;
+		} else if (dist == cur_best_fit_dist &&
+			   framefmt->code == supported_modes[i].bus_fmt) {
+			cur_best_fit = i;
+			break;
 		}
 	}
 
@@ -1163,6 +1166,9 @@ static long sc2310_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 	long ret = 0;
 	u64 pixel_rate = 0;
 	u32 i, h, w, stream;
+	int cur_best_fit = -1;
+	int cur_best_fit_dist = -1;
+	int cur_dist, cur_fps, dst_fps;
 
 	switch (cmd) {
 	case PREISP_CMD_SET_HDRAE_EXP:
@@ -1175,24 +1181,37 @@ static long sc2310_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 			if (ret)
 				return ret;
 		}
+		if (hdr_cfg->hdr_mode == sc2310->cur_mode->hdr_mode)
+			return 0;
 		w = sc2310->cur_mode->width;
 		h = sc2310->cur_mode->height;
+		dst_fps = DIV_ROUND_CLOSEST(sc2310->cur_mode->max_fps.denominator,
+			sc2310->cur_mode->max_fps.numerator);
 		for (i = 0; i < sc2310->cfg_num; i++) {
 			if (w == supported_modes[i].width &&
 			    h == supported_modes[i].height &&
 			    supported_modes[i].hdr_mode == hdr_cfg->hdr_mode &&
 			    supported_modes[i].bus_fmt == sc2310->cur_mode->bus_fmt) {
-				sc2310_change_mode(sc2310, &supported_modes[i]);
-				break;
+				cur_fps = DIV_ROUND_CLOSEST(supported_modes[i].max_fps.denominator,
+					supported_modes[i].max_fps.numerator);
+				cur_dist = abs(cur_fps - dst_fps);
+				if (cur_best_fit_dist == -1 || cur_dist < cur_best_fit_dist) {
+					cur_best_fit_dist = cur_dist;
+					cur_best_fit = i;
+				} else if (cur_dist == cur_best_fit_dist) {
+					cur_best_fit = i;
+					break;
+				}
 			}
 		}
 
-		if (i == sc2310->cfg_num) {
+		if (cur_best_fit == -1) {
 			dev_err(&sc2310->client->dev,
 				"not find hdr mode:%d %dx%d config\n",
 				hdr_cfg->hdr_mode, w, h);
 			ret = -EINVAL;
 		} else {
+			sc2310_change_mode(sc2310, &supported_modes[cur_best_fit]);
 			mode = sc2310->cur_mode;
 			w = mode->hts_def - mode->width;
 			h = mode->vts_def - mode->height;

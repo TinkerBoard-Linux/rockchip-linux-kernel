@@ -1099,15 +1099,30 @@ static int imx334_set_hdrae(struct imx334 *imx334,
 	return ret;
 }
 
+static int imx334_get_channel_info(struct imx334 *imx334, struct rkmodule_channel_info *ch_info)
+{
+	if (ch_info->index < PAD0 || ch_info->index >= PAD_MAX)
+		return -EINVAL;
+	ch_info->vc = imx334->cur_mode->vc[ch_info->index];
+	ch_info->width = imx334->cur_mode->width;
+	ch_info->height = imx334->cur_mode->height;
+	ch_info->bus_fmt = imx334->cur_mode->bus_fmt;
+	return 0;
+}
+
 static long imx334_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 {
 	struct imx334 *imx334 = to_imx334(sd);
 	struct rkmodule_hdr_cfg *hdr;
+	struct rkmodule_channel_info *ch_info;
 	long ret = 0;
 	u32 i, h, w;
 	s64 dst_pixel_rate = 0;
 	const struct imx334_mode *mode;
 	u32 stream = 0;
+	int cur_best_fit = -1;
+	int cur_best_fit_dist = -1;
+	int cur_dist, cur_fps, dst_fps;
 
 	switch (cmd) {
 	case PREISP_CMD_SET_HDRAE_EXP:
@@ -1122,23 +1137,36 @@ static long imx334_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 		break;
 	case RKMODULE_SET_HDR_CFG:
 		hdr = (struct rkmodule_hdr_cfg *)arg;
+		if (hdr->hdr_mode == imx334->cur_mode->hdr_mode)
+			return 0;
 		w = imx334->cur_mode->width;
 		h = imx334->cur_mode->height;
+		dst_fps = DIV_ROUND_CLOSEST(imx334->cur_mode->max_fps.denominator,
+			imx334->cur_mode->max_fps.numerator);
 		for (i = 0; i < ARRAY_SIZE(supported_modes); i++) {
 			if (w == supported_modes[i].width &&
 			    h == supported_modes[i].height &&
 			    supported_modes[i].bus_fmt == imx334->cur_mode->bus_fmt &&
 			    supported_modes[i].hdr_mode == hdr->hdr_mode) {
-				imx334->cur_mode = &supported_modes[i];
-				break;
+				cur_fps = DIV_ROUND_CLOSEST(supported_modes[i].max_fps.denominator,
+					supported_modes[i].max_fps.numerator);
+				cur_dist = abs(cur_fps - dst_fps);
+				if (cur_best_fit_dist == -1 || cur_dist < cur_best_fit_dist) {
+					cur_best_fit_dist = cur_dist;
+					cur_best_fit = i;
+				} else if (cur_dist == cur_best_fit_dist) {
+					cur_best_fit = i;
+					break;
+				}
 			}
 		}
-		if (i == ARRAY_SIZE(supported_modes)) {
+		if (cur_best_fit == -1) {
 			dev_err(&imx334->client->dev,
 				"not find hdr mode:%d %dx%d config\n",
 				hdr->hdr_mode, w, h);
 			ret = -EINVAL;
 		} else {
+			imx334->cur_mode = &supported_modes[cur_best_fit];
 			mode = imx334->cur_mode;
 			imx334->cur_vts = mode->vts_def;
 			w = mode->hts_def - mode->width;
@@ -1181,6 +1209,10 @@ static long imx334_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 			ret = imx334_write_reg(imx334->client, IMX334_REG_CTRL_MODE,
 				IMX334_REG_VALUE_08BIT, 1);
 		break;
+	case RKMODULE_GET_CHANNEL_INFO:
+		ch_info = (struct rkmodule_channel_info *)arg;
+		ret = imx334_get_channel_info(imx334, ch_info);
+		break;
 	default:
 		ret = -ENOIOCTLCMD;
 		break;
@@ -1198,6 +1230,7 @@ static long imx334_compat_ioctl32(struct v4l2_subdev *sd,
 	struct rkmodule_awb_cfg *cfg;
 	struct rkmodule_hdr_cfg *hdr;
 	struct preisp_hdrae_exp_s *hdrae;
+	struct rkmodule_channel_info *ch_info;
 	long ret;
 	u32 stream = 0;
 
@@ -1266,6 +1299,21 @@ static long imx334_compat_ioctl32(struct v4l2_subdev *sd,
 		ret = copy_from_user(&stream, up, sizeof(u32));
 		if (!ret)
 			ret = imx334_ioctl(sd, cmd, &stream);
+		break;
+	case RKMODULE_GET_CHANNEL_INFO:
+		ch_info = kzalloc(sizeof(*ch_info), GFP_KERNEL);
+		if (!ch_info) {
+			ret = -ENOMEM;
+			return ret;
+		}
+
+		ret = imx334_ioctl(sd, cmd, ch_info);
+		if (!ret) {
+			ret = copy_to_user(up, ch_info, sizeof(*ch_info));
+			if (ret)
+				return -EFAULT;
+		}
+		kfree(ch_info);
 		break;
 	default:
 		ret = -ENOIOCTLCMD;

@@ -60,6 +60,9 @@
 #define I2CM_ADDR					0xff000
 #define I2CM_SLVADDR					0xfe0
 #define I2CM_WR_MASK					0x1e
+#define I2CM_NBYTES_MASK				(0xf << 20)
+#define I2CM_16BYTES					(0xf << 20)
+#define I2CM_1BYTES					(0 << 20)
 #define I2CM_EXT_READ					BIT(4)
 #define I2CM_SHORT_READ					BIT(3)
 #define I2CM_FM_READ					BIT(2)
@@ -849,5 +852,9 @@
 #define HDMI_HDCP14_MEM_BSTATUS0			0x5958
 #define HDMI_HDCP14_MEM_M0_1				0x5960
 #define HDMI_HDCP14_MEM_M0_7				0x597c
+
+#define SCDC_CONFIG_1					0x31
+#define SCDC_SOURCE_TEST_CONFIG				0x35
+#define SCDC_STATUS_FLAGS_2				0x42
 
 #endif /* __DW_HDMI_QP_H__ */

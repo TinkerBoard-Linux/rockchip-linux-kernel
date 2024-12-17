@@ -475,6 +475,10 @@ gc02m2_find_best_fit(struct v4l2_subdev_format *fmt)
 		if (cur_best_fit_dist == -1 || dist < cur_best_fit_dist) {
 			cur_best_fit_dist = dist;
 			cur_best_fit = i;
+		} else if (dist == cur_best_fit_dist &&
+			   framefmt->code == supported_modes[i].bus_fmt) {
+			cur_best_fit = i;
+			break;
 		}
 	}
 
@@ -694,6 +698,9 @@ static long gc02m2_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 	long ret = 0;
 	int i, w, h;
 	u32 stream = 0;
+	int cur_best_fit = -1;
+	int cur_best_fit_dist = -1;
+	int cur_dist, cur_fps, dst_fps;
 
 	switch (cmd) {
 	case RKMODULE_GET_MODULE_INFO:
@@ -713,7 +720,6 @@ static long gc02m2_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 			ret |= gc02m2_write_reg(gc02m2->client, GC02M2_PAGE_SELECT, 0x00);
 		}
 		break;
-		
 	case RKMODULE_GET_HDR_CFG:
 		hdr_cfg = (struct rkmodule_hdr_cfg *)arg;
 		hdr_cfg->esp.mode = HDR_NORMAL_VC;
@@ -721,23 +727,36 @@ static long gc02m2_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 		break;
 	case RKMODULE_SET_HDR_CFG:
 		hdr_cfg = (struct rkmodule_hdr_cfg *)arg;
+		if (hdr_cfg->hdr_mode == gc02m2->cur_mode->hdr_mode)
+			return 0;
 		w = gc02m2->cur_mode->width;
 		h = gc02m2->cur_mode->height;
+		dst_fps = DIV_ROUND_CLOSEST(gc02m2->cur_mode->max_fps.denominator,
+			gc02m2->cur_mode->max_fps.numerator);
 		for (i = 0; i < ARRAY_SIZE(supported_modes); i++) {
 			if (w == supported_modes[i].width &&
 			    h == supported_modes[i].height &&
 			    supported_modes[i].bus_fmt == gc02m2->cur_mode->bus_fmt &&
 			    supported_modes[i].hdr_mode == hdr_cfg->hdr_mode) {
-				gc02m2->cur_mode = &supported_modes[i];
-				break;
+				cur_fps = DIV_ROUND_CLOSEST(supported_modes[i].max_fps.denominator,
+					supported_modes[i].max_fps.numerator);
+				cur_dist = abs(cur_fps - dst_fps);
+				if (cur_best_fit_dist == -1 || cur_dist < cur_best_fit_dist) {
+					cur_best_fit_dist = cur_dist;
+					cur_best_fit = i;
+				} else if (cur_dist == cur_best_fit_dist) {
+					cur_best_fit = i;
+					break;
+				}
 			}
 		}
-		if (i == ARRAY_SIZE(supported_modes)) {
+		if (cur_best_fit == -1) {
 			dev_err(&gc02m2->client->dev,
 				"not find hdr mode:%d %dx%d config\n",
 				hdr_cfg->hdr_mode, w, h);
 			ret = -EINVAL;
 		} else {
+			gc02m2->cur_mode = &supported_modes[cur_best_fit];
 			w = gc02m2->cur_mode->hts_def - gc02m2->cur_mode->width;
 			h = gc02m2->cur_mode->vts_def - gc02m2->cur_mode->height;
 			__v4l2_ctrl_modify_range(gc02m2->hblank, w, w, 1, w);

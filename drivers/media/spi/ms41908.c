@@ -6,6 +6,7 @@
  *
  */
 //#define DEBUG
+//#define READREG_DEBUG
 #include <linux/io.h>
 #include <linux/of_gpio.h>
 #include <linux/module.h>
@@ -140,6 +141,9 @@ struct ext_dev {
 	int max_back_delay;
 	struct completion complete_out;
 	bool is_running;
+
+	u32 default_psum;
+	u32 default_intct;
 };
 
 struct dciris_dev {
@@ -1099,7 +1103,7 @@ static void motor_config_dev_next_status(struct motor_dev *motor, struct ext_dev
 	u16 psum = 0;
 	u16 micro = 0;
 	struct spi_device *spi = motor->spi;
-#ifdef DEBUG
+#ifdef READREG_DEBUG
 	u16 intct = 0;
 	int i = 0;
 	u16 val = 0;
@@ -1124,7 +1128,7 @@ static void motor_config_dev_next_status(struct motor_dev *motor, struct ext_dev
 	}
 #endif
 
-#ifdef DEBUG
+#ifdef READREG_DEBUG
 	spi_read_reg(spi, dev->reg_op->reg.ppw, &ppw);
 	spi_read_reg(spi, dev->reg_op->reg.psum, &psum);
 	spi_read_reg(spi, dev->reg_op->reg.intct, &intct);
@@ -1199,7 +1203,7 @@ static void motor_op_work(struct work_struct *work)
 		container_of(work, struct motor_work_s, work);
 	struct motor_dev *motor = wk->dev;
 	static struct __kernel_old_timeval tv_last = {0};
-	struct __kernel_old_timeval tv = {0};
+	struct __kernel_old_timeval tv;
 	u64 time_dist = 0;
 
 	tv = ns_to_kernel_old_timeval(ktime_get_ns());
@@ -1307,7 +1311,7 @@ static void wait_for_motor_stop(struct motor_dev *motor, struct ext_dev *dev)
 
 static int ms41908_s_ctrl(struct v4l2_ctrl *ctrl)
 {
-#ifdef DEBUG
+#ifdef READREG_DEBUG
 	int i = 0;
 	u16 val = 0;
 #endif
@@ -1329,7 +1333,7 @@ static int ms41908_s_ctrl(struct v4l2_ctrl *ctrl)
 			gpiod_set_value(motor->dciris->vd_iris_gpio, 0);
 			motor->dciris->last_log = ctrl->val;
 			dev_dbg(&motor->spi->dev, "set iris pos %d\n", ctrl->val);
-#ifdef DEBUG
+#ifdef READREG_DEBUG
 			for (i = 0; i < 16; i++) {
 				spi_read_reg(motor->spi, i, &val);
 				dev_dbg(&motor->spi->dev, "reg,val=0x%02x,0x%04x\n", i, val);
@@ -1401,6 +1405,92 @@ static int ms41908_s_ctrl(struct v4l2_ctrl *ctrl)
 	return ret;
 }
 
+static void ms41908_restore_speed(struct motor_dev *motor)
+{
+	struct ext_dev *zoom_dev = motor->zoom;
+	struct ext_dev *focus_dev = motor->focus;
+
+	zoom_dev->run_data.psum = zoom_dev->default_psum;
+	zoom_dev->run_data.intct = zoom_dev->default_intct;
+	focus_dev->run_data.psum = focus_dev->default_psum;
+	focus_dev->run_data.intct = focus_dev->default_intct;
+
+	dev_dbg(&motor->spi->dev,
+		"%s: zoom psum: %d, zoom intct: %d, focus psum: %d, focus intct: %d\n",
+		__func__,
+		zoom_dev->run_data.psum,
+		zoom_dev->run_data.intct,
+		focus_dev->run_data.psum,
+		focus_dev->run_data.intct);
+}
+
+static void ms41908_sync_zoomfocus_speed(struct motor_dev *motor, s32 zoom_pos, s32 focus_pos,
+					 bool is_zoom_need_reback, bool is_focus_need_reback)
+{
+	struct ext_dev *zoom_dev = motor->zoom;
+	struct ext_dev *focus_dev = motor->focus;
+	u32 zoom_mv_cnt = 0;
+	u32 focus_mv_cnt = 0;
+	u32 zoom_mv_step = 0;
+	u32 focus_mv_step = 0;
+	u32 zoom_vd_count = 0;
+	u32 focus_vd_count = 0;
+	u32 max_vd_count = 0;
+	u32 zoom_vd_psum = 0;
+	u32 focus_vd_psum = 0;
+
+	zoom_mv_cnt = abs(zoom_pos - zoom_dev->last_pos);
+	if (is_zoom_need_reback)
+		zoom_mv_cnt += zoom_dev->reback;
+
+	if (zoom_dev->is_half_step_mode)
+		zoom_mv_step = zoom_mv_cnt * 4;
+	else
+		zoom_mv_step = zoom_mv_cnt * 8;
+
+	zoom_vd_count = (zoom_mv_step + zoom_dev->default_psum - 1) / zoom_dev->default_psum;
+
+	focus_mv_cnt = abs(focus_pos - focus_dev->last_pos);
+	if (is_focus_need_reback)
+		focus_mv_cnt += focus_dev->reback;
+
+	if (focus_dev->is_half_step_mode)
+		focus_mv_step = focus_mv_cnt * 4;
+	else
+		focus_mv_step = focus_mv_cnt * 8;
+
+	focus_vd_count = (focus_mv_step + focus_dev->default_psum - 1) / focus_dev->default_psum;
+	max_vd_count = (zoom_vd_count > focus_vd_count) ? zoom_vd_count : focus_vd_count;
+
+	if (zoom_mv_cnt > 0) {
+		zoom_vd_psum = (zoom_mv_step + max_vd_count - 1) / max_vd_count;
+		if (zoom_vd_psum > zoom_dev->default_psum)
+			zoom_vd_psum = zoom_dev->default_psum;
+		zoom_dev->run_data.psum = zoom_vd_psum;
+		zoom_dev->run_data.intct = motor->sys_clk * motor->vd_fz_period_us /
+					   (zoom_dev->run_data.psum * 24);
+	}
+
+	if (focus_mv_cnt > 0) {
+		focus_vd_psum = (focus_mv_step + max_vd_count - 1) / max_vd_count;
+		if (focus_vd_psum > focus_dev->default_psum)
+			focus_vd_psum = focus_dev->default_psum;
+		focus_dev->run_data.psum = focus_vd_psum;
+		focus_dev->run_data.intct = motor->sys_clk * motor->vd_fz_period_us /
+					    (focus_dev->run_data.psum * 24);
+	}
+
+	dev_dbg(&motor->spi->dev,
+		"%s: zoom_mv_cnt %d, focus_mv_cnt %d, zoom psum: %d, zoom intct: %d, focus psum: %d, focus intct: %d\n",
+		__func__,
+		zoom_mv_cnt,
+		focus_mv_cnt,
+		zoom_dev->run_data.psum,
+		zoom_dev->run_data.intct,
+		focus_dev->run_data.psum,
+		focus_dev->run_data.intct);
+}
+
 static int ms41908_set_zoom_follow(struct motor_dev *motor, struct rk_cam_set_zoom *mv_param)
 {
 	int i = 0;
@@ -1410,12 +1500,19 @@ static int ms41908_set_zoom_follow(struct motor_dev *motor, struct rk_cam_set_zo
 
 	for (i = 0; i < mv_param->setzoom_cnt; i++) {
 		dev_dbg(&motor->spi->dev,
-			"%s zoom %d, focus %d, i %d\n",
+			"%s zoom %d, focus %d, i %d, setzoom_cnt %d, is_need_zoom_reback %d, is_need_focus_reback %d\n",
 			__func__,
 			mv_param->zoom_pos[i].zoom_pos,
 			mv_param->zoom_pos[i].focus_pos,
-			i);
+			i, mv_param->setzoom_cnt,
+			is_need_zoom_reback,
+			is_need_focus_reback);
 
+		ms41908_sync_zoomfocus_speed(motor,
+					     mv_param->zoom_pos[i].zoom_pos,
+					     mv_param->zoom_pos[i].focus_pos,
+					     is_need_zoom_reback,
+					     is_need_focus_reback);
 		if (i == (mv_param->setzoom_cnt - 1)) {
 			ret = set_motor_running_status(motor,
 						       motor->focus,
@@ -1423,20 +1520,20 @@ static int ms41908_set_zoom_follow(struct motor_dev *motor, struct rk_cam_set_zo
 						       true,
 						       true,
 						       is_need_focus_reback);
-			ret = set_motor_running_status(motor,
+			ret |= set_motor_running_status(motor,
 						       motor->zoom,
 						       mv_param->zoom_pos[i].zoom_pos,
 						       true,
 						       false,
 						       is_need_zoom_reback);
 		} else {
-			set_motor_running_status(motor,
+			ret = set_motor_running_status(motor,
 						 motor->focus,
 						 mv_param->zoom_pos[i].focus_pos,
 						 false,
 						 true,
 						 false);
-			set_motor_running_status(motor,
+			ret |= set_motor_running_status(motor,
 						 motor->zoom,
 						 mv_param->zoom_pos[i].zoom_pos,
 						 false,
@@ -1446,6 +1543,8 @@ static int ms41908_set_zoom_follow(struct motor_dev *motor, struct rk_cam_set_zo
 		wait_for_motor_stop(motor, motor->focus);
 		wait_for_motor_stop(motor, motor->zoom);
 	}
+
+	ms41908_restore_speed(motor);
 	return ret;
 }
 
@@ -1667,7 +1766,7 @@ static int ms41908_reinit_piris(struct motor_dev *motor)
 					       false);
 		wait_for_motor_stop(motor, motor->piris);
 	}
-	return 0;
+	return ret;
 }
 
 static void ms41908_reinit_piris_pos(struct motor_dev *motor)
@@ -1743,7 +1842,7 @@ static int ms41908_reinit_focus(struct motor_dev *motor)
 					       true);
 		wait_for_motor_stop(motor, motor->focus);
 	}
-	return 0;
+	return ret;
 }
 
 static void ms41908_reinit_focus_pos(struct motor_dev *motor)
@@ -1820,7 +1919,7 @@ static int  ms41908_reinit_zoom(struct motor_dev *motor)
 					       true);
 		wait_for_motor_stop(motor, motor->zoom);
 	}
-	return 0;
+	return ret;
 }
 
 static void ms41908_reinit_zoom_pos(struct motor_dev *motor)
@@ -1885,7 +1984,7 @@ static int ms41908_reinit_zoom1(struct motor_dev *motor)
 					       true);
 		wait_for_motor_stop(motor, motor->zoom1);
 	}
-	return 0;
+	return ret;
 }
 
 static void ms41908_reinit_zoom1_pos(struct motor_dev *motor)
@@ -2659,11 +2758,15 @@ static void dev_param_init(struct motor_dev *motor)
 					       (motor->focus->run_data.psum * 24);
 		motor->focus->is_running = false;
 		motor->focus->reback_ctrl = false;
+		motor->focus->default_intct = motor->focus->run_data.intct;
+		motor->focus->default_psum = motor->focus->run_data.psum;
 		dev_info(&motor->spi->dev,
-			 "focus vd_fz_period_us %u, psum %d, inict %d\n",
+			 "focus vd_fz_period_us %u, psum %d, inict %d, default_intct %d, default_psum %d\n",
 			 motor->vd_fz_period_us,
 			 motor->focus->run_data.psum,
-			 motor->focus->run_data.intct);
+			 motor->focus->run_data.intct,
+			 motor->focus->default_intct,
+			 motor->focus->default_psum);
 		if (motor->focus->reback != 0) {
 			motor->focus->cur_back_delay = 0;
 			motor->focus->max_back_delay = FOCUS_MAX_BACK_DELAY;
@@ -2708,6 +2811,8 @@ static void dev_param_init(struct motor_dev *motor)
 					      (motor->zoom->run_data.psum * 24);
 		motor->zoom->is_running = false;
 		motor->zoom->reback_ctrl = false;
+		motor->zoom->default_intct = motor->zoom->run_data.intct;
+		motor->zoom->default_psum = motor->zoom->run_data.psum;
 		if (motor->zoom->reback != 0) {
 			motor->zoom->cur_back_delay = 0;
 			motor->zoom->max_back_delay = ZOOM_MAX_BACK_DELAY;
@@ -2735,10 +2840,12 @@ static void dev_param_init(struct motor_dev *motor)
 			motor->zoom->reback_move_time_us = reback_vd_cnt * (motor->vd_fz_period_us + 500);
 		}
 		dev_info(&motor->spi->dev,
-			 "zoom vd_fz_period_us %u, psum %d, inict %d\n",
+			 "zoom vd_fz_period_us %u, psum %d, inict %d, default_intct %d, default_psum %d\n",
 			 motor->vd_fz_period_us,
 			 motor->zoom->run_data.psum,
-			 motor->zoom->run_data.intct);
+			 motor->zoom->run_data.intct,
+			 motor->zoom->default_intct,
+			 motor->zoom->default_psum);
 	}
 	if (motor->is_use_zoom1) {
 		motor->zoom1->is_mv_tim_update = false;
@@ -2757,11 +2864,15 @@ static void dev_param_init(struct motor_dev *motor)
 					       (motor->zoom1->run_data.psum * 24);
 		motor->zoom1->is_running = false;
 		motor->zoom1->reback_ctrl = false;
+		motor->zoom1->default_intct = motor->zoom1->run_data.intct;
+		motor->zoom1->default_psum = motor->zoom1->run_data.psum;
 		dev_info(&motor->spi->dev,
-			 "zoom1 vd_fz_period_us %u, psum %d, inict %d\n",
+			 "zoom1 vd_fz_period_us %u, psum %d, inict %d, default_intct %d, default_psum %d\n",
 			 motor->vd_fz_period_us,
 			 motor->zoom1->run_data.psum,
-			 motor->zoom1->run_data.intct);
+			 motor->zoom1->run_data.intct,
+			 motor->zoom1->default_intct,
+			 motor->zoom1->default_psum);
 	}
 
 	motor->is_should_wait = false;

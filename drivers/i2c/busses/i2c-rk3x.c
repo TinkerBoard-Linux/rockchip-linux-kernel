@@ -1456,6 +1456,11 @@ static const struct i2c_algorithm rk3x_i2c_algorithm = {
 	.functionality		= rk3x_i2c_func,
 };
 
+static const struct rk3x_i2c_soc_data rv1103b_soc_data = {
+	.grf_offset = 0x50008,
+	.calc_timings = rk3x_i2c_v1_calc_timings,
+};
+
 static const struct rk3x_i2c_soc_data rv1108_soc_data = {
 	.grf_offset = 0x408,
 	.calc_timings = rk3x_i2c_v1_calc_timings,
@@ -1492,6 +1497,10 @@ static const struct rk3x_i2c_soc_data rk3399_soc_data = {
 };
 
 static const struct of_device_id rk3x_i2c_match[] = {
+	{
+		.compatible = "rockchip,rv1103b-i2c",
+		.data = &rv1103b_soc_data
+	},
 	{
 		.compatible = "rockchip,rv1108-i2c",
 		.data = &rv1108_soc_data
@@ -1616,7 +1625,10 @@ static int rk3x_i2c_probe(struct platform_device *pdev)
 		if (!IS_ERR(grf)) {
 			int bus_nr = i2c->adap.nr;
 
-			if (i2c->soc_data == &rv1108_soc_data && bus_nr == 2)
+			if (i2c->soc_data == &rv1103b_soc_data && bus_nr == 4)
+				/* rv1103b i2c4 set grf offset-0x8, bit-8 */
+				value = BIT(24) | BIT(8);
+			else if (i2c->soc_data == &rv1108_soc_data && bus_nr == 2)
 				/* rv1108 i2c2 set grf offset-0x408, bit-10 */
 				value = BIT(26) | BIT(10);
 			else if (i2c->soc_data == &rv1126_soc_data &&

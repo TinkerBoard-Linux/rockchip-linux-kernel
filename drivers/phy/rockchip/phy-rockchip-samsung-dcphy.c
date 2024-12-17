@@ -215,6 +215,8 @@
 #define RX_S0D3_DESKEW_CON0		(0xF40)
 #define RX_S0D3_DESKEW_CON2		(0xF48)
 #define RX_S0D3_DESKEW_CON4		(0xF50)
+#define RX_S0D3_ADI_STAT0		(0XFEC)
+#define MIPI_DCPHY_MAX_REGISGER		RX_S0D3_ADI_STAT0
 
 struct samsung_mipi_dphy_timing {
 	unsigned int max_lane_mbps;
@@ -2289,7 +2291,7 @@ static const struct regmap_config samsung_mipi_dcphy_regmap_config = {
 	.reg_bits = 32,
 	.val_bits = 32,
 	.reg_stride = 4,
-	.max_register = 0x10000,
+	.max_register = MIPI_DCPHY_MAX_REGISGER,
 };
 
 static int samsung_mipi_dcphy_probe(struct platform_device *pdev)
@@ -2311,6 +2313,7 @@ static int samsung_mipi_dcphy_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, samsung);
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	samsung->res = res;
 	regs = devm_ioremap_resource(dev, res);
 	if (IS_ERR(regs))
 		return PTR_ERR(regs);

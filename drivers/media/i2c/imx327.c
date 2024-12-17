@@ -145,6 +145,7 @@ struct imx327_mode {
 	u32 link_freq_idx;
 	u32 lanes;
 	u32 bpp;
+	u32 vc[PAD_MAX];
 };
 
 struct imx327 {
@@ -599,6 +600,7 @@ static const struct imx327_mode mipi_supported_modes[] = {
 		.link_freq_idx = 0,
 		.lanes = 4,
 		.bpp = 10,
+		.vc[PAD0] = V4L2_MBUS_CSI2_CHANNEL_0,
 	}, {
 		.bus_fmt = MEDIA_BUS_FMT_SRGGB10_1X10,
 		.width = 1952,
@@ -615,6 +617,10 @@ static const struct imx327_mode mipi_supported_modes[] = {
 		.link_freq_idx = 1,
 		.lanes = 4,
 		.bpp = 10,
+		.vc[PAD0] = V4L2_MBUS_CSI2_CHANNEL_1,
+		.vc[PAD1] = V4L2_MBUS_CSI2_CHANNEL_0,//L->csi wr0
+		.vc[PAD2] = V4L2_MBUS_CSI2_CHANNEL_1,
+		.vc[PAD3] = V4L2_MBUS_CSI2_CHANNEL_1,//M->csi wr2
 	},
 };
 
@@ -1163,16 +1169,31 @@ undo:
 }
 #endif
 
+static int imx327_get_channel_info(struct imx327 *imx327, struct rkmodule_channel_info *ch_info)
+{
+	if (ch_info->index < PAD0 || ch_info->index >= PAD_MAX)
+		return -EINVAL;
+	ch_info->vc = imx327->cur_mode->vc[ch_info->index];
+	ch_info->width = imx327->cur_mode->width;
+	ch_info->height = imx327->cur_mode->height;
+	ch_info->bus_fmt = imx327->cur_mode->bus_fmt;
+	return 0;
+}
+
 static long imx327_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 {
 	struct imx327 *imx327 = to_imx327(sd);
 	struct rkmodule_hdr_cfg *hdr;
 	struct rkmodule_lvds_cfg *lvds_cfg;
+	struct rkmodule_channel_info *ch_info;
 	u32 i, h, w;
 	long ret = 0;
 	s64 dst_pixel_rate = 0;
 	s32 dst_link_freq = 0;
 	u32 stream = 0;
+	int cur_best_fit = -1;
+	int cur_best_fit_dist = -1;
+	int cur_dist, cur_fps, dst_fps;
 
 	switch (cmd) {
 	case RKMODULE_GET_MODULE_INFO:
@@ -1191,19 +1212,32 @@ static long imx327_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 		break;
 	case RKMODULE_SET_HDR_CFG:
 		hdr = (struct rkmodule_hdr_cfg *)arg;
+		if (hdr->hdr_mode == imx327->cur_mode->hdr_mode)
+			return 0;
+		dst_fps = DIV_ROUND_CLOSEST(imx327->cur_mode->max_fps.denominator,
+			imx327->cur_mode->max_fps.numerator);
 		for (i = 0; i < imx327->support_modes_num; i++) {
 			if (imx327->support_modes[i].bus_fmt == imx327->cur_mode->bus_fmt &&
 			    imx327->support_modes[i].hdr_mode == hdr->hdr_mode) {
-				imx327->cur_mode = &imx327->support_modes[i];
-				break;
+				cur_fps = DIV_ROUND_CLOSEST(imx327->support_modes[i].max_fps.denominator,
+					imx327->support_modes[i].max_fps.numerator);
+				cur_dist = abs(cur_fps - dst_fps);
+				if (cur_best_fit_dist == -1 || cur_dist < cur_best_fit_dist) {
+					cur_best_fit_dist = cur_dist;
+					cur_best_fit = i;
+				} else if (cur_dist == cur_best_fit_dist) {
+					cur_best_fit = i;
+					break;
+				}
 			}
 		}
-		if (i == imx327->support_modes_num) {
+		if (cur_best_fit == -1) {
 			dev_err(&imx327->client->dev,
 				"not find hdr mode:%d config\n",
 				hdr->hdr_mode);
 			ret = -EINVAL;
 		} else {
+			imx327->cur_mode = &imx327->support_modes[cur_best_fit];
 			w = imx327->cur_mode->hts_def - imx327->cur_mode->width;
 			h = imx327->cur_mode->vts_def - imx327->cur_mode->height;
 			__v4l2_ctrl_modify_range(imx327->hblank, w, w, 1, w);
@@ -1247,6 +1281,10 @@ static long imx327_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 					       IMX327_REG_VALUE_08BIT,
 					       1);
 		break;
+	case RKMODULE_GET_CHANNEL_INFO:
+		ch_info = (struct rkmodule_channel_info *)arg;
+		ret = imx327_get_channel_info(imx327, ch_info);
+		break;
 	default:
 		ret = -ENOIOCTLCMD;
 		break;
@@ -1263,6 +1301,7 @@ static long imx327_compat_ioctl32(struct v4l2_subdev *sd,
 	struct rkmodule_awb_cfg *cfg;
 	struct rkmodule_hdr_cfg *hdr;
 	struct preisp_hdrae_exp_s *hdrae;
+	struct rkmodule_channel_info *ch_info;
 	long ret;
 	u32 cg = 0;
 	u32 stream = 0;
@@ -1336,6 +1375,21 @@ static long imx327_compat_ioctl32(struct v4l2_subdev *sd,
 		ret = copy_from_user(&stream, up, sizeof(u32));
 		if (!ret)
 			ret = imx327_ioctl(sd, cmd, &stream);
+		break;
+	case RKMODULE_GET_CHANNEL_INFO:
+		ch_info = kzalloc(sizeof(*ch_info), GFP_KERNEL);
+		if (!ch_info) {
+			ret = -ENOMEM;
+			return ret;
+		}
+
+		ret = imx327_ioctl(sd, cmd, ch_info);
+		if (!ret) {
+			ret = copy_to_user(up, ch_info, sizeof(*ch_info));
+			if (ret)
+				return -EFAULT;
+		}
+		kfree(ch_info);
 		break;
 	default:
 		ret = -ENOIOCTLCMD;

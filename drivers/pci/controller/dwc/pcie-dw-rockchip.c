@@ -174,6 +174,8 @@ struct rk_pcie {
 	struct gpio_desc		*rst_gpio;
 	struct gpio_desc		*pwr_gpio;
 	u32				perst_inactive_ms;
+	u32                             s2r_perst_inactive_ms;
+	u32				wait_for_link_ms;
 	struct gpio_desc		*prsnt_gpio;
 	phys_addr_t			mem_start;
 	size_t				mem_size;
@@ -193,6 +195,7 @@ struct rk_pcie {
 	raw_spinlock_t			intx_lock;
 	u16				aspm;
 	u32				l1ss_ctl1;
+	u32				l1ss_ctl2;
 	struct dentry			*debugfs;
 	u32				msi_vector_num;
 	struct workqueue_struct		*hot_rst_wq;
@@ -720,6 +723,24 @@ static inline void rk_pcie_enable_ltssm(struct rk_pcie *rk_pcie)
 	rk_pcie_writel_apb(rk_pcie, 0x0, 0xC000C);
 }
 
+static int rk_pcie_link_up(struct dw_pcie *pci)
+{
+	struct rk_pcie *rk_pcie = to_rk_pcie(pci);
+	u32 val;
+
+	if (rk_pcie->is_rk1808) {
+		val = rk_pcie_readl_apb(rk_pcie, PCIE_CLIENT_GENERAL_DEBUG);
+		if ((val & (PCIE_PHY_LINKUP | PCIE_DATA_LINKUP)) == 0x3)
+			return 1;
+	} else {
+		val = rk_pcie_readl_apb(rk_pcie, PCIE_CLIENT_LTSSM_STATUS);
+		if ((val & (RDLH_LINKUP | SMLH_LINKUP)) == 0x30000)
+			return 1;
+	}
+
+	return 0;
+}
+
 static void rk_pcie_enable_debug(struct rk_pcie *rk_pcie)
 {
 	if (!IS_ENABLED(CONFIG_DEBUG_FS))
@@ -795,16 +816,7 @@ static int rk_pcie_establish_link(struct dw_pcie *pci)
 		 * finishing training. So there must be timeout here. These kinds of devices
 		 * need rescan devices by its driver when used. So no need to waste time waiting
 		 * for training pass.
-		 */
-		if (rk_pcie->in_suspend && rk_pcie->skip_scan_in_resume) {
-			rfkill_get_wifi_power_state(&power);
-			if (!power) {
-				gpiod_set_value_cansleep(rk_pcie->rst_gpio, 1);
-				return 0;
-			}
-		}
-
-		/*
+		 *
 		 * PCIe requires the refclk to be stable for 100µs prior to releasing
 		 * PERST and T_PVPERL (Power stable to PERST# inactive) should be a
 		 * minimum of 100ms.  See table 2-4 in section 2.6.2 AC, the PCI Express
@@ -812,19 +824,34 @@ static int rk_pcie_establish_link(struct dw_pcie *pci)
 		 * requuirement here. We add a 200ms by default for sake of hoping everthings
 		 * work fine. If it doesn't, please add more in DT node by add rockchip,perst-inactive-ms.
 		 */
-		dev_info(pci->dev, "power on!");
-		msleep(rk_pcie->perst_inactive_ms);
+		if (rk_pcie->in_suspend && rk_pcie->skip_scan_in_resume) {
+			rfkill_get_wifi_power_state(&power);
+			if (!power) {
+				gpiod_set_value_cansleep(rk_pcie->rst_gpio, 1);
+				return 0;
+			}
+			if (rk_pcie->s2r_perst_inactive_ms)
+				usleep_range(rk_pcie->s2r_perst_inactive_ms * 1000,
+					(rk_pcie->s2r_perst_inactive_ms + 1) * 1000);
+		} else {
+			usleep_range(rk_pcie->perst_inactive_ms * 1000,
+				(rk_pcie->perst_inactive_ms + 1) * 1000);
+
+		}
+
 		gpiod_set_value_cansleep(rk_pcie->rst_gpio, 1);
 		if (!IS_ERR_OR_NULL(rk_pcie->pwr_gpio))
 			gpiod_set_value_cansleep(rk_pcie->pwr_gpio, 1);
 
 		/*
-		 * Add this 1ms delay because we observe link is always up stably after it and
-		 * could help us save 20ms for scanning devices.
+		 * Add this delay because we observe devices need a period of time to be able to
+		 * work, so the link is always up stably after it. And the default 1ms could help us
+		 * save 20ms for scanning devices. If the devices need longer than 2s to be able to
+		 * work, please change wait_for_link_ms via dts.
 		 */
 		usleep_range(1000, 1100);
 
-		for (retries = 0; retries < 100; retries++) {
+		for (retries = 0; retries < rk_pcie->wait_for_link_ms / 20; retries++) {
 			if (dw_pcie_link_up(pci)) {
 				/*
 				 * We may be here in case of L0 in Gen1. But if EP is capable
@@ -846,7 +873,7 @@ static int rk_pcie_establish_link(struct dw_pcie *pci)
 			dev_info_ratelimited(pci->dev, "PCIe Linking... LTSSM is 0x%x\n",
 					rk_pcie_readl_apb(rk_pcie, PCIE_CLIENT_LTSSM_STATUS));
 			rk_pcie_debug_dump(rk_pcie);
-			msleep(20);
+			usleep_range(20000, 21000);
 		}
 
 		/*
@@ -1335,6 +1362,14 @@ static int rk_pcie_resource_get(struct platform_device *pdev,
 				     &rk_pcie->perst_inactive_ms))
 		rk_pcie->perst_inactive_ms = 200;
 
+	if (device_property_read_u32(&pdev->dev, "rockchip,s2r-perst-inactive-ms",
+				     &rk_pcie->s2r_perst_inactive_ms))
+		rk_pcie->s2r_perst_inactive_ms = rk_pcie->perst_inactive_ms;
+
+	device_property_read_u32(&pdev->dev, "rockchip,wait-for-link-ms",
+				     &rk_pcie->wait_for_link_ms);
+	rk_pcie->wait_for_link_ms = max_t(u32, rk_pcie->wait_for_link_ms, 2000);
+
 	rk_pcie->prsnt_gpio = devm_gpiod_get_optional(&pdev->dev, "prsnt", GPIOD_IN);
 	if (IS_ERR_OR_NULL(rk_pcie->prsnt_gpio))
 		dev_info(&pdev->dev, "invalid prsnt-gpios property in node\n");
@@ -1643,6 +1678,7 @@ MODULE_DEVICE_TABLE(of, rk_pcie_of_match);
 
 static const struct dw_pcie_ops dw_pcie_ops = {
 	.start_link = rk_pcie_establish_link,
+	.link_up = rk_pcie_link_up,
 };
 
 static int rk1808_pcie_fixup(struct rk_pcie *rk_pcie, struct device_node *np)
@@ -2080,6 +2116,12 @@ retry_regulator:
 
 	reset_control_deassert(rk_pcie->rsts);
 
+	ret = phy_calibrate(rk_pcie->phy);
+	if (ret) {
+		dev_err(dev, "phy lock failed\n");
+		goto disable_phy;
+	}
+
 	ret = rk_pcie_clk_init(rk_pcie);
 	if (ret) {
 		dev_err(dev, "clock init failed\n");
@@ -2308,45 +2350,68 @@ static void rk_pcie_downstream_dev_to_d0(struct rk_pcie *rk_pcie, bool enable)
 	}
 
 	/* Save and restore root bus ASPM */
-	if (enable) {
-		if (rk_pcie->l1ss_ctl1)
-			dw_pcie_writel_dbi(rk_pcie->pci, bridge->l1ss + PCI_L1SS_CTL1, rk_pcie->l1ss_ctl1);
-
-		/* rk_pcie->aspm woule be saved in advance when enable is false */
-		dw_pcie_writel_dbi(rk_pcie->pci, bridge->pcie_cap + PCI_EXP_LNKCTL, rk_pcie->aspm);
-	} else {
+	if (!enable) {
 		val = dw_pcie_readl_dbi(rk_pcie->pci, bridge->l1ss + PCI_L1SS_CTL1);
-		if (val & PCI_L1SS_CTL1_L1SS_MASK)
+		if (val & PCI_L1SS_CTL1_L1SS_MASK) {
 			rk_pcie->l1ss_ctl1 = val;
-		else
+			rk_pcie->l1ss_ctl2 = dw_pcie_readl_dbi(rk_pcie->pci,
+							       bridge->l1ss + PCI_L1SS_CTL2);
+		} else {
 			rk_pcie->l1ss_ctl1 = 0;
+			rk_pcie->l1ss_ctl2 = 0;
+		}
 
 		val = dw_pcie_readl_dbi(rk_pcie->pci, bridge->pcie_cap + PCI_EXP_LNKCTL);
 		rk_pcie->aspm = val & PCI_EXP_LNKCTL_ASPMC;
-		val &= ~(PCI_EXP_LNKCAP_ASPM_L1 | PCI_EXP_LNKCAP_ASPM_L0S);
-		dw_pcie_writel_dbi(rk_pcie->pci, bridge->pcie_cap + PCI_EXP_LNKCTL, val);
 	}
+
+	if (enable) {
+		if (rk_pcie->l1ss_ctl1) {
+			dw_pcie_writel_dbi(rk_pcie->pci, bridge->l1ss + PCI_L1SS_CTL2,
+					   rk_pcie->l1ss_ctl2);
+			dw_pcie_writel_dbi(rk_pcie->pci, bridge->l1ss + PCI_L1SS_CTL1,
+					   rk_pcie->l1ss_ctl1);
+			if (bridge->ltr_path)
+				pcie_capability_set_word(bridge, PCI_EXP_DEVCTL2, 0x0400);
+		}
+	}
+
+	if (enable) {
+		list_for_each_entry(pdev, &root_bus->devices, bus_list) {
+			if (PCI_SLOT(pdev->devfn) == 0) {
+				if (rk_pcie->l1ss_ctl1) {
+					pci_write_config_dword(pdev, pdev->l1ss + PCI_L1SS_CTL2,
+							       rk_pcie->l1ss_ctl2);
+					pci_write_config_dword(pdev, pdev->l1ss + PCI_L1SS_CTL1,
+							       rk_pcie->l1ss_ctl1);
+				}
+			}
+		}
+	}
+
+	if (enable)
+		dw_pcie_writel_dbi(rk_pcie->pci, bridge->pcie_cap + PCI_EXP_LNKCTL, rk_pcie->aspm);
 
 	list_for_each_entry(pdev, &root_bus->devices, bus_list) {
 		if (PCI_SLOT(pdev->devfn) == 0) {
 			if (pci_set_power_state(pdev, PCI_D0))
 				dev_err(rk_pcie->pci->dev,
-					"Failed to transition %s to D3hot state\n",
+					"Failed to transition %s to D0 state\n",
 					dev_name(&pdev->dev));
-			if (enable) {
-				if (rk_pcie->l1ss_ctl1) {
-					pci_read_config_dword(pdev, pdev->l1ss + PCI_L1SS_CTL1, &val);
-					val &= ~PCI_L1SS_CTL1_L1SS_MASK;
-					val |= (rk_pcie->l1ss_ctl1 & PCI_L1SS_CTL1_L1SS_MASK);
-					pci_write_config_dword(pdev, pdev->l1ss + PCI_L1SS_CTL1, val);
-				}
-
+			if (enable)
 				pcie_capability_clear_and_set_word(pdev, PCI_EXP_LNKCTL,
-								   PCI_EXP_LNKCTL_ASPMC, rk_pcie->aspm);
-			} else {
-				pci_disable_link_state(pdev, PCIE_LINK_STATE_L0S | PCIE_LINK_STATE_L1);
-			}
+								   PCI_EXP_LNKCTL_ASPMC,
+								   rk_pcie->aspm);
+			else
+				pci_disable_link_state(pdev,
+						       PCIE_LINK_STATE_L0S | PCIE_LINK_STATE_L1);
 		}
+	}
+
+	if (!enable) {
+		val = dw_pcie_readl_dbi(rk_pcie->pci, bridge->pcie_cap + PCI_EXP_LNKCTL);
+		val &= ~(PCI_EXP_LNKCTL_ASPM_L1 | PCI_EXP_LNKCTL_ASPM_L0S);
+		dw_pcie_writel_dbi(rk_pcie->pci, bridge->pcie_cap + PCI_EXP_LNKCTL, val);
 	}
 }
 #endif
