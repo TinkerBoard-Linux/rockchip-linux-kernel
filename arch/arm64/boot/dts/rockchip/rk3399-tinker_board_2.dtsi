@@ -882,6 +882,7 @@
 	status = "okay";
 
 	u2phy0_otg: otg-port {
+		rockchip,vbus-always-on;
 		status = "okay";
 	};
 
