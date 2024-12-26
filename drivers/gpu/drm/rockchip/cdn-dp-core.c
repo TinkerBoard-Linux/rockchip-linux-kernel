@@ -1295,7 +1295,6 @@ static int cdn_dp_probe(struct platform_device *pdev)
 	struct phy *phy;
 	int ret;
 	int i;
-	int ret;
 
 	dp = devm_kzalloc(dev, sizeof(*dp), GFP_KERNEL);
 	if (!dp)
