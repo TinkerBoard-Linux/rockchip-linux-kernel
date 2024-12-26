@@ -1394,4 +1394,6 @@ config TOUCHSCREEN_TINKER_FT5406
 	help
 	  Control ft5406 touch ic.
 
+source "drivers/input/touchscreen/hxchipset/Kconfig"
+
 endif
