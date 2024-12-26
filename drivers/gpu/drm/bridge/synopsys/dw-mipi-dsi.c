@@ -396,6 +396,7 @@ static void dw_mipi_message_config(struct dw_mipi_dsi *dsi,
 {
 	bool lpm = msg->flags & MIPI_DSI_MSG_USE_LPM;
 	u32 val = 0;
+	u32 ctrl = 0;
 
 	/*
 	 * TODO dw drv improvements
