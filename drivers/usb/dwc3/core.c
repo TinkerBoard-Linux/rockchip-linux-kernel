@@ -1685,6 +1685,10 @@ static int dwc3_probe(struct platform_device *pdev)
 	if (ret)
 		goto err3;
 
+	reset_control_assert(dwc->reset);
+	udelay(10);
+	reset_control_deassert(dwc->reset);
+
 	ret = dwc3_core_init(dwc);
 	if (ret) {
 		dev_err_probe(dev, ret, "failed to initialize core\n");
