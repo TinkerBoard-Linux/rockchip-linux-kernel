@@ -416,6 +416,8 @@ static int pwm_backlight_parse_dt(struct device *dev,
 		}
 
 		data->max_brightness--;
+		ret = of_property_read_u32(node, "minimal-brightness-level",
+			&minimal_brightness);
 	}
 
 	if(of_property_read_bool(node, "hdmi-backlight")) {
