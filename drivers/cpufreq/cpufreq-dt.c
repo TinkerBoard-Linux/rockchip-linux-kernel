@@ -97,6 +97,11 @@ static const char *find_supply_name(struct device *dev)
 		goto node_put;
 	}
 
+	if (!(of_property_read_string(dev->of_node, "reg-name", (const char **)&name))) {
+		dev_info(dev, "get regulator name: %s\n", name);
+		goto node_put;
+	}
+
 	dev_dbg(dev, "no regulator for cpu%d\n", cpu);
 node_put:
 	of_node_put(np);
@@ -147,9 +152,9 @@ static int resources_available(void)
 		 * not yet registered, we should try defering probe.
 		 */
 		if (ret == -EPROBE_DEFER)
-			dev_dbg(cpu_dev, "cpu0 regulator not ready, retry\n");
+			dev_info(cpu_dev, "cpu0 regulator not ready, retry\n");
 		else
-			dev_dbg(cpu_dev, "no regulator for cpu0: %d\n", ret);
+			dev_info(cpu_dev, "no regulator for cpu0: %d\n", ret);
 
 		return ret;
 	}

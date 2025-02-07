@@ -350,11 +350,13 @@
 };
 
 &cpu_b0 {
-	cpu-supply = <&vdd_cpu_b>;
+	//cpu-supply = <&vdd_cpu_b>;
+	reg-name = "vdd_cpu_b";
 };
 
 &cpu_b1 {
-	cpu-supply = <&vdd_cpu_b>;
+	//cpu-supply = <&vdd_cpu_b>;
+	reg-name = "vdd_cpu_b";
 };
 
 &display_subsystem {
@@ -473,7 +475,8 @@
 
 &gpu {
 	status = "okay";
-	mali-supply = <&vdd_gpu>;
+	//mali-supply = <&vdd_gpu>;
+	reg-name = "vdd_gpu";
 };
 
 &hdmi {
@@ -773,9 +776,29 @@
 		};
 	};
 
-	vdd_cpu_b: fan53555@60 {
+	fan53555_cpu: fan53555@60 {
 		compatible = "fcs,fan53555";
 		reg = <0x60>;
+		vin-supply = <&vcc5v0_sys>;
+		regulator-compatible = "fan53555-reg";
+		pinctrl-0 = <&vsel1_gpio>;
+		vsel-gpios = <&gpio1 RK_PC1 GPIO_ACTIVE_HIGH>;
+		regulator-name = "vdd_cpu_b";
+		regulator-min-microvolt = <925000>;
+		regulator-max-microvolt = <1275000>;
+		regulator-ramp-delay = <1000>;
+		fcs,suspend-voltage-selector = <1>;
+		regulator-always-on;
+		regulator-boot-on;
+		regulator-initial-state = <3>;
+		regulator-state-mem {
+			regulator-off-in-suspend;
+		};
+	};
+
+	syr837_cpu: syr837@40 {
+		compatible = "silergy,syr827";
+		reg = <0x40>;
 		vin-supply = <&vcc5v0_sys>;
 		regulator-compatible = "fan53555-reg";
 		pinctrl-0 = <&vsel1_gpio>;
@@ -1120,7 +1143,7 @@
 		};
 	};
 
-	vdd_gpu: fan53555@60 {
+	fan53555_gpu: fan53555@60 {
 		compatible = "fcs,fan53555";
 		reg = <0x60>;
 		vin-supply = <&vcc5v0_sys>;
@@ -1140,6 +1163,25 @@
 		};
 	};
 
+	syr837_gpu: syr837@40 {
+		compatible = "silergy,syr827";
+		reg = <0x40>;
+		vin-supply = <&vcc5v0_sys>;
+		regulator-compatible = "fan53555-reg";
+		pinctrl-0 = <&vsel2_gpio>;
+		vsel-gpios = <&gpio1 RK_PB6 GPIO_ACTIVE_HIGH>;
+		regulator-name = "vdd_gpu";
+		regulator-min-microvolt = <925000>;
+		regulator-max-microvolt = <1225000>;
+		regulator-ramp-delay = <1000>;
+		fcs,suspend-voltage-selector = <1>;
+		regulator-always-on;
+		regulator-boot-on;
+		regulator-initial-state = <3>;
+		regulator-state-mem {
+			regulator-off-in-suspend;
+		};
+	};
 };
 
 &i2s1 {
