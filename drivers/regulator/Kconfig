@@ -1348,5 +1348,12 @@ config REGULATOR_XZ3216
 	help
 	  Support the voltage and current regulators of the XZ321X series of DCDC devices.
 
+config REGULATOR_TINKER
+	tristate "Tinker Board 2S regulators support"
+	default n
+	depends on I2C
+	help
+	  Support to Tinker Board 2S's regulators.
+
 endif
 
