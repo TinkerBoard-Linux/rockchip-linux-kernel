@@ -183,6 +183,7 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3568-evb1-ddr4-v10-linux-amp.dtb
 dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3568-evb1-ddr4-v10-linux-spi-nor.dtb
 dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3568-evb1-ddr4-v10-single-channel-lvds.dtb
 dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3568-evb1-ddr4-v10-two-vp-two-separate-single-channel-lvds.dtb
+dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3568-tinker_board_3n.dtb
 dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3568-evb2-lp4x-v10.dtb
 dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3568-evb2-lp4x-v10-bt1120-to-hdmi.dtb
 dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3568-evb4-lp3-v10.dtb
