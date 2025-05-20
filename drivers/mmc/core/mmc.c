@@ -102,6 +102,9 @@ static int mmc_decode_cid(struct mmc_card *card)
 		card->cid.serial	= UNSTUFF_BITS(resp, 16, 24);
 		card->cid.month		= UNSTUFF_BITS(resp, 12, 4);
 		card->cid.year		= UNSTUFF_BITS(resp, 8, 4) + 1997;
+		dev_info(&card->host->class_dev, "manfid=0x%06X, prod_name=%c%c%c%c%c%c%c, hwrev=0x%X fwrev=0x%X, serial=%06X, month=%d, year=%d\n", 
+				card->cid.manfid, card->cid.prod_name[0], card->cid.prod_name[1], card->cid.prod_name[2],
+				card->cid.prod_name[3], card->cid.prod_name[4], card->cid.prod_name[5], card->cid.prod_name[6], card->cid.hwrev, card->cid.fwrev, card->cid.serial, card->cid.month, card->cid.year);
 		break;
 
 	case 2: /* MMC v2.0 - v2.2 */
@@ -119,6 +122,10 @@ static int mmc_decode_cid(struct mmc_card *card)
 		card->cid.serial	= UNSTUFF_BITS(resp, 16, 32);
 		card->cid.month		= UNSTUFF_BITS(resp, 12, 4);
 		card->cid.year		= UNSTUFF_BITS(resp, 8, 4) + 1997;
+		dev_info(&card->host->class_dev, "manfid=0x%02X, oemid=0x%04X, prod_name=%c%c%c%c%c%c, prv=0x%2X, serial=%08X, month=%d, year=%d\n",
+				card->cid.manfid, card->cid.oemid, card->cid.prod_name[0], card->cid.prod_name[1], card->cid.prod_name[2],
+				card->cid.prod_name[3], card->cid.prod_name[4], card->cid.prod_name[5], card->cid.prv, card->cid.serial, card->cid.month, 
+				card->cid.year);
 		break;
 
 	default:

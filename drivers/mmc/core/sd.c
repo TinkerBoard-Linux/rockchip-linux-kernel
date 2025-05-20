@@ -108,6 +108,10 @@ void mmc_decode_cid(struct mmc_card *card)
 	card->cid.month			= UNSTUFF_BITS(resp, 8, 4);
 
 	card->cid.year += 2000; /* SD cards year offset */
+	dev_info(&card->host->class_dev, "manfid=0x%02X, oemid=0x%04X, prod_name=%c%c%c%c%c, hwrev=0x%X fwrev=0x%X, serial=%08X, year=%d, month=%d\n",
+				card->cid.manfid, card->cid.oemid, card->cid.prod_name[0], card->cid.prod_name[1], card->cid.prod_name[2],
+				card->cid.prod_name[3], card->cid.prod_name[4], card->cid.hwrev, card->cid.fwrev, card->cid.serial, card->cid.year,
+				card->cid.month);
 }
 
 /*
