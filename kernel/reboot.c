@@ -74,6 +74,7 @@ void __weak (*pm_power_off)(void);
 void emergency_restart(void)
 {
 	kmsg_dump(KMSG_DUMP_EMERG);
+	setmmcEmergency();
 	system_state = SYSTEM_RESTART;
 	machine_emergency_restart();
 }

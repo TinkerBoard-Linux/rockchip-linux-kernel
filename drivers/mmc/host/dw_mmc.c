@@ -40,8 +40,10 @@
 #include <linux/mmc/slot-gpio.h>
 #include <linux/soc/rockchip/rk_sdmmc.h>
 #include <linux/soc/rockchip/rockchip_decompress.h>
+#include <linux/reboot.h>
 
 #include "dw_mmc.h"
+#include "../core/core.h"
 
 /* Common flag combinations */
 #define DW_MCI_DATA_ERROR_FLAGS	(SDMMC_INT_DRTO | SDMMC_INT_DCRC | \
@@ -3000,6 +3002,29 @@ rv1106_sd:
 	return IRQ_HANDLED;
 }
 
+static struct dw_mci *mSdhost = NULL;
+void setmmcEmergency() {
+    struct mmc_host *mmc;
+    int ret;
+
+    if (mSdhost == NULL)
+        return;
+
+    mmc = mSdhost->slot->mmc;
+    mmc_power_off(mmc);
+    mdelay(20);
+
+    if (!IS_ERR(mmc->supply.vmmc))  {
+        ret = regulator_enable(mmc->supply.vmmc);
+    }
+
+    if (!IS_ERR(mmc->supply.vqmmc)) {
+        ret = regulator_enable(mmc->supply.vqmmc);
+        regulator_set_voltage(mmc->supply.vqmmc, 3300000, 3300000);
+    }
+}
+EXPORT_SYMBOL(setmmcEmergency);
+
 static int dw_mci_init_slot_caps(struct dw_mci_slot *slot)
 {
 	struct dw_mci *host = slot->host;
@@ -3023,6 +3048,9 @@ static int dw_mci_init_slot_caps(struct dw_mci_slot *slot)
 	} else {
 		ctrl_id = to_platform_device(host->dev)->id;
 	}
+
+	if (of_find_property(host->dev->of_node, "supports-sd", NULL))
+		mSdhost = host;
 
 	if (drv_data && drv_data->caps) {
 		if (ctrl_id >= drv_data->num_caps) {
