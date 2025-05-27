@@ -2636,6 +2636,13 @@ static struct usb_device_id btusb_table[] = {
       .bInterfaceSubClass = 0x01,
       .bInterfaceProtocol = 0x01 },
 
+    { .match_flags = USB_DEVICE_ID_MATCH_VENDOR |
+                     USB_DEVICE_ID_MATCH_INT_INFO,
+      .idVendor = 0x04ca,
+      .bInterfaceClass = 0xe0,
+      .bInterfaceSubClass = 0x01,
+      .bInterfaceProtocol = 0x01 },
+
     { }
 };
 
