@@ -119,6 +119,8 @@ struct rk817_codec_priv {
 	int spk_mute_delay;
 	int hp_mute_delay;
 	int chip_ver;
+
+	bool only_factory_use;
 };
 
 /*
@@ -1203,7 +1205,7 @@ static int rk817_digital_mute_dac(struct snd_soc_dai *dai, int mute, int stream)
 	DBG("%s %d\n", __func__, mute);
 
 	if (mute) {
-		if(jack_connection_status == 0) {
+		if(rk817->only_factory_use || jack_connection_status == 0) {
 			gpio_set_value(SPK_EN, 0);
 			pr_info("rk817_digital_mute mute, SPK_EN = %s\n", gpio_get_value(SPK_EN)? "H":"L");
 			msleep(1);
@@ -1252,7 +1254,7 @@ static int rk817_digital_mute_dac(struct snd_soc_dai *dai, int mute, int stream)
 					PWD_DACL_ON | PWD_DACR_ON);
 			rk817_codec_ctl_gpio(rk817, CODEC_SET_SPK, 0);
 			rk817_codec_ctl_gpio(rk817, CODEC_SET_HP, 1);
-			if(jack_connection_status == 0) {
+			if(rk817->only_factory_use || jack_connection_status == 0) {
 				msleep(2);
 				gpio_set_value(SPK_EN, 1);
 				pr_info("rk817_digital_mute unmute, SPK_EN = %s\n", gpio_get_value(SPK_EN)? "H":"L");
@@ -1570,6 +1572,10 @@ static int rk817_codec_parse_dt_property(struct device *dev,
 
 	rk817->adc_for_loopback =
 			of_property_read_bool(node, "adc-for-loopback");
+
+	rk817->only_factory_use =
+			of_property_read_bool(node, "only-factory-use");
+	printk("rk809-codec: only_factory_use:%d\n",rk817->only_factory_use);
 
 	of_node_put(node);
 
