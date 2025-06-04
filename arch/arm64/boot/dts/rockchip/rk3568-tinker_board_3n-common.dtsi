@@ -30,6 +30,7 @@
 	};
 
 	backlight: backlight {
+		status = "disabled";
 		compatible = "pwm-backlight";
 		pwms = <&pwm6 0 400000 0>;
 		brightness-levels = <
@@ -66,7 +67,6 @@
 			240 241 242 243 244 245 246 247
 			248 249 250 251 252 253 254 255
 		>;
-		panel-type = "eDP";
 		default-brightness-level = <200>;
 		minimal-brightness-level = <20>;
 		enable_delay = <15>;//EDP T14,min 10
@@ -79,6 +79,7 @@
 	};
 
 	backlight1: backlight1 {
+		status = "disabled";
 		compatible = "pwm-backlight";
 		pwms = <&pwm5 0 25000 0>;
 		brightness-levels = <
@@ -382,7 +383,7 @@
 		bpc=<8>;
 		bus-format = <0x100a>;//<MEDIA_BUS_FMT_RGB888_1X24>;
 		dsi,flags = <(MIPI_DSI_MODE_VIDEO | MIPI_DSI_MODE_VIDEO_BURST |
-			MIPI_DSI_MODE_LPM | MIPI_DSI_MODE_NO_EOT_PACKET)>;
+			MIPI_DSI_MODE_LPM | MIPI_DSI_MODE_NO_EOT_PACKET)>; //0xA03
 		dsi,format = <MIPI_DSI_FMT_RGB888>;
 		dsi,lanes  = <4>;
 
@@ -395,19 +396,19 @@
 		t7=<0>;//Backlight off to Backlight sys Disable
 		//t1 -> t2-t6 -> t6 -> t3 -> t7 -> t4 -> t5
 
-
+		//default timing for G240HVT01
 		disp_timings0: display-timings {
 			native-mode = <&dsi0_timing0>;
 			dsi0_timing0: timing0 {
 				clock-frequency = <144000000>;
 				hactive = <1920>;
 				vactive = <1080>;
-				hfront-porch = <96>;
-				hback-porch = <96>;
-				hsync-len = <64>;
-				vfront-porch = <8>;
-				vsync-len = <4>;
-				vback-porch = <8>;
+				hfront-porch = <80>;
+				hback-porch = <80>;
+				hsync-len = <40>;
+				vfront-porch = <15>;
+				vsync-len = <10>;
+				vback-porch = <15>;
 				hsync-active = <0>;
 				vsync-active = <0>;
 				de-active = <1>;
@@ -1433,11 +1434,6 @@
 &route_edp {
 	status = "disabled";
 	connect = <&vp1_out_edp>;
-};
-
-&route_dsi0 {
-	status = "disabled";
-	connect = <&vp2_out_dsi0>;
 };
 
 &saradc {
