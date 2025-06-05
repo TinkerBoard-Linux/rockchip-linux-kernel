@@ -2469,6 +2469,7 @@ analogix_dp_probe(struct device *dev, struct analogix_dp_plat_data *plat_data)
 	struct resource *res;
 	int ret;
 
+	pr_info("%s: ++++\n", __func__);
 	if (!plat_data) {
 		dev_err(dev, "Invalided input plat_data\n");
 		return ERR_PTR(-EINVAL);
@@ -2584,6 +2585,7 @@ analogix_dp_probe(struct device *dev, struct analogix_dp_plat_data *plat_data)
 	dp->bridge.driver_private = dp;
 	dp->bridge.funcs = &analogix_dp_bridge_funcs;
 
+	pr_info("%s: ----\n", __func__);
 	return dp;
 }
 EXPORT_SYMBOL_GPL(analogix_dp_probe);
@@ -2592,6 +2594,7 @@ int analogix_dp_bind(struct analogix_dp_device *dp, struct drm_device *drm_dev)
 {
 	int ret;
 
+	pr_info("%s: ++++\n", __func__);
 	dp->drm_dev = drm_dev;
 	dp->encoder = dp->plat_data->encoder;
 
@@ -2618,6 +2621,7 @@ int analogix_dp_bind(struct analogix_dp_device *dp, struct drm_device *drm_dev)
 
 	enable_irq(dp->irq);
 
+	pr_info("%s: ----\n", __func__);
 	return 0;
 
 err_disable_pm_runtime:
@@ -2632,6 +2636,7 @@ EXPORT_SYMBOL_GPL(analogix_dp_bind);
 
 void analogix_dp_unbind(struct analogix_dp_device *dp)
 {
+	pr_info("%s: ++++\n", __func__);
 	disable_irq(dp->irq);
 	if (dp->connector.funcs->destroy)
 		dp->connector.funcs->destroy(&dp->connector);
@@ -2639,6 +2644,7 @@ void analogix_dp_unbind(struct analogix_dp_device *dp)
 	pm_runtime_put(dp->dev);
 	pm_runtime_dont_use_autosuspend(dp->dev);
 	pm_runtime_disable(dp->dev);
+	pr_info("%s: ----\n", __func__);
 }
 EXPORT_SYMBOL_GPL(analogix_dp_unbind);
 
