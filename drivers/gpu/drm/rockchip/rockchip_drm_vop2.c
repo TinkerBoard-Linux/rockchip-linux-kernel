@@ -9119,6 +9119,52 @@ static void vop2_post_color_swap(struct drm_crtc *crtc)
 	VOP_MODULE_SET(vop2, vp, dsp_data_swap, data_swap);
 }
 
+#define ASUS_HDMI_RESOLUTION_FILE_PATH "/boot/display/hdmi/xrandr.cfg"
+#define ASUS_DP_RESOLUTION_FILE_PATH "/boot/display/dp/xrandr.cfg"
+static struct workqueue_struct *resolution_wq = NULL;
+static struct work_struct resolution_work;
+static char resolution_g[64]={0};
+static int output_type_g = 0;
+
+static void asus_write_resolution_to_file(char *buf, int writelen, int type)
+{
+	struct file *fp;
+	loff_t pos = 0;
+
+	if(type == DRM_MODE_CONNECTOR_HDMIA)
+	{
+		fp = filp_open(ASUS_HDMI_RESOLUTION_FILE_PATH, O_WRONLY, 0644);
+
+		if(!IS_ERR(fp))
+		{
+			kernel_write(fp, buf, writelen, &pos);
+			pr_err("%s: set HDMI resolution file to %s", __func__, buf);
+			filp_close(fp, NULL);
+		}
+		else
+			pr_err("%s: HDMI failed to open file\n", __func__);
+
+	}
+	else if(type == DRM_MODE_CONNECTOR_DisplayPort) {
+		fp = filp_open(ASUS_HDMI_RESOLUTION_FILE_PATH, O_WRONLY, 0644);
+
+		if(!IS_ERR(fp)) {
+			kernel_write(fp, buf, writelen, &pos);
+			pr_err("%s: set DP resolution file to %s", __func__, buf);
+			filp_close(fp, NULL);
+		}
+		else
+			pr_err("%s: DP failed to open file\n", __func__);
+	}
+	else
+		pr_err("%s: error type %d\n", __func__, type);
+}
+
+static void resolution_work_handler(struct work_struct *data)
+{
+	asus_write_resolution_to_file(resolution_g, strlen(resolution_g) + 1, output_type_g);
+}
+
 /*
  * For vop3 video port0, if hdr_vivid is not enable, the pipe delay time as follow:
  * win_dly + config_win_dly + layer_mix_dly + sdr2hdr_dly + hdr_mix_dly = config_bg_dly
@@ -9359,6 +9405,7 @@ static void vop2_crtc_atomic_enable(struct drm_crtc *crtc, struct drm_atomic_sta
 	int port_mux;
 	int ret;
 	char *output_if_string;
+	char resolution[64]={0};
 
 	if (old_cstate && old_cstate->self_refresh_active) {
 		vop2_crtc_atomic_exit_psr(crtc, old_cstate);
@@ -9380,7 +9427,6 @@ static void vop2_crtc_atomic_enable(struct drm_crtc *crtc, struct drm_atomic_sta
 		     vcstate->output_type, output_if_string,
 		     vcstate->output_flags, vp->id,
 		     (unsigned long long)adjusted_mode->crtc_clock * 1000);
-	kfree(output_if_string);
 
 	if (adjusted_mode->hdisplay > VOP2_MAX_VP_OUTPUT_WIDTH) {
 		vcstate->splice_mode = true;
@@ -9409,7 +9455,22 @@ static void vop2_crtc_atomic_enable(struct drm_crtc *crtc, struct drm_atomic_sta
 			     vcstate->dsc_id, dsc_sink_cap->slice_width,
 			     dsc_sink_cap->slice_height, vcstate->dsc_slice_num);
 	}
+	sprintf(resolution, "%dx%d\n", hdisplay, vdisplay);
+	strncpy(resolution_g, resolution, strlen(resolution));
+	output_type_g = vcstate->output_type;
+	if((output_type_g == DRM_MODE_CONNECTOR_Unknown) && strstr(output_if_string, "HDMI0"))
+	{
+		output_type_g = DRM_MODE_CONNECTOR_HDMIA;
+		pr_info("%s: output_type is unknown, but output_if_string is HDMI0, set output_type_g to DRM_MODE_CONNECTOR_HDMIA\n", __func__);
+	}
+	else if((output_type_g == DRM_MODE_CONNECTOR_Unknown) && strstr(output_if_string, "DP0"))
+	{
+		output_type_g = DRM_MODE_CONNECTOR_DisplayPort;
+		pr_info("%s: output_type is unknown, but output_if_string is DP0, set output_type_g to DRM_MODE_CONNECTOR_DisplayPort\n", __func__);
+	}
+	kfree(output_if_string);
 
+	queue_work(resolution_wq, &resolution_work);
 	vop2_initial(crtc);
 	vcstate->vdisplay = vdisplay;
 	vcstate->mode_update = vop2_crtc_mode_update(crtc);
@@ -14769,6 +14830,9 @@ static int vop2_bind(struct device *dev, struct device *master, void *data)
 	rockchip_drm_dma_init_device(drm_dev, vop2->dev);
 	pm_runtime_enable(&pdev->dev);
 	rockchip_vop2_devfreq_init(vop2);
+
+	resolution_wq = create_singlethread_workqueue("resolution_workqueue");
+	INIT_WORK(&resolution_work, resolution_work_handler);
 
 	return 0;
 }
