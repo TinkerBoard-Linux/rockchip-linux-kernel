@@ -236,13 +236,13 @@ static void adc_jack_handler(struct work_struct *work)
 	};
 	//plug-out
 	char *argv_0[] = {
-		"/etc/pulse/jack_hotplug.sh",
+		"/etc/wireplumber/jack_hotplug.sh",
 		"0",
 		NULL,
 	};
 	//plug-in
 	char *argv_1[] = {
-		"/etc/pulse/jack_hotplug.sh",
+		"/etc/wireplumber/jack_hotplug.sh",
 		"1",
 		NULL,
 	};
