@@ -198,11 +198,7 @@
 
 	it5201: tcpc@67 {
 		compatible = "ite,it5201";
-		pinctrl-names = "default";
-		pinctrl-0 = <&pinctrl_typec>;
 		reg = <0x67>;
-		interrupt-parent = <&gpio0>;
-		interrupts = <RK_PA5 IRQ_TYPE_EDGE_FALLING>;
 	};
 };
 
