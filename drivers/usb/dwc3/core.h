@@ -1363,6 +1363,9 @@ struct dwc3 {
 	int			last_fifo_depth;
 	int			num_ep_resized;
 	struct dentry		*debug_root;
+	struct gpio_desc	*gpio_hub_reset;
+	struct gpio_desc	*gpio_hub_vbus;
+	struct gpio_desc        *gpio_connector_vbus;
 };
 
 #define INCRX_BURST_MODE 0
