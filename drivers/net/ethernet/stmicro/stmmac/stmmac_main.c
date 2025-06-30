@@ -1093,6 +1093,21 @@ static void stmmac_mac_link_up(struct phylink_config *config,
 		stmmac_fpe_link_state_handle(priv, true);
 }
 
+void set_led_configuration(struct phy_device *phy_dev) {
+	// To switch Page0xd04
+	phy_write(phy_dev, 31, 0x0d04);
+
+	//Disable EEELCR mode
+	phy_write(phy_dev, 17, 0x0000);
+
+	printk("%s: #### before setting led, Reg16 = 0x%x\n", __func__, phy_read(phy_dev, 16));
+	phy_write(phy_dev, 16, 0x8b68);
+	printk("%s: #### after setting led, Reg16 = 0x%x\n", __func__, phy_read(phy_dev, 16));
+
+	//switch to Page0
+	phy_write(phy_dev, 31, 0x0000);
+}
+
 static const struct phylink_mac_ops stmmac_phylink_mac_ops = {
 	.validate = phylink_generic_validate,
 	.mac_select_pcs = stmmac_mac_select_pcs,
@@ -3847,6 +3862,7 @@ static int __stmmac_open(struct net_device *dev,
 				   __func__, ret);
 			goto init_phy_error;
 		}
+		set_led_configuration(dev->phydev);
 	}
 
 	/* Extra statistics */
