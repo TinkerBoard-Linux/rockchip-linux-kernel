@@ -129,6 +129,7 @@ struct rk_pcie {
 	struct reset_control		*rsts;
 	unsigned int			clk_cnt;
 	struct gpio_desc		*rst_gpio;
+	struct gpio_desc		*pwr_gpio;
 	u32				perst_inactive_ms;
 	u32				s2r_perst_inactive_ms;
 	u32				wait_for_link_ms;
@@ -171,6 +172,16 @@ struct rk_pcie_of_data {
 };
 
 #define to_rk_pcie(x)	dev_get_drvdata((x)->dev)
+
+#ifdef CONFIG_BOARDINFO
+extern int get_pcbid(void);
+extern int get_prjid(void);
+extern int get_odmid(void);
+#define M2B_PWR_OFF_N                   118
+#define PCB_ID_SR			18
+#define PRJ_ID_TB3_SKU3 		12
+#define ODM_ID_TB3			18
+#endif
 
 static inline u32 rk_pcie_readl_apb(struct rk_pcie *rk_pcie, u32 reg)
 {
@@ -372,6 +383,7 @@ static int rk_pcie_establish_link(struct dw_pcie *pci)
 	for (hw_retries = 0; hw_retries < RK_PCIE_ENUM_HW_RETRYIES; hw_retries++) {
 		/* Rest the device */
 		gpiod_set_value_cansleep(rk_pcie->rst_gpio, 0);
+		gpiod_set_value_cansleep(rk_pcie->pwr_gpio, 0);
 
 		rk_pcie_disable_ltssm(rk_pcie);
 		rk_pcie_link_status_clear(rk_pcie);
@@ -400,7 +412,9 @@ static int rk_pcie_establish_link(struct dw_pcie *pci)
 		if (rk_pcie->in_suspend && rk_pcie->skip_scan_in_resume) {
 			rfkill_get_wifi_power_state(&power);
 			if (!power) {
+				dev_info(pci->dev, "power on!");
 				gpiod_set_value_cansleep(rk_pcie->rst_gpio, 1);
+				gpiod_set_value_cansleep(rk_pcie->pwr_gpio, 1);
 				return 0;
 			}
 			if (rk_pcie->s2r_perst_inactive_ms)
@@ -410,8 +424,9 @@ static int rk_pcie_establish_link(struct dw_pcie *pci)
 			usleep_range(rk_pcie->perst_inactive_ms * 1000,
 				(rk_pcie->perst_inactive_ms + 1) * 1000);
 		}
-
+		dev_info(pci->dev, "power on!");
 		gpiod_set_value_cansleep(rk_pcie->rst_gpio, 1);
+		gpiod_set_value_cansleep(rk_pcie->pwr_gpio, 1);
 
 		/*
 		 * Add this delay because we observe devices need a period of time to be able to
@@ -687,6 +702,32 @@ static int rk_pcie_resource_get(struct platform_device *pdev,
 		dev_err(&pdev->dev, "invalid reset-gpios property in node\n");
 		return PTR_ERR(rk_pcie->rst_gpio);
 	}
+
+	#ifdef CONFIG_BOARDINFO
+	dev_info(&pdev->dev, "pcbid=%d", get_pcbid());
+	// swap pcie3 and pcie2 after SR
+	if (get_pcbid() != PCB_ID_SR) {
+		//set m2b_pwr_off to pcie2 when board is not SR
+		if (!strcmp(dev_name(&pdev->dev), "3c0000000.pcie")) {
+			dev_info(&pdev->dev, "set m2b_pwr_off_n");
+			gpio_request(M2B_PWR_OFF_N,"m2b_pwr_off_n");
+			gpio_direction_output(M2B_PWR_OFF_N, 1);
+			rk_pcie->pwr_gpio = gpio_to_desc(M2B_PWR_OFF_N);
+			if (IS_ERR_OR_NULL(rk_pcie->pwr_gpio))
+				dev_err(&pdev->dev, "m2b_pwr_off_n init fail\n");
+		}
+	} else {
+		// set m2b_pwr_off to pcie3 when board is SR
+		if (!strcmp(dev_name(&pdev->dev), "3c0800000.pcie")) {
+			dev_info(&pdev->dev, "set m2b_pwr_off_n SR");
+			gpio_request(M2B_PWR_OFF_N,"m2b_pwr_off_n");
+			gpio_direction_output(M2B_PWR_OFF_N, 1);
+			rk_pcie->pwr_gpio = gpio_to_desc(M2B_PWR_OFF_N);
+			if (IS_ERR_OR_NULL(rk_pcie->pwr_gpio))
+				dev_err(&pdev->dev, "m2b_pwr_off_n init fail\n");
+		}
+	}
+	#endif
 
 	if (device_property_read_u32(&pdev->dev, "rockchip,perst-inactive-ms",
 				     &rk_pcie->perst_inactive_ms))
@@ -1724,6 +1765,35 @@ release_driver:
 
 static int rk_pcie_probe(struct platform_device *pdev)
 {
+	#ifdef CONFIG_BOARDINFO
+	struct device *dev = &pdev->dev;
+
+	if (get_prjid() == -1 && get_odmid() == -1 && get_pcbid() == -1) {
+		dev_info(dev, "boardinfo driver not ready\n");
+		return -EPROBE_DEFER;
+	}
+
+	dev_info(dev, "prjid=%d, odmid=%d, pcbid=%d\n", get_prjid(), get_odmid(), get_pcbid());
+	if (get_prjid() == PRJ_ID_TB3_SKU3 &&
+		get_odmid() == ODM_ID_TB3) {
+		// there's no m2b slot on tb3 sku3
+		if (get_pcbid() == PCB_ID_SR) {
+			if (!strcmp(dev_name(dev), "3c0800000.pcie")) {
+				dev_err(dev, "ignore this pcie controller on sku3 SR");
+				return -ENODEV;
+			}
+
+		} else {
+			// pcie2 swap with pcie3 after SR
+			if (!strcmp(dev_name(dev), "3c0000000.pcie")) {
+				dev_err(dev, "ignore this pcie controller on sku3");
+				return -ENODEV;
+			}
+
+		}
+	}
+	#endif
+
 	if (IS_ENABLED(CONFIG_PCIE_RK_THREADED_INIT)) {
 		struct task_struct *tsk;
 
@@ -1988,6 +2058,7 @@ no_l2:
 
 	rk_pcie->in_suspend = true;
 
+	dev_info(dev, "suspend!");
 	return 0;
 }
 
