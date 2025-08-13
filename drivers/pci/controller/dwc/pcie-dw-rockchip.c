@@ -178,6 +178,7 @@ extern int get_pcbid(void);
 extern int get_prjid(void);
 extern int get_odmid(void);
 #define M2B_PWR_OFF_N                   118
+#define M2B_RESET                       120
 #define PCB_ID_SR			18
 #define PRJ_ID_TB3_SKU3 		12
 #define ODM_ID_TB3			18
@@ -706,9 +707,12 @@ static int rk_pcie_resource_get(struct platform_device *pdev,
 	#ifdef CONFIG_BOARDINFO
 	dev_info(&pdev->dev, "pcbid=%d", get_pcbid());
 	// swap pcie3 and pcie2 after SR
-	if (get_pcbid() != PCB_ID_SR) {
-		//set m2b_pwr_off to pcie2 when board is not SR
-		if (!strcmp(dev_name(&pdev->dev), "3c0000000.pcie")) {
+		if (!strcmp(dev_name(&pdev->dev), "3c0800000.pcie")) {
+                        dev_info(&pdev->dev, "set m2b_reset");
+                        gpio_request(M2B_RESET,"m2b_reset");
+                        gpio_direction_output(M2B_RESET, 0);
+
+			mdelay(50);
 			dev_info(&pdev->dev, "set m2b_pwr_off_n");
 			gpio_request(M2B_PWR_OFF_N,"m2b_pwr_off_n");
 			gpio_direction_output(M2B_PWR_OFF_N, 1);
@@ -716,17 +720,6 @@ static int rk_pcie_resource_get(struct platform_device *pdev,
 			if (IS_ERR_OR_NULL(rk_pcie->pwr_gpio))
 				dev_err(&pdev->dev, "m2b_pwr_off_n init fail\n");
 		}
-	} else {
-		// set m2b_pwr_off to pcie3 when board is SR
-		if (!strcmp(dev_name(&pdev->dev), "3c0800000.pcie")) {
-			dev_info(&pdev->dev, "set m2b_pwr_off_n SR");
-			gpio_request(M2B_PWR_OFF_N,"m2b_pwr_off_n");
-			gpio_direction_output(M2B_PWR_OFF_N, 1);
-			rk_pcie->pwr_gpio = gpio_to_desc(M2B_PWR_OFF_N);
-			if (IS_ERR_OR_NULL(rk_pcie->pwr_gpio))
-				dev_err(&pdev->dev, "m2b_pwr_off_n init fail\n");
-		}
-	}
 	#endif
 
 	if (device_property_read_u32(&pdev->dev, "rockchip,perst-inactive-ms",
@@ -1777,20 +1770,10 @@ static int rk_pcie_probe(struct platform_device *pdev)
 	if (get_prjid() == PRJ_ID_TB3_SKU3 &&
 		get_odmid() == ODM_ID_TB3) {
 		// there's no m2b slot on tb3 sku3
-		if (get_pcbid() == PCB_ID_SR) {
 			if (!strcmp(dev_name(dev), "3c0800000.pcie")) {
 				dev_err(dev, "ignore this pcie controller on sku3 SR");
 				return -ENODEV;
 			}
-
-		} else {
-			// pcie2 swap with pcie3 after SR
-			if (!strcmp(dev_name(dev), "3c0000000.pcie")) {
-				dev_err(dev, "ignore this pcie controller on sku3");
-				return -ENODEV;
-			}
-
-		}
 	}
 	#endif
 
