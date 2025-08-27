@@ -1727,10 +1727,14 @@ static int _mmc_sd_shutdown(struct mmc_host *host)
 		err = mmc_deselect_cards(host);
 
 	if (!err) {
-		mmc_power_off(host);
-		mmc_card_set_suspended(host->card);
+	        if ((host->card->type == MMC_TYPE_SD) &&
+			strstr(saved_command_line, "storagemedia=sd")) {
+		        pr_info("SD card boot and don't poweroff vqmmc power\n");
+	        } else {
+                        mmc_power_off(host);
+                        mmc_card_set_suspended(host->card);
+		}
 	}
-
 	host->ios.signal_voltage = MMC_SIGNAL_VOLTAGE_330;
 	host->ios.vdd = fls(host->ocr_avail) - 1;
 	mmc_regulator_set_vqmmc(host, &host->ios);
@@ -1744,7 +1748,6 @@ out:
 static int mmc_sd_shutdown(struct mmc_host *host)
 {
 	int err;
-
 	err = _mmc_sd_shutdown(host);
 	if (!err) {
 		pm_runtime_disable(&host->card->dev);
