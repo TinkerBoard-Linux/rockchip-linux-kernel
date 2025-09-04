@@ -277,6 +277,7 @@
 	pinctrl-0 = <&gmac0_pmeb_gpios>;
 	wolirq-gpio = <&gpio3 RK_PA5 GPIO_ACTIVE_LOW>;
 
+	wakeup-source;
 	snps,reset-gpio = <&gpio3 RK_PA6 GPIO_ACTIVE_LOW>;
 	snps,reset-active-low;
 	/* Reset time is 20ms, 100ms for rtl8211f */
@@ -308,6 +309,7 @@
 	pinctrl-0 = <&gmac1_pmeb_gpios>;
 	wolirq-gpio = <&gpio3 RK_PA7 GPIO_ACTIVE_LOW>;
 
+	wakeup-source;
 	snps,reset-gpio = <&gpio3 RK_PB0 GPIO_ACTIVE_LOW>;
 	snps,reset-active-low;
 	/* Reset time is 20ms, 100ms for rtl8211f */

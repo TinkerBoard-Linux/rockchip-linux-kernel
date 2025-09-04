@@ -16,6 +16,7 @@
 #include <linux/of_net.h>
 #include <linux/of_device.h>
 #include <linux/of_mdio.h>
+#include <linux/of_gpio.h>
 
 #include "stmmac.h"
 #include "stmmac_platform.h"
@@ -401,6 +402,7 @@ stmmac_probe_config_dt(struct platform_device *pdev, u8 *mac)
 	int phy_mode;
 	void *ret;
 	int rc;
+	enum of_gpio_flags flags;
 
 	plat = devm_kzalloc(&pdev->dev, sizeof(*plat), GFP_KERNEL);
 	if (!plat)
@@ -436,6 +438,8 @@ stmmac_probe_config_dt(struct platform_device *pdev, u8 *mac)
 	plat->bus_id = of_alias_get_id(np, "ethernet");
 	if (plat->bus_id < 0)
 		plat->bus_id = 0;
+
+	plat->wolirq_io = of_get_named_gpio_flags(np, "wolirq-gpio",0, &flags);
 
 	/* Default to phy auto-detection */
 	plat->phy_addr = -1;

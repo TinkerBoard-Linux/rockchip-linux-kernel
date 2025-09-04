@@ -209,6 +209,7 @@ struct stmmac_priv {
 	int hwts_tx_en;
 	bool tx_path_in_lpi_mode;
 	bool tso;
+	bool wol_irq_requested;
 	int sph;
 	int sph_cap;
 	u32 sarc_type;

@@ -278,5 +278,8 @@ struct plat_stmmacenet_data {
 	int msi_tx_base_vec;
 	bool use_phy_wol;
 	bool sph_disable;
+	int  wolirq_io;
+	int  wol_irq;
+	bool is_in_suspend;
 };
 #endif
